@@ -1,0 +1,21 @@
+{
+    "BOT_USERNAME"   : "ScemoPezzente",
+    "BOT_TOKEN" : "BOT_TOKEN",
+    "BOT_ID" : "BOT_ID",
+    "GUILD_ID" : "GUILD_ID",
+    "API_HOSTNAME"   : "YOURIP",
+    "API_URL"   : "http://YOURIP:5080",
+    "API_PORT"   : 5080,
+    "API_PATH_TEXT" : "/chatbot_text/",
+    "API_PATH_AUDIO" : "/chatbot_audio/",
+    "API_PATH_MUSIC" : "/chatbot_music/",
+    "API_PATH_JOKES_TEXT" : "/jokes_text/",
+    "API_PATH_JOKES_AUDIO" : "/jokes_audio/",
+    "API_PATH_IMAGE" : "/images/",
+    "API_PATH_TWITTER" : "/twitter/",
+    "CACHE_DIR" : "/tmp/scemo-pezzente-discord"
+    "MAX_LISTENERS"   : 100,
+    "ENABLED"   : true,
+    "AUTONOMOUS"   : false,
+    "AUTONOMOUS_TIMEOUT"   : 120000
+}

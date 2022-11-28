@@ -1,0 +1,78 @@
+FROM python:3.8-slim-bullseye
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        build-essential \
+        curl \
+        git \
+        libbz2-dev \
+        libncurses5-dev \
+        libncursesw5-dev \
+        libreadline-dev \
+        libsqlite3-dev \
+        libssl-dev \
+        llvm \
+        make \
+        tk-dev \
+        wget \
+        xz-utils \
+        zlib1g-dev \
+        gcc \
+        ffmpeg \
+        locales \
+        libffi-dev \
+        python3-venv \
+        python3-dev \
+        procps \
+        python3-enchant \
+        libpcre3-dev \
+        libpcre3
+        
+RUN echo 'vm.overcommit_memory=1' >> /etc/sysctl.conf
+
+RUN sed -i '/it_IT.UTF-8/s/^# //g' /etc/locale.gen && \
+    locale-gen
+ENV LANG it_IT.UTF-8  
+ENV LANGUAGE it_IT:it  
+ENV LC_ALL it_IT.UTF-8
+
+#RUN useradd -ms /bin/bash uwsgi
+#USER uwsgi
+
+ENV PATH="/home/uwsgi/.local/bin:${PATH}"
+
+COPY requirements.txt .
+
+
+RUN pip3 install --no-cache --upgrade pip setuptools
+RUN pip3 install wheel
+RUN pip3 install -r requirements.txt
+RUN spacy download it_core_news_lg
+
+#USER root
+WORKDIR /app
+
+#ENV UWSGI_CHEAPER 0
+#ENV UWSGI_PROCESSES 2
+#COPY .env 
+COPY data data
+COPY templates templates
+COPY utils.py .
+COPY custom_trainer.py .
+COPY insults.py .
+COPY reddit.py .
+#COPY twitter.py .
+COPY tournament.py .
+COPY image.py .
+COPY main.py .
+COPY config.py .
+#COPY uwsgi.ini .
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+#RUN chown -R uwsgi:uwsgi /app
+
+#USER uwsgi
+#WORKDIR /app
+
+CMD ["./entrypoint.sh"]
+#CMD . .venv/bin/activate && exec flask run main.py --host=0.0.0.0

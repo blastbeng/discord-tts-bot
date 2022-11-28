@@ -1,0 +1,24 @@
+{
+  "name": "accumulators-discord-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@discordjs/opus": "^0.8.0",
+    "@discordjs/rest": "^1.0.1",
+    "@discordjs/voice": "^0.11.0",
+    "discord-api-types": "^0.37.2",
+    "discord-speech-recognition": "^3.1.0",
+    "discord.js": "^14.2.0",
+    "ffmpeg-static": "^5.0.2",
+    "find-remove": "^4.0.4",
+    "node-fetch": "^2.6.7",
+    "sync-fetch": "^0.4.2",
+    "tweetnacl": "^1.0.3"
+  }
+}
