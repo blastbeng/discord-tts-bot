@@ -1,15 +1,11 @@
 FROM node:current-alpine3.14
 
-### Create app directory
-RUN mkdir -p /usr/src/app
+COPY package*.json /tmp/
+RUN cd /tmp && npm ci --only=production
+RUN mkdir -p /usr/src/app && cp -a /tmp/node_modules /usr/src/app
+
 WORKDIR /usr/src/app
 
-### Install app dependencies
-COPY package.json .
-COPY package-lock.json .
-RUN npm install
-
-### Copy application source
 COPY . .
 
 RUN chmod +x entrypoint.sh

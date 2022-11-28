@@ -13,7 +13,7 @@ services:
     image: "blastbeng/discord-voicebot-api:1.0.0"
     restart: "no"
     volumes:
-      - ".env:/app/.env"
+      - ".env:/app/.  "
       - "./config:/app/config"
       - "/tmp/discord-voicebot-api:/tmp/discord-voicebot-api"
       - "/dev/dri/card0:/dev/dri/card0"

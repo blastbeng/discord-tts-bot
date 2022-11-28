@@ -378,7 +378,7 @@ class AudioInsultClass(Resource):
     try:
       if text and text != '' and text != 'none':
         sentence = text + " " + sentence
-        tts_out = utils.get_tts(sentence, voice="google", timeout=120)
+      tts_out = utils.get_tts(sentence, voice="google", timeout=120)
       if tts_out is not None:    
         response = send_file(tts_out, attachment_filename='audio.wav', mimetype='audio/x-wav')
         response.call_on_close(get_chatbot_by_id(chatid).get_response(sentence)) 
