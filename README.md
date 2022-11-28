@@ -5,8 +5,7 @@ A fully functional discord and telegram bot with various functions
 ## Getting Started
 
 These instructions will give you a copy of the project up and running on
-your local machine for development and testing purposes. See deployment
-for notes on deploying the project on a live system.
+your local or remote machine.
 
 ### Prerequisites
 
@@ -21,8 +20,11 @@ Manual install:
 
 ### Installing & Deploy
 
-There are two ways to run this bot, one is by manually using docker-compose and another in is by using the convenience script install.sh.
-The main difference is that the automated install requires systemd and will handle the bot restarts automatically.
+There are two ways to run this bot, one is by manually using docker-compose 
+and another in is by using the convenience script install.sh.
+
+The main difference is that the automated install requires systemd and will 
+handle the bot restarts automatically.
 
 - cp config.json.example to config.json and edit it with your params
 - cp .env.sample to .env and edit it with your paarams
