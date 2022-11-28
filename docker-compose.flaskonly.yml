@@ -1,0 +1,36 @@
+---
+version: "3.3"
+services:
+  discord-voicebot-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.api
+    container_name: discord-voicebot-api
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Rome
+    image: "blastbeng/discord-voicebot-api:1.0.0"
+    restart: "no"
+    volumes:
+      - ".env:/app/.env"
+      - "./config:/app/config"
+      - "/tmp/discord-voicebot-api:/tmp/discord-voicebot-api"
+      - "/dev/dri/card0:/dev/dri/card0"
+      - "/dev/dri/renderD128:/dev/dri/renderD128"
+    entrypoint: ./entrypoint.sh
+    #ports:
+    #  - "5080:5080"
+    networks:
+      - caching
+  redis:
+    image: redis
+    container_name: discord-voicebot-redis
+    networks:
+      - caching
+    restart: "no"
+networks:
+  caching:
+    driver: bridge
+
+

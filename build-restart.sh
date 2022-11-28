@@ -1,7 +1,7 @@
 #!/bin/sh
-sudo rm -rf /tmp/scemo-pezzente-api/fakeyou_voices.sqlite
-sudo systemctl stop docker-compose@scemo-pezzente.service
+sudo rm -rf /tmp/discord-voicebot-api/fakeyou_voices.sqlite
+sudo systemctl stop docker-compose@discord-voicebot.service
 docker-compose build
-sudo systemctl start docker-compose@scemo-pezzente.service
+sudo systemctl start docker-compose@discord-voicebot.service
 sleep 10
 docker-compose logs -f

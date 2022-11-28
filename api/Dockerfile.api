@@ -36,9 +36,6 @@ ENV LANG it_IT.UTF-8
 ENV LANGUAGE it_IT:it  
 ENV LC_ALL it_IT.UTF-8
 
-#RUN useradd -ms /bin/bash uwsgi
-#USER uwsgi
-
 ENV PATH="/home/uwsgi/.local/bin:${PATH}"
 
 COPY requirements.txt .
@@ -49,30 +46,19 @@ RUN pip3 install wheel
 RUN pip3 install -r requirements.txt
 RUN spacy download it_core_news_lg
 
-#USER root
 WORKDIR /app
 
-#ENV UWSGI_CHEAPER 0
-#ENV UWSGI_PROCESSES 2
-#COPY .env 
 COPY data data
 COPY templates templates
 COPY utils.py .
 COPY custom_trainer.py .
 COPY insults.py .
 COPY reddit.py .
-#COPY twitter.py .
 COPY tournament.py .
 COPY image.py .
 COPY main.py .
 COPY config.py .
-#COPY uwsgi.ini .
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
-#RUN chown -R uwsgi:uwsgi /app
-
-#USER uwsgi
-#WORKDIR /app
 
 CMD ["./entrypoint.sh"]
-#CMD . .venv/bin/activate && exec flask run main.py --host=0.0.0.0

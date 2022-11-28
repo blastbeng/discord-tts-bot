@@ -13,7 +13,7 @@
     "API_PATH_JOKES_AUDIO" : "/jokes_audio/",
     "API_PATH_IMAGE" : "/images/",
     "API_PATH_TWITTER" : "/twitter/",
-    "CACHE_DIR" : "/tmp/scemo-pezzente-discord"
+    "CACHE_DIR" : "/tmp/discord-voicebot-discord"
     "MAX_LISTENERS"   : 100,
     "ENABLED"   : true,
     "AUTONOMOUS"   : false,

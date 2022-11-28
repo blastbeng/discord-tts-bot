@@ -15,7 +15,7 @@ services:
     volumes:
       - ".env:/app/.env"
       - "./config:/app/config"
-      - "/tmp/scemo-pezzente-api:/tmp/scemo-pezzente-api"
+      - "/tmp/discord-voicebot-api:/tmp/discord-voicebot-api"
       - "/dev/dri/card0:/dev/dri/card0"
       - "/dev/dri/renderD128:/dev/dri/renderD128"
     entrypoint: ./entrypoint.sh
@@ -28,7 +28,7 @@ services:
     build:
       context: ./battuteAPI
       dockerfile: Dockerfile
-    container_name: battuteapi
+    container_name: discord-voicebot-battuteapi
     environment:
       - PUID=1000
       - PGID=1000
@@ -50,7 +50,7 @@ services:
     depends_on:
       - discord-voicebot-api
     volumes:
-      - "/tmp/scemo-pezzente-api:/tmp/scemo-pezzente-api"
+      - "/tmp/discord-voicebot-api:/tmp/discord-voicebot-api"
     restart: "no"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:5080/utils/healthcheck"]
@@ -87,8 +87,8 @@ services:
     init: true
     volumes:
       - ./cron/crontab.txt:/etc/crontab
-      - "/tmp/scemo-pezzente-discord:/discord-voicebot-client-tmpdir"
-      - "/tmp/scemo-pezzente-api:/discord-voicebot-api-tmpdir"
+      - "/tmp/discord-voicebot-discord:/discord-voicebot-client-tmpdir"
+      - "/tmp/discord-voicebot-api:/discord-voicebot-api-tmpdir"
   discord-voicebot-tor:
     container_name: discord-voicebot-tor
     ports:
