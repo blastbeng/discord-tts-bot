@@ -21,7 +21,7 @@ Manual install:
 ### Installing & Deploy
 
 There are two ways to run this bot, one is by manually using docker-compose 
-and another in is by using the convenience script install.sh.
+and another one is by using the convenience script install.sh.
 
 The main difference is that the automated install requires systemd and will 
 handle the bot restarts automatically.
