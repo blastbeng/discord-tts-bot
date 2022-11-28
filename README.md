@@ -2,6 +2,10 @@
 
 A fully functional discord and telegram bot with various functions
 
+# IMPORTANT!!!
+
+The bot is configured to speak, learn and answer in Italian, if you want to configure it in another language, you will have to edit the code.
+
 ## Getting Started
 
 These instructions will give you a copy of the project up and running on
