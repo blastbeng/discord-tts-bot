@@ -5,7 +5,7 @@ then
     cd /opt/docker/compose/
 fi
 
-git clone https://github.com/blastbeng/discord-voicebot --recurse-submodules
+git clone https://github.com/blastbeng/discord-voicebot
 cd discord-voicebot
 
 docker-compose build
