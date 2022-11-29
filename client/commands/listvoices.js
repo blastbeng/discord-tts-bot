@@ -20,7 +20,7 @@ function getSlashCommand() {
 
     var command = new SlashCommandBuilder()
         .setName('listvoices')
-        .setDescription('Il pezzente ti dice quali voci son disponibili per il comando /speak');
+        .setDescription('Il pezzente ti dice quali voci son disponibili per i comandi /speak e /generate');
     return command;
 }
 

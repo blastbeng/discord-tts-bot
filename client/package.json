@@ -18,6 +18,7 @@
     "discord.js": "^14.2.0",
     "ffmpeg-static": "^5.0.2",
     "find-remove": "^4.0.4",
+    "node-cron": "^3.0.2",
     "node-fetch": "^2.6.7",
     "sync-fetch": "^0.4.2",
     "tweetnacl": "^1.0.3"

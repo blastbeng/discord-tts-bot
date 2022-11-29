@@ -16,6 +16,7 @@ services:
       - ".env:/app/.env"
       - "./config:/app/config"
       - "/tmp/discord-voicebot-api:/tmp/discord-voicebot-api"
+      - "/tmp/discord-voicebot-discord:/tmp/discord-voicebot-discord"
       - "/dev/dri/card0:/dev/dri/card0"
       - "/dev/dri/renderD128:/dev/dri/renderD128"
     entrypoint: ./entrypoint.sh

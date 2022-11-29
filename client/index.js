@@ -25,9 +25,23 @@ require( 'console-stamp' )( console );
 const client = new Client({ intents: 32767 });
 addSpeechEvent(client, { lang: "it-IT", profanityFilter: false });
 
+const cron = require('node-cron');
+
 const TOKEN = config.BOT_TOKEN;
 const path = config.CACHE_DIR;
 const GUILD_ID = config.GUILD_ID;
+
+
+cron.schedule('0 */5 * * * *', () => {
+    var age_param = { seconds: 7200 };
+    var extensions_param = '.wav';
+    findRemoveSync(config.CACHE_DIR, {
+        age: age_param,
+        extensions: extensions_param
+      });
+    //console.log("Deleting old wav files...", "[config.CACHE_DIR: " + config.CACHE_DIR +"]", "[age: " + JSON.stringify(age_param) +"]", "[extensions: "+ extensions_param +"]");  
+                                               
+});
 
 
 const player = createAudioPlayer();

@@ -18,5 +18,7 @@
     "MAX_LISTENERS"   : 100,
     "ENABLED"   : true,
     "AUTONOMOUS"   : true,
-    "AUTONOMOUS_TIMEOUT"   : 120000
+    "AUTONOMOUS_TIMEOUT"   : 120000,
+    "DOWNLOAD_ENABLED"   : false,
+    "DOWNLOAD_SERVER_URL"   : "https://yourdomain.com"
 }

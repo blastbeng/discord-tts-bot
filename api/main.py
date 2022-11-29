@@ -30,6 +30,7 @@ log = logging.getLogger('werkzeug')
 log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 TMP_DIR = os.environ.get("TMP_DIR")
+TMP_DIR_DISCORD = os.environ.get("TMP_DIR_DISCORD")
 
 app = Flask(__name__)
 class Config:    
@@ -595,6 +596,19 @@ class UtilsTrainFile(Resource):
 class FakeYouGetVoicesByCatClass(Resource):
   def get(self, category: str):
     return jsonify(utils.get_fakeyou_voices(category))
+
+
+@nsutils.route('/download/<string:filename>')
+class FakeYouGetVoicesByCatClass(Resource):
+  def get(self, filename: str):
+    try:
+      filepath = TMP_DIR_DISCORD + '/' + filename
+      return send_file(filepath, attachment_filename='audio.wav', mimetype='audio/x-wav')
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      print(exc_type, fname, exc_tb.tb_lineno)
+      return get_response_str("Error downloading from server.")
 
 @limiter.limit("1/second")
 @nsutils.route('/healthcheck')

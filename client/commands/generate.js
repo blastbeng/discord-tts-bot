@@ -1,11 +1,9 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
-const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, StreamType  } = require('@discordjs/voice');
 require( 'console-stamp' )( console );
 const fs = require('fs');
 const config = require("../config.json");
 require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
-const player = createAudioPlayer();
 const fetch = require('node-fetch');
 const syncfetch = require('sync-fetch')
 const GUILD_ID = config.GUILD_ID;
@@ -23,9 +21,9 @@ function getSlashCommand() {
     data = syncfetch(url).json();
 
     var command = new SlashCommandBuilder()
-        .setName('speak')
-        .setDescription('Il pezzente parla ripetendo il testo scritto')
-        .addStringOption(option => option.setName('input').setDescription('Il testo da ripetere').setRequired(true))
+        .setName('generate')
+        .setDescription('Il pezzente genera un audio partendo ripetendo il testo scritto')
+        .addStringOption(option => option.setName('input').setDescription('Il testo da generare').setRequired(true))
         .addStringOption(option =>{
             option.setName('voice')
                 .setDescription('La voce da usare')
@@ -45,29 +43,6 @@ function getSlashCommand() {
 module.exports = {
     data: getSlashCommand(),
     async execute(interaction) {
-        if (interaction.member.voice === null 
-            || interaction.member.voice === undefined 
-            || interaction.member.voice.channelId === null 
-            || interaction.member.voice.channelId === undefined ){
-                interaction.reply({ content: 'Devi prima entrare in un canale vocale', ephemeral: true });
-        } else {
-            var connection = null;
-            const connection_old = getVoiceConnection(interaction.member.voice.guild.id);
-            if (connection_old !== null 
-                && connection_old !== undefined
-                && connection_old.joinConfig.channelId !== interaction.member.voice.channelId){
-                connection_old.destroy();
-            } else {
-                connection = connection_old;
-            }
-            
-            connection = joinVoiceChannel({
-                channelId: interaction.member.voice.channelId,
-                guildId: interaction.guildId,
-                adapterCreator: interaction.guild.voiceAdapterCreator,
-                selfDeaf: false,
-                selfMute: false
-            });
 
             const words = interaction.options.getString('input');
 
@@ -149,47 +124,27 @@ module.exports = {
                                         dest.on('error', reject);
 
                                         dest.on('finish', function(){      
-                                            connection.subscribe(player);                      
-                                            const resource = createAudioResource(outFile, {
-                                                inputType: StreamType.Arbitrary,
-                                            });
                                             
-                                            player.on('error', error => {
-                                                console.error("ERRORE!", "["+ error + "]");
-                                                const row = new ActionRowBuilder()
-                                                .addComponents(
-                                                    new ButtonBuilder()
-                                                        .setCustomId('errore')
-                                                        .setLabel("ERRORE! Attendi almeno altri 30 secondi.")
-                                                        .setStyle(ButtonStyle.Danger)
-                                                        .setDisabled(true));
-                                                        
-                                                interaction.editReply({ content: "Testo: " + words + " \nVoce: " + voicename + "\n\n" + error.message, ephemeral: true, components: [row] });      
-                                            });
-                                            var outcontent = "Il pezzente sta parlando\nAd esclusione di google, tutte le voci sono fornite da fakeyou con possibile Rate Limiting\nTesto: " 
+                                            var outcontent = "Il pezzente ha generato l'audio\nAd esclusione di google, tutte le voci sono fornite da fakeyou con possibile Rate Limiting\nTesto: " 
                                                     + words 
                                                     + "  \nVoce: " 
                                                     + voicename;
-                                            
                                             if (config.DOWNLOAD_ENABLED) {
 
                                                 var url = config.DOWNLOAD_SERVER_URL + file;
                                                 outcontent = outcontent + "\n--> [Download Link]("+url+") <--";
                                                 outcontent = outcontent + "\nIl download sarà disponibile per due ore a partire da adesso";
-                                                console.log("Il pezzente sta parlando", "[username: " + interaction.member.user.username +"]", "[words: " + words +"]", "[voicename: "+ voicename +"]", "[url: "+ url +"]");  
-                                                
+                                                console.log("Il pezzente ha generato l'audio", "[username: " + interaction.member.user.username +"]", "[words: " + words +"]", "[voicename: "+ voicename +"]", "[url: "+ url +"]");  
+                                        
                                             } else {
-        
-                                                console.log("Il pezzente sta parlando", "[username: " + interaction.member.user.username +"]", "[words: " + words +"]", "[voicename: "+ voicename +"]");  
-                                                
+
+                                                console.log("Il pezzente ha generato l'audio", "[username: " + interaction.member.user.username +"]", "[words: " + words +"]", "[voicename: "+ voicename +"]");  
+                                        
                                             }
 
-                                            interaction.editReply({ content: outcontent, ephemeral: true });    
+                                            interaction.editReply({ content: outcontent, ephemeral: true });  
 
-
-                                            player.play(resource);
-                                            
-                                        });
+                                            });
                                     }).catch(function(error) {
                                         console.error("ERRORE!", "["+ error + "]");
                                         const row = new ActionRowBuilder()
@@ -234,7 +189,7 @@ module.exports = {
                         
                 interaction.editReply({ content: "Testo: " + words + " \nVoce: " + voicename + "\n\n" + error.message, ephemeral: true, components: [row] });  
             }
-        }
+        
 
     }
 }; 

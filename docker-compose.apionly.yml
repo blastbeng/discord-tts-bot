@@ -16,6 +16,7 @@ services:
       - ".env:/app/.  "
       - "./config:/app/config"
       - "/tmp/discord-voicebot-api:/tmp/discord-voicebot-api"
+      - "/tmp/discord-voicebot-discord:/tmp/discord-voicebot-discord"
       - "/dev/dri/card0:/dev/dri/card0"
       - "/dev/dri/renderD128:/dev/dri/renderD128"
     entrypoint: ./entrypoint.sh
@@ -63,16 +64,6 @@ services:
     networks:
       - caching
     restart: "no"
-  discord-voicebot-cron:
-    container_name: discord-voicebot-cron
-    build:
-      context: ./cron
-      dockerfile: Dockerfile.cron
-    init: true
-    volumes:
-      - ./cron/crontab.txt:/etc/crontab
-      - "/tmp/discord-voicebot-discord:/discord-voicebot-client-tmpdir"
-      - "/tmp/discord-voicebot-api:/discord-voicebot-api-tmpdir"
   discord-voicebot-tor:
     container_name: discord-voicebot-tor
     ports:
