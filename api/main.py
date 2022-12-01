@@ -9,6 +9,7 @@ import json
 import threading
 import random
 import sys
+import shutil
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask import Flask, request, send_file, Response, jsonify, render_template, make_response, after_this_request, g
@@ -65,8 +66,8 @@ def get_response_str(text: str):
     r.headers["Content-Type"] = "text/xml; charset=utf-8"
     return r
 
-def get_response_json(text: str):
-    r = Response(response=text, status=200, mimetype="application/json")
+def get_response_json(data):
+    r = Response(response=data, status=200, mimetype="application/json")
     r.headers["Content-Type"] = "application/json; charset=utf-8"
     return r
 
@@ -100,6 +101,7 @@ class AudioRepeatLearnUserClass(Resource):
 
 @nstext.route('/ask/<string:text>/<string:chatid>')
 class TextAskClass(Resource):
+  @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, chatid: str):
     return get_response_str(get_chatbot_by_id(chatid).get_response(text).text)
 
@@ -112,6 +114,7 @@ class TextAskNoLearnClass(Resource):
 
 @nstext.route('/ask/user/<string:user>/<string:text>/<string:chatid>')
 class TextAskUserClass(Resource):
+  @cache.cached(timeout=7200, query_string=True)
   def get (self, user: str, text: str, chatid: str):
     dolearn = False;
     if user not in previousMessages:
@@ -247,6 +250,7 @@ class AudioRepeatLearnUserClass(Resource):
 
 @nsaudio.route('/ask/<string:text>/<string:chatid>')
 class AudioAskClass(Resource):
+  @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, chatid: str):
     try:
       tts_out = utils.get_tts(get_chatbot_by_id(chatid).get_response(text).text, timeout=120)
@@ -267,6 +271,7 @@ class AudioAskClass(Resource):
 
 @nsaudio.route('/ask/nolearn/<string:text>/<string:chatid>')
 class AudioAskNoLearnClass(Resource):
+  @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, chatid: str):
     try:
       tts_out = utils.get_tts(get_chatbot_by_id(chatid).get_response(text, learn=False).text, timeout=120)
@@ -287,6 +292,7 @@ class AudioAskNoLearnClass(Resource):
 
 @nsaudio.route('/ask/nolearn/random/<string:text>/<string:chatid>')
 class AudioAskNoLearnRandomClass(Resource):
+  @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, chatid: str):
     try:
       text = get_chatbot_by_id(chatid).get_response(text, learn=False).text
@@ -308,6 +314,7 @@ class AudioAskNoLearnRandomClass(Resource):
 
 @nsaudio.route('/ask/user/<string:user>/<string:text>/<string:chatid>')
 class AudioAskUserClass(Resource):
+  @cache.cached(timeout=7200, query_string=True)
   def get (self, user: str, text: str, chatid: str):
     dolearn = False;
     if user not in previousMessages:
@@ -331,20 +338,6 @@ class AudioAskUserClass(Resource):
       def clear_cache(response):
         cache.delete_memoized(AudioAskUserClass.get, self, str, str, str)
         return make_response(g.get('request_error'), 500)
-
-#def thread_wait(i):
-#    time.sleep(i)
-
-#@nsaudio.route('/ask/<int:countdown>/<string:text>')
-#class AudioAskTimedClass(Resource):
-#  def get (self, countdown: int, text: str):
-#    if thread_wait and thread_wait.is_alive():
-#      None
-#    else:
-#      thread_wait = threading.Thread(target=thread_wait, args=(countdown,))
-#      thread_wait.start()
-#      return send_file(utils.get_tts(get_chatbot_by_id(chatid).get_response(text).text), attachment_filename='audio.wav', mimetype='audio/x-wav')
-
 
 @nsaudio.route('/search/<string:text>/<string:chatid>')
 class AudioSearchClass(Resource):
@@ -389,7 +382,6 @@ class AudioInsultClass(Resource):
         return resp
     except Exception as e:
       return make_response(str(e), 500)
-
 
 nsmusic = api.namespace('chatbot_music', 'Accumulators Chatbot Music APIs')
 

@@ -54,9 +54,9 @@ const fetch = require('node-fetch');
 const api=config.API_URL;
 const port=config.API_PORT;
 const hostname=config.API_HOSTNAME;
-const path_audio=config.API_PATH_AUDIO
-const path_music=config.API_PATH_MUSIC
-const path_text=config.API_PATH_TEXT
+const path_audio=config.API_PATH_AUDIO;
+const path_music=config.API_PATH_MUSIC;
+const path_text=config.API_PATH_TEXT;
 let lastSpeech = 0;
 
 //setInterval(findRemoveSync.bind(this, path, { extensions: ['.wav', '.mp3'] }), 21600000)
