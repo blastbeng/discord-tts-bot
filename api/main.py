@@ -544,10 +544,10 @@ class UtilsPopulateSentencesApi(Resource):
     return get_response_str(utils.populate_new_sentences(get_chatbot_by_id(chatid), 5, None, True, chatid))
 
 
-#@nsutils.route('/delete/bytext/<string:text>/<string:chatid>')
-#class UtilsDeleteByText(Resource):
-#  def get (self, text: str, chatid: str):
-#    return get_response_str(utils.delete_by_text('./config/' + get_chatbot_by_id(chatid).storage.database_uri[17:], text))
+@nsutils.route('/delete/bytext/<string:text>/<string:chatid>')
+class UtilsDeleteByText(Resource):
+  def get (self, text: str, chatid: str):
+    return get_response_str(utils.delete_by_text('./config/' + get_chatbot_by_id(chatid).storage.database_uri[17:], text))
 	
 
 @nsutils.route('/upload/trainfile/json')
