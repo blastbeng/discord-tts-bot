@@ -1,2 +1,2 @@
 const findRemoveSync = require('find-remove');
-findRemoveSync("/tmp/AccumulatorsBot/audio", { extensions: ['.wav'] })
+findRemoveSync("/tmp/AccumulatorsBot/audio", { extensions: ['.mp3'] })

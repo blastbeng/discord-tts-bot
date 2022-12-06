@@ -222,7 +222,7 @@ def speak(update: Update, context: CallbackContext):
                             voice = voices[voice_rest]
                             break
 
-                url = API_URL + API_PATH_AUDIO + "repeat/learn/user/" + urllib.parse.quote(str(update.message.chat.id)) + "/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid) + "/" + urllib.parse.quote(voice)
+                url = API_URL + API_PATH_AUDIO + "repeat/learn/user/" + urllib.parse.quote(str(update.message.chat.id)) + "/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(strid) 
 
                 response = requests.get(url)
                 if (response.text != "Internal Server Error" and response.content):

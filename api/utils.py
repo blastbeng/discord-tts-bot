@@ -40,6 +40,7 @@ from dotenv import load_dotenv
 from fakeyou.objects import *
 from fakeyou.exception import *
 from sqlitedict import SqliteDict
+from pydub import AudioSegment
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -112,7 +113,12 @@ def get_tts_google(text: str):
   fp = BytesIO()
   tts.write_to_fp(fp)
   fp.seek(0)
-  return fp
+  sound = AudioSegment.from_mp3(fp)
+  memoryBuff = BytesIO()
+  sound.export(memoryBuff, format='mp3', bitrate="256")
+  memoryBuff.seek(0)
+  return memoryBuff
+  #return fp
 
 def clean_input(testo: str):
   re_equ = r"(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’]))"
@@ -561,7 +567,7 @@ def delete_by_text(dbpath: str, text: str):
     if sqliteConnection:
         sqliteConnection.close()
 
-def get_tts(text: str, voice=None, timeout=30):
+def get_tts(text: str, voice=None, timeout=120, israndom=False):
   try:
     if voice is None or voice == "null" or voice == "random":
       voice_to_use = get_random_voice()
@@ -593,7 +599,7 @@ def get_tts(text: str, voice=None, timeout=30):
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     print(exc_type, fname, exc_tb.tb_lineno)
-    if voice == "random":
+    if voice == "random" or israndom:
       return get_tts_google(text.strip())
     else:
       raise Exception(e)
@@ -678,7 +684,12 @@ def get_wav_fy(fy,ijt:str, timeout:int):
         content=fy.session.get("https://storage.googleapis.com/vocodes-public"+wavo.maybePublicWavPath).content
         fp = BytesIO(content)
         fp.seek(0)
-        return fp
+        sound = AudioSegment.from_wav(fp)
+        memoryBuff = BytesIO()
+        sound.export(memoryBuff, format='mp3', bitrate="256")
+        memoryBuff.seek(0)
+        return memoryBuff
+        #return fp
       elif count > timeout:
         raise RequestError("FakeYou: generation is taking longer than " + str(timeout) + " seconds, forcing timeout.")
     elif handler.status_code==429:
@@ -686,3 +697,35 @@ def get_wav_fy(fy,ijt:str, timeout:int):
 
 def login_fakeyou():
   fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+
+def get_random_from_bot(chatid: str):
+  try:
+    dbfile=chatid+"-db.sqlite3"
+    sqliteConnection = sqlite3.connect('./config/'+dbfile)
+    cursor = sqliteConnection.cursor()
+
+    
+    sqlite_select_sentences_query = """SELECT text FROM statement ORDER BY RANDOM() LIMIT 1;"""
+
+    data = ()
+
+    cursor.execute(sqlite_select_sentences_query, data)
+    records = cursor.fetchall()
+      
+    globalsanit = ""
+
+    count = 0
+
+    for row in records:
+      sentence = row[0]
+
+    cursor.close()
+    return sentence
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    print(exc_type, fname, exc_tb.tb_lineno)
+    raise Exception(e)
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()

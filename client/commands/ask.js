@@ -75,8 +75,8 @@ module.exports = {
                                 });         
                             } else {
                                 new Promise((resolve, reject) => {
-                                    var file = Math.random().toString(36).slice(2)+".wav";
-                                    //var file = "temp.wav";
+                                    var file = Math.random().toString(36).slice(2)+".mp3";
+                                    //var file = "temp.mp3";
                                     var outFile = path+"/"+file;
                                     const dest = fs.createWriteStream(outFile);
                                     res.body.pipe(dest);

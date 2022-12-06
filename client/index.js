@@ -34,12 +34,12 @@ const GUILD_ID = config.GUILD_ID;
 
 cron.schedule('0 */5 * * * *', () => {
     var age_param = { seconds: 7200 };
-    var extensions_param = '.wav';
+    var extensions_param = '.mp3';
     findRemoveSync(config.CACHE_DIR, {
         age: age_param,
         extensions: extensions_param
       });
-    //console.log("Deleting old wav files...", "[config.CACHE_DIR: " + config.CACHE_DIR +"]", "[age: " + JSON.stringify(age_param) +"]", "[extensions: "+ extensions_param +"]");  
+    //console.log("Deleting old mp3 files...", "[config.CACHE_DIR: " + config.CACHE_DIR +"]", "[age: " + JSON.stringify(age_param) +"]", "[extensions: "+ extensions_param +"]");  
                                                
 });
 
@@ -59,7 +59,7 @@ const path_music=config.API_PATH_MUSIC;
 const path_text=config.API_PATH_TEXT;
 let lastSpeech = 0;
 
-//setInterval(findRemoveSync.bind(this, path, { extensions: ['.wav', '.mp3'] }), 21600000)
+//setInterval(findRemoveSync.bind(this, path, { extensions: ['.mp3', '.mp3'] }), 21600000)
 
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 
@@ -401,8 +401,8 @@ client.on('interactionCreate', async interaction => {
                             interaction.editReply({ content: 'Si è verificato un errore', ephemeral: true });           
                         } else {
                             new Promise((resolve, reject) => {
-                                var file = Math.random().toString(36).slice(2)+".wav";
-                                //var file = "temp.wav";
+                                var file = Math.random().toString(36).slice(2)+".mp3";
+                                //var file = "temp.mp3";
                                 var outFile = path+"/"+file;
                                 const dest = fs.createWriteStream(outFile);
                                 res.body.pipe(dest);
@@ -480,7 +480,7 @@ client.on('interactionCreate', async interaction => {
                             } else {
                                 new Promise((resolve, reject) => {
                                     var file = "youtube.mp3";
-                                    //var file = "temp.wav";
+                                    //var file = "temp.mp3";
                                     var outFile = path+"/"+file;
                                     const dest = fs.createWriteStream(outFile);
                                     res.body.pipe(dest);
@@ -705,8 +705,8 @@ client.on("speech", (msg) => {
                         }); 
                     } else {
                         new Promise((resolve, reject) => {
-                            var file = Math.random().toString(36).slice(2)+".wav";
-                            //var file = "temp.wav";
+                            var file = Math.random().toString(36).slice(2)+".mp3";
+                            //var file = "temp.mp3";
                             var outFile = path+"/"+file;
                             const dest = fs.createWriteStream(outFile);
                             res.body.pipe(dest);

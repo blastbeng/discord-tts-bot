@@ -71,51 +71,64 @@ def get_response_json(data):
     r.headers["Content-Type"] = "application/json; charset=utf-8"
     return r
 
+@nstext.route('/repeat/<string:text>/')
 @nstext.route('/repeat/<string:text>/<string:chatid>')
 class TextRepeatClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, chatid: str):
-    return text
+  def get (self, text: str, chatid = "000000"):
+    return get_response_str(text)
 
+@nstext.route('/random/')
+@nstext.route('/random/<string:chatid>')
+class TextRandomClass(Resource):
+  @cache.cached(timeout=2, query_string=True)
+  def get (self, chatid = "000000"):
+    response = get_response_str(utils.get_random_from_bot(chatid))
+    return response
 
+@nstext.route('/repeat/learn/<string:text>/')
 @nstext.route('/repeat/learn/<string:text>/<string:chatid>')
 class TextRepeatLearnClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, chatid: str):
+  def get (self, text: str, chatid = "000000"):
     #get_chatbot_by_id(chatid).get_response(text)
     #threading.Timer(0, , args=[text]).start()
-    response = Response(get_response_str(text))
+    response = get_response_str(text)
     response.call_on_close(get_chatbot_by_id(chatid).get_response(text)) 
     return response
 
 
+@nstext.route('/repeat/learn/user/<string:user>/<string:text>/')
 @nstext.route('/repeat/learn/user/<string:user>/<string:text>/<string:chatid>')
 class AudioRepeatLearnUserClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, user: str, text: str, chatid: str):
+  def get (self, user: str, text: str, chatid = "000000"):
     if user in previousMessages:
       utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid))
     previousMessages[user] = text
     return get_response_str(text)
 
 
+@nstext.route('/ask/<string:text>/')
 @nstext.route('/ask/<string:text>/<string:chatid>')
 class TextAskClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, chatid: str):
+  def get (self, text: str, chatid = "000000"):
     return get_response_str(get_chatbot_by_id(chatid).get_response(text).text)
 
 
+@nstext.route('/ask/nolearn/<string:text>/')
 @nstext.route('/ask/nolearn/<string:text>/<string:chatid>')
 class TextAskNoLearnClass(Resource):
-  def get (self, text: str, chatid: str):
+  def get (self, text: str, chatid = "000000"):
     return get_response_str(get_chatbot_by_id(chatid).get_response(text, learn=False).text)
 
 
+@nstext.route('/ask/user/<string:user>/<string:text>/')
 @nstext.route('/ask/user/<string:user>/<string:text>/<string:chatid>')
 class TextAskUserClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, user: str, text: str, chatid: str):
+  def get (self, user: str, text: str, chatid = "000000"):
     dolearn = False;
     if user not in previousMessages:
       dolearn=True
@@ -126,17 +139,19 @@ class TextAskUserClass(Resource):
     return get_response_str(chatbot_response)
 
 
+@nstext.route('/search/<string:text>/')
 @nstext.route('/search/<string:text>/<string:chatid>')
 class TextSearchClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, chatid: str):
+  def get (self, text: str, chatid = "000000"):
     return get_response_str(utils.wiki_summary(text))
 
 
+@nstext.route('/learn/<string:text>/<string:response>/')
 @nstext.route('/learn/<string:text>/<string:response>/<string:chatid>')
 class TextLearnClass(Resource):
   @cache.cached(timeout=10, query_string=True)
-  def get (self, text: str, response: str, chatid: str):
+  def get (self, text: str, response: str, chatid = "000000"):
     utils.learn(text, response, get_chatbot_by_id(chatid))
     return "Ho imparato: " + text + " => " + response
 
@@ -148,6 +163,8 @@ class TextInsultClass(Resource):
     sentence = insults.get_insults()
     #get_chatbot_by_id(chatid).get_response(sentence)
     chatid = request.args.get("chatid")
+    if chatid is None:
+      chatid = "000000"
     #threading.Timer(0, get_chatbot_by_id(chatid).get_response, args=[sentence]).start()
     text = request.args.get("text")
     if text and text != '' and text != 'none':
@@ -174,14 +191,15 @@ class TextTournamentRegenClass(Resource):
 nsaudio = api.namespace('chatbot_audio', 'Accumulators Chatbot TTS audio APIs')
 
 
-@nsaudio.route('/repeat/<string:text>/<string:chatid>/<string:voice>')
+@nsaudio.route('/repeat/<string:text>/<string:voice>/')
+@nsaudio.route('/repeat/<string:text>/<string:voice>/<string:chatid>')
 class AudioRepeatClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, chatid: str, voice: str):
+  def get (self, text: str, voice: str, chatid = "000000"):
     try:
       tts_out = utils.get_tts(text, voice=voice, timeout=120)
       if tts_out is not None:
-        return send_file(tts_out, attachment_filename='audio.wav', mimetype='audio/x-wav')
+        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
         @after_this_request
         def clear_cache(response):
@@ -196,16 +214,40 @@ class AudioRepeatClass(Resource):
       
 
 
-@nsaudio.route('/repeat/learn/<string:text>/<string:chatid>/<string:voice>')
+@nsaudio.route('/random/')
+@nsaudio.route('/random/<string:voice>/')
+@nsaudio.route('/random/<string:voice>/<string:chatid>')
+class AudioRandomClass(Resource):
+  @cache.cached(timeout=2, query_string=True)
+  def get (self, voice = "google", chatid = "000000"):
+    try:
+      tts_out = utils.get_tts(utils.get_random_from_bot(chatid), voice=voice, timeout=120, israndom=True)
+      if tts_out is not None:
+        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+      else:
+        @after_this_request
+        def clear_cache(response):
+          cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+          return make_response("TTS Generation Error!", 500)
+    except Exception as e:
+      g.request_error = str(e)
+      @after_this_request
+      def clear_cache(response):
+        cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+        return make_response(g.get('request_error'), 500)
+      
+
+@nsaudio.route('/repeat/learn/<string:text>/<string:voice>/')
+@nsaudio.route('/repeat/learn/<string:text>/<string:voice>/<string:chatid>')
 class AudioRepeatLearnClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, chatid: str, voice: str):
+  def get (self, text: str, voice: str, chatid = "000000"):
     #get_chatbot_by_id(chatid).get_response(text)
     #threading.Timer(0, get_chatbot_by_id(chatid).get_response, args=[text]).start()
     try:
       tts_out = utils.get_tts(text, voice=voice, timeout=120)
       if tts_out is not None:
-        response = send_file(tts_out, attachment_filename='audio.wav', mimetype='audio/x-wav')
+        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.call_on_close(get_chatbot_by_id(chatid).get_response(text)) 
         return response
       else:
@@ -221,10 +263,11 @@ class AudioRepeatLearnClass(Resource):
         return make_response(g.get('request_error'), 500)
 
 
-@nsaudio.route('/repeat/learn/user/<string:user>/<string:text>/<string:chatid>/<string:voice>')
+@nsaudio.route('/repeat/learn/user/<string:user>/<string:text>/<string:voice>/')
+@nsaudio.route('/repeat/learn/user/<string:user>/<string:text>/<string:voice>/<string:chatid>')
 class AudioRepeatLearnUserClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, user: str, text: str, chatid: str, voice: str):
+  def get (self, user: str, text: str, voice: str, chatid = "000000"):
     try:
       tts_out = utils.get_tts(text, voice=voice, timeout=120)
       if tts_out is not None:     
@@ -232,7 +275,7 @@ class AudioRepeatLearnUserClass(Resource):
           if user in previousMessages:
             utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid))
           previousMessages[user] = text  
-        response = send_file(tts_out, attachment_filename='audio.wav', mimetype='audio/x-wav')
+        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.call_on_close(learnthis(user,text)) 
         return response
       else:
@@ -248,14 +291,15 @@ class AudioRepeatLearnUserClass(Resource):
         return make_response(g.get('request_error'), 500)
 
 
+@nsaudio.route('/ask/<string:text>/')
 @nsaudio.route('/ask/<string:text>/<string:chatid>')
 class AudioAskClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, chatid: str):
+  def get (self, text: str, chatid = "000000"):
     try:
       tts_out = utils.get_tts(get_chatbot_by_id(chatid).get_response(text).text, timeout=120)
       if tts_out is not None:
-        return send_file(tts_out, attachment_filename='audio.wav', mimetype='audio/x-wav')
+        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
         @after_this_request
         def clear_cache(response):
@@ -269,14 +313,15 @@ class AudioAskClass(Resource):
         return make_response(g.get('request_error'), 500)
 
 
+@nsaudio.route('/ask/nolearn/<string:text>/')
 @nsaudio.route('/ask/nolearn/<string:text>/<string:chatid>')
 class AudioAskNoLearnClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, chatid: str):
+  def get (self, text: str, chatid = "000000"):
     try:
       tts_out = utils.get_tts(get_chatbot_by_id(chatid).get_response(text, learn=False).text, timeout=120)
       if tts_out is not None:
-        return send_file(tts_out, attachment_filename='audio.wav', mimetype='audio/x-wav')
+        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
         @after_this_request
         def clear_cache(response):
@@ -290,15 +335,16 @@ class AudioAskNoLearnClass(Resource):
         return make_response(g.get('request_error'), 500)
 
 
+@nsaudio.route('/ask/nolearn/random/<string:text>/')
 @nsaudio.route('/ask/nolearn/random/<string:text>/<string:chatid>')
 class AudioAskNoLearnRandomClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, chatid: str):
+  def get (self, text: str, chatid = "000000"):
     try:
       text = get_chatbot_by_id(chatid).get_response(text, learn=False).text
       tts_out = utils.get_tts(text, voice="random", timeout=120)
       if tts_out is not None:
-        return send_file(tts_out, attachment_filename='audio.wav', mimetype='audio/x-wav')
+        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
         @after_this_request
         def clear_cache(response):
@@ -312,10 +358,11 @@ class AudioAskNoLearnRandomClass(Resource):
         return make_response(g.get('request_error'), 500)
 
 
+@nsaudio.route('/ask/user/<string:user>/<string:text>/')
 @nsaudio.route('/ask/user/<string:user>/<string:text>/<string:chatid>')
 class AudioAskUserClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, user: str, text: str, chatid: str):
+  def get (self, user: str, text: str, chatid = "000000"):
     dolearn = False;
     if user not in previousMessages:
       dolearn=True
@@ -326,7 +373,7 @@ class AudioAskUserClass(Resource):
     try:
       tts_out = utils.get_tts(chatbot_response, timeout=120)
       if tts_out is not None:
-        return send_file(tts_out, attachment_filename='audio.wav', mimetype='audio/x-wav')
+        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
         @after_this_request
         def clear_cache(response):
@@ -339,14 +386,15 @@ class AudioAskUserClass(Resource):
         cache.delete_memoized(AudioAskUserClass.get, self, str, str, str)
         return make_response(g.get('request_error'), 500)
 
+@nsaudio.route('/search/<string:text>/')
 @nsaudio.route('/search/<string:text>/<string:chatid>')
 class AudioSearchClass(Resource):
   @cache.cached(timeout=10, query_string=True)
-  def get (self, text: str, chatid: str):
+  def get (self, text: str, chatid = "000000"):
     try:
       tts_out = utils.get_tts(utils.wiki_summary(text), voice="null", timeout=120)
       if tts_out is not None:
-        return send_file(tts_out, attachment_filename='audio.wav', mimetype='audio/x-wav')
+        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
         @after_this_request
         def clear_cache(response):
@@ -367,6 +415,8 @@ class AudioInsultClass(Resource):
     sentence = insults.get_insults()
     #get_chatbot_by_id(chatid).get_response(sentence)
     chatid = request.args.get("chatid")
+    if chatid is None:
+      chatid = "000000"
     #threading.Timer(0, get_chatbot_by_id(chatid).get_response, args=[sentence]).start()
     text = request.args.get("text")
     try:
@@ -374,7 +424,7 @@ class AudioInsultClass(Resource):
         sentence = text + " " + sentence
       tts_out = utils.get_tts(sentence, voice="google", timeout=120)
       if tts_out is not None:    
-        response = send_file(tts_out, attachment_filename='audio.wav', mimetype='audio/x-wav')
+        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.call_on_close(get_chatbot_by_id(chatid).get_response(sentence)) 
         return response
       else:
@@ -443,7 +493,7 @@ class AudioChuckClass(Resource):
       text = utils.get_joke("CHUCK_NORRIS")
       tts_out = utils.get_tts(text, voice="null", timeout=120)
       if tts_out is not None:
-        return send_file(tts, attachment_filename='audio.wav', mimetype='audio/x-wav')
+        return send_file(tts, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
         resp = make_response("TTS Generation Error!", 500)
         return resp
@@ -458,7 +508,7 @@ class AudioRandomJokeClass(Resource):
       text = utils.get_joke("")
       tts_out = utils.get_tts(text, voice="null", timeout=120)
       if tts_out is not None:
-        return send_file(tts, attachment_filename='audio.wav', mimetype='audio/x-wav')
+        return send_file(tts, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
         resp = make_response("TTS Generation Error!", 500)
         return resp
@@ -518,35 +568,40 @@ class AudioSearchClass(Resource):
 nsutils = api.namespace('utils', 'AccumulatorsUtils APIs')
 
 
+@nsutils.route('/sentence/populate/<int:count>/')
 @nsutils.route('/sentence/populate/<int:count>/<string:chatid>')
 class UtilsPopulateSentences(Resource):
-  def get (self, count: int, chatid: str):
+  def get (self, count: int, chatid = "000000"):
     threading.Timer(0, utils.populate_new_sentences, args=[get_chatbot_by_id(chatid), count, None, False, chatid]).start()
     return "Starting thread populate_new_sentences with parameters: " + str(count) + ", None. Watch the logs."
 
 
+@nsutils.route('/sentence/populate/parsed/<int:count>/<string:word>/')
 @nsutils.route('/sentence/populate/parsed/<int:count>/<string:word>/<string:chatid>')
 class UtilsPopulateSentencesParsed(Resource):
-  def get (self, count: int, word: str, chatid: str):
+  def get (self, count: int, word: str, chatid = "000000"):
     threading.Timer(0, utils.populate_new_sentences, args=[get_chatbot_by_id(chatid), count, word, False, chatid]).start()
     return "Starting thread populate_new_sentences with parameters: " + str(count) + ", " + word + ". Watch the logs."
 
 
+@nsutils.route('/sentence/populate/parsed/api/<string:word>/')
 @nsutils.route('/sentence/populate/parsed/api/<string:word>/<string:chatid>')
 class UtilsPopulateSentencesParsedApi(Resource):
-  def get (self, word: str, chatid: str):
+  def get (self, word: str, chatid = "000000"):
     return get_response_str(utils.populate_new_sentences(get_chatbot_by_id(chatid), 5, word, True, chatid))
 
 
+@nsutils.route('/sentence/populate/api/')
 @nsutils.route('/sentence/populate/api/<string:chatid>')
 class UtilsPopulateSentencesApi(Resource):
-  def get (self, chatid: str):
+  def get (self, chatid = "000000"):
     return get_response_str(utils.populate_new_sentences(get_chatbot_by_id(chatid), 5, None, True, chatid))
 
 
+@nsutils.route('/delete/bytext/<string:text>/')
 @nsutils.route('/delete/bytext/<string:text>/<string:chatid>')
 class UtilsDeleteByText(Resource):
-  def get (self, text: str, chatid: str):
+  def get (self, text: str, chatid = "000000"):
     return get_response_str(utils.delete_by_text('./config/' + get_chatbot_by_id(chatid).storage.database_uri[17:], text))
 	
 
@@ -555,6 +610,8 @@ class UtilsTrainFile(Resource):
   def post (self):    
     try:
       chatid = request.form.get("chatid")
+      if chatid is None:
+        chatid = "000000"
       threading.Timer(0, utils.train_json, args=[request.get_json(), get_chatbot_by_id(chatid)]).start()
       return get_response_str("Done. Watch the logs for errors.")
     except Exception as e:
@@ -569,6 +626,8 @@ class UtilsTrainFile(Resource):
   def post (self):
     try:
       chatid = request.form.get("chatid")
+      if chatid is None:
+        chatid = "000000"
       trf=request.files['trainfile']
       if not trf and allowed_file(trf):
         return get_response_str("Error! Please upload a trainfile.txt")
@@ -584,9 +643,10 @@ class UtilsTrainFile(Resource):
       return get_response_str("Error! Please upload a trainfile.txt")
 
 
+@nsutils.route('/fakeyou/get_voices_by_cat/')
 @nsutils.route('/fakeyou/get_voices_by_cat/<string:category>')
 class FakeYouGetVoicesByCatClass(Resource):
-  def get(self, category: str):
+  def get(self, category = "Italiano"):
     return jsonify(utils.get_fakeyou_voices(category))
 
 
@@ -595,7 +655,7 @@ class UtilsDownloadClass(Resource):
   def get(self, filename: str):
     try:
       filepath = TMP_DIR_DISCORD + '/' + filename
-      return send_file(filepath, attachment_filename='audio.wav', mimetype='audio/x-wav')
+      return send_file(filepath, attachment_filename='audio.mp3', mimetype='audio/mpeg')
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -615,7 +675,7 @@ def upload_file():
 
 
 
-def get_chatbot_by_id(chatid: str):
+def get_chatbot_by_id(chatid = "000000"):
   if chatid not in chatbots_dict:
     chatbots_dict[chatid] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True")
 #    scheduler.add_job(
@@ -631,17 +691,6 @@ def get_chatbot_by_id(chatid: str):
 #        replace_existing=True
 #    )
   return chatbots_dict[chatid]
-
-if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-  previousMessages = {}
-  chatbots_dict = {}
-  #chatbot = utils.get_chatterbot(os.environ['TRAIN'] == "True")
-  #twitter.create_empty_tables()
-  tournament.create_empty_tables()
-  cache.init_app(app)
-  limiter.init_app(app)
-  scheduler.init_app(app)
-  scheduler.start()
   
   
   
@@ -657,6 +706,20 @@ def scrape_jokes():
 #@scheduler.task('cron', id='populate_sentences', hour=4, minute=10, second=0, misfire_grace_time=900)
 #def populate_sentences():
 #  print(utils.populate_new_sentences(chatbot, 1000, None, False))
+
+
+
+
+#if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+previousMessages = {}
+chatbots_dict = {}
+#chatbot = utils.get_chatterbot(os.environ['TRAIN'] == "True")
+#twitter.create_empty_tables()
+tournament.create_empty_tables()
+cache.init_app(app)
+limiter.init_app(app)
+scheduler.init_app(app)
+scheduler.start()
 
 if __name__ == '__main__':
   app.run()

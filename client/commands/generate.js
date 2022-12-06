@@ -76,7 +76,7 @@ module.exports = {
 
                             
 
-                            var params = api+path_audio+"repeat/learn/user/"+encodeURIComponent(interaction.member.user.username)+"/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid)+"/"+encodeURIComponent(voicetoken);
+                            var params = api+path_audio+"repeat/learn/user/"+encodeURIComponent(interaction.member.user.username)+"/"+encodeURIComponent(words)+"/"+encodeURIComponent(voicetoken)+"/"+encodeURIComponent(guildid);
 
                             fetch(
                                 params,
@@ -100,8 +100,8 @@ module.exports = {
                                     });
                                 } else {
                                     new Promise((resolve, reject) => {
-                                        //var file = Math.random().toString(36).slice(2)+".wav";
-                                        //var file = "temp.wav";
+                                        //var file = Math.random().toString(36).slice(2)+".mp3";
+                                        //var file = "temp.mp3";
                                         var file = words;
                                         if(file.length > 50){
                                             file = file.substring(0,50);
@@ -115,7 +115,7 @@ module.exports = {
                                                         .replace(/\s+/g, " ")
                                                         .split(' ')
                                                         .join('_');
-                                        file = file + ".wav";
+                                        file = file + ".mp3";
 
                                         var outFile = path+"/"+file;
                                         const dest = fs.createWriteStream(outFile);
