@@ -4,6 +4,7 @@ import image
 import utils
 import insults
 import tournament
+import audiodb
 import requests
 import json
 import threading
@@ -197,7 +198,7 @@ class AudioRepeatClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, voice: str, chatid = "000000"):
     try:
-      tts_out = utils.get_tts(text, voice=voice, timeout=120)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, timeout=120)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -216,12 +217,13 @@ class AudioRepeatClass(Resource):
 
 @nsaudio.route('/random/')
 @nsaudio.route('/random/<string:voice>/')
-@nsaudio.route('/random/<string:voice>/<string:chatid>')
+@nsaudio.route('/random/<string:voice>/<int:timeout>/')
+@nsaudio.route('/random/<string:voice>/<int:timeout>/<string:chatid>')
 class AudioRandomClass(Resource):
   @cache.cached(timeout=2, query_string=True)
-  def get (self, voice = "google", chatid = "000000"):
+  def get (self, voice = "google", timeout = 120, chatid = "000000"):
     try:
-      tts_out = utils.get_tts(utils.get_random_from_bot(chatid), voice=voice, timeout=120, israndom=True)
+      tts_out = utils.get_tts(utils.get_random_from_bot(chatid), chatid=chatid, voice=voice, timeout=timeout, israndom=True)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -247,7 +249,7 @@ class AudioRepeatLearnClass(Resource):
     try:
       tts_out = utils.get_tts(text, voice=voice, timeout=120)
       if tts_out is not None:
-        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        response = send_file(tts_out, chatid=chatid, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.call_on_close(get_chatbot_by_id(chatid).get_response(text)) 
         return response
       else:
@@ -269,7 +271,7 @@ class AudioRepeatLearnUserClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, user: str, text: str, voice: str, chatid = "000000"):
     try:
-      tts_out = utils.get_tts(text, voice=voice, timeout=120)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, timeout=120)
       if tts_out is not None:     
         def learnthis(user: str, text: str):
           if user in previousMessages:
@@ -297,7 +299,7 @@ class AudioAskClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, chatid = "000000"):
     try:
-      tts_out = utils.get_tts(get_chatbot_by_id(chatid).get_response(text).text, timeout=120)
+      tts_out = utils.get_tts(get_chatbot_by_id(chatid).get_response(text).text, chatid=chatid, timeout=120)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -319,7 +321,7 @@ class AudioAskNoLearnClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, chatid = "000000"):
     try:
-      tts_out = utils.get_tts(get_chatbot_by_id(chatid).get_response(text, learn=False).text, timeout=120)
+      tts_out = utils.get_tts(get_chatbot_by_id(chatid).get_response(text, learn=False).text, chatid=chatid, timeout=120)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -342,7 +344,7 @@ class AudioAskNoLearnRandomClass(Resource):
   def get (self, text: str, chatid = "000000"):
     try:
       text = get_chatbot_by_id(chatid).get_response(text, learn=False).text
-      tts_out = utils.get_tts(text, voice="random", timeout=120)
+      tts_out = utils.get_tts(text, voice="random", chatid=chatid, timeout=120)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -371,7 +373,7 @@ class AudioAskUserClass(Resource):
       utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid))
     previousMessages[user] = chatbot_response
     try:
-      tts_out = utils.get_tts(chatbot_response, timeout=120)
+      tts_out = utils.get_tts(chatbot_response, chatid=chatid, timeout=120)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -392,7 +394,7 @@ class AudioSearchClass(Resource):
   @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, chatid = "000000"):
     try:
-      tts_out = utils.get_tts(utils.wiki_summary(text), voice="null", timeout=120)
+      tts_out = utils.get_tts(utils.wiki_summary(text), chatid=chatid, voice="null", timeout=120)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -422,7 +424,7 @@ class AudioInsultClass(Resource):
     try:
       if text and text != '' and text != 'none':
         sentence = text + " " + sentence
-      tts_out = utils.get_tts(sentence, voice="google", timeout=120)
+      tts_out = utils.get_tts(sentence, chatid=chatid, voice="google", timeout=120)
       if tts_out is not None:    
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.call_on_close(get_chatbot_by_id(chatid).get_response(sentence)) 
@@ -491,7 +493,7 @@ class AudioChuckClass(Resource):
   def get(self):
     try:
       text = utils.get_joke("CHUCK_NORRIS")
-      tts_out = utils.get_tts(text, voice="null", timeout=120)
+      tts_out = utils.get_tts(text, chatid="X", voice="null", timeout=120)
       if tts_out is not None:
         return send_file(tts, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -506,7 +508,7 @@ class AudioRandomJokeClass(Resource):
   def get(self):
     try:
       text = utils.get_joke("")
-      tts_out = utils.get_tts(text, voice="null", timeout=120)
+      tts_out = utils.get_tts(text, chatid="X", voice="null", timeout=120)
       if tts_out is not None:
         return send_file(tts, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -602,7 +604,16 @@ class UtilsPopulateSentencesApi(Resource):
 @nsutils.route('/delete/bytext/<string:text>/<string:chatid>')
 class UtilsDeleteByText(Resource):
   def get (self, text: str, chatid = "000000"):
-    return get_response_str(utils.delete_by_text('./config/' + get_chatbot_by_id(chatid).storage.database_uri[17:], text))
+    return get_response_str(utils.delete_by_text('./config/' + get_chatbot_by_id(chatid).storage.database_uri[17:], text, chatid))
+
+
+
+@nsutils.route('/audiodb/populate/')
+@nsutils.route('/audiodb/populate/<string:chatid>')
+class UtilsAudiodbPopulate(Resource):
+  def get (self, chatid = "000000"):
+    threading.Timer(0, utils.populate_audiodb, args=['./config/' + get_chatbot_by_id(chatid).storage.database_uri[17:], chatid]).start()
+    return "Starting thread populate_audiodb. Watch the logs."
 	
 
 @nsutils.route('/upload/trainfile/json')
@@ -694,13 +705,18 @@ def get_chatbot_by_id(chatid = "000000"):
   
   
   
-@scheduler.task('interval', id='scrape_jokes', hours=72, misfire_grace_time=900)
+@scheduler.task('interval', id='scrape_jokes', hours=73, misfire_grace_time=900)
 def scrape_jokes():
   utils.scrape_jokes()
   
-@scheduler.task('interval', id='login_fakeyou', hours=12, misfire_grace_time=900)
+@scheduler.task('interval', id='login_fakeyou', hours=11, misfire_grace_time=900)
 def scrape_jokes():
   utils.login_fakeyou()
+  
+@scheduler.task('interval', id='populate_audiodb', hours=5, misfire_grace_time=900)
+def populate_audiodb():
+  chatid, chatbot = random.choice(list(chatbots_dict.items()))
+  utils.populate_audiodb('./config/' + chatbot.storage.database_uri[17:], chatid)
 
   
 #@scheduler.task('cron', id='populate_sentences', hour=4, minute=10, second=0, misfire_grace_time=900)
@@ -713,6 +729,7 @@ def scrape_jokes():
 #if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
 previousMessages = {}
 chatbots_dict = {}
+audiodb.create_empty_tables()
 #chatbot = utils.get_chatterbot(os.environ['TRAIN'] == "True")
 #twitter.create_empty_tables()
 tournament.create_empty_tables()

@@ -17,6 +17,7 @@ import time
 import wave
 import audioop
 import logging
+import audiodb
 from uuid import uuid4
 from chatterbot import ChatBot
 from chatterbot.conversation import Statement
@@ -108,17 +109,23 @@ def generate(filename: str):
           yield data
           data = fmp3.read(1024)
 
-def get_tts_google(text: str):
-  tts = gTTS(text=text, lang="it", slow=False)
-  fp = BytesIO()
-  tts.write_to_fp(fp)
-  fp.seek(0)
-  sound = AudioSegment.from_mp3(fp)
-  memoryBuff = BytesIO()
-  sound.export(memoryBuff, format='mp3', bitrate="256")
-  memoryBuff.seek(0)
-  return memoryBuff
-  #return fp
+def get_tts_google(text: str, chatid="000000"):
+  data = audiodb.select(text, chatid, "google")
+  if data is not None:
+    return data
+  else:
+    tts = gTTS(text=text, lang="it", slow=False)
+    fp = BytesIO()
+    tts.write_to_fp(fp)
+    fp.seek(0)
+    sound = AudioSegment.from_mp3(fp)
+    memoryBuff = BytesIO()
+    sound.export(memoryBuff, format='mp3', bitrate="256")
+    memoryBuff.seek(0)
+    audiodb.insert(text, chatid, memoryBuff, "google")
+    return audiodb.select(text, chatid, "google")
+    #return memoryBuff
+    #return fp
 
 def clean_input(testo: str):
   re_equ = r"(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’]))"
@@ -541,7 +548,7 @@ def train_txt(trainfile, chatbot: ChatBot, lang: str):
     print(exc_type, fname, exc_tb.tb_lineno)
     print("Error! Please upload a trainfile.txt")
 
-def delete_by_text(dbpath: str, text: str):
+def delete_by_text(dbpath: str, text: str, chatid: str):
   try:
     sqliteConnection = sqlite3.connect(dbpath)
     cursor = sqliteConnection.cursor()
@@ -559,6 +566,8 @@ def delete_by_text(dbpath: str, text: str):
     sqliteConnection.commit()
     cursor.close()
 
+    audiodb.delete_by_name(text, chatid)
+
     return('Frasi con parola chiave "' + text + '" cancellate!')
   except sqlite3.Error as error:
     print("Failed to delete data from sqlite", error)
@@ -567,40 +576,45 @@ def delete_by_text(dbpath: str, text: str):
     if sqliteConnection:
         sqliteConnection.close()
 
-def get_tts(text: str, voice=None, timeout=120, israndom=False):
+def get_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=False):
   try:
     if voice is None or voice == "null" or voice == "random":
       voice_to_use = get_random_voice()
     else:
       voice_to_use = voice
-    if voice_to_use != "google":
-      if bool(random.getrandbits(1)):
-        proxies = {'http': 'http://192.168.1.160:9058'}
-        fy.session.proxies.update(proxies)
+    if voice_to_use != "google": 
+      datafy = audiodb.select(text.strip(), chatid, voice_to_use)
+      if datafy is not None:
+        return datafy
       else:
-        proxies = {}
-        fy.session.proxies.update(proxies)
-      ijt = generate_ijt(fy, text.strip(), voice_to_use)
-      if ijt is not None:
-        out = get_wav_fy(fy,ijt, timeout=timeout)
-        if out is not None:
-          return out
+        if bool(random.getrandbits(1)):
+          proxies = {'http': 'http://192.168.1.160:9058'}
+          fy.session.proxies.update(proxies)
+        else:
+          proxies = {}
+          fy.session.proxies.update(proxies)
+        ijt = generate_ijt(fy, text.strip(), voice_to_use)
+        if ijt is not None:
+          out = get_wav_fy(fy,ijt, timeout=timeout)
+          if out is not None:
+            audiodb.insert(text.strip(), chatid, out, voice_to_use)
+            return audiodb.select(text.strip(), chatid, voice_to_use)
+          elif voice == "random" or voice == "google":
+            return get_tts_google(text.strip(), chatid=chatid)
+          else:
+            return None
         elif voice == "random" or voice == "google":
-          return get_tts_google(text.strip())
+          return get_tts_google(text.strip(), chatid=chatid)
         else:
           return None
-      elif voice == "random" or voice == "google":
-        return get_tts_google(text.strip())
-      else:
-        return None
     else:
-      return get_tts_google(text.strip())
+      return get_tts_google(text.strip(), chatid=chatid)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     print(exc_type, fname, exc_tb.tb_lineno)
     if voice == "random" or israndom:
-      return get_tts_google(text.strip())
+      return get_tts_google(text.strip(), chatid=chatid)
     else:
       raise Exception(e)
 
@@ -625,7 +639,7 @@ def get_fakeyou_voices(category: str):
     localvoices["Goku"]                         = "TM:eb0rmkq6fxtj"
     localvoices["google"]                       = "google"
     localvoices["Homer Simpson"]                = "TM:dq50arje7sq4"
-    localvoices["Mario Giordano"]              = "TM:xd8srfb4v5w6"
+    localvoices["Mario Giordano"]               = "TM:xd8srfb4v5w6"
     localvoices["Papa Francesco"]               = "TM:8bqjb9x51vz3"  
     localvoices["Peter Griffin"]                = "TM:s493mhsbek15" 
     localvoices["Richard Benson"]               = "TM:esw7xh74gvt7" 
@@ -638,7 +652,7 @@ def get_fakeyou_voices(category: str):
     db["Goku"]                                  = "TM:eb0rmkq6fxtj"
     db["google"]                                = "google"
     db["Homer Simpson"]                         = "TM:dq50arje7sq4"
-    db["Mario Giordano"]                       = "TM:xd8srfb4v5w6"
+    db["Mario Giordano"]                        = "TM:xd8srfb4v5w6"
     db["Papa Francesco"]                        = "TM:8bqjb9x51vz3"   
     db["Peter Griffin"]                         = "TM:s493mhsbek15" 
     db["Richard Benson"]                        = "TM:esw7xh74gvt7" 
@@ -711,13 +725,60 @@ def get_random_from_bot(chatid: str):
 
     cursor.execute(sqlite_select_sentences_query, data)
     records = cursor.fetchall()
-      
-    globalsanit = ""
 
     count = 0
 
     for row in records:
       sentence = row[0]
+
+    cursor.close()
+    return sentence
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    print(exc_type, fname, exc_tb.tb_lineno)
+    raise Exception(e)
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()
+
+
+
+def populate_audiodb(dbpath: str, chatid: str):  
+  try:
+    dbfile=chatid+"-db.sqlite3"
+    sqliteConnection = sqlite3.connect('./config/'+dbfile)
+    cursor = sqliteConnection.cursor()
+
+    
+    sqlite_select_sentences_query = """SELECT text FROM statement ORDER BY RANDOM() LIMIT 100;"""
+
+    data = ()
+
+    cursor.execute(sqlite_select_sentences_query, data)
+    records = cursor.fetchall()
+
+    count = 0
+
+    for row in records:
+      sentence = row[0]      
+      voices = get_fakeyou_voices("Italiano")
+      listvoices = list(voices.items())
+      random.shuffle(listvoices)
+      for key, voice in listvoices:
+        try:
+          get_tts(sentence, chatid=chatid, voice=voice, timeout=120)
+          print("populate_audiodb - Population OK")
+          print("populate_audiodb -      CHATID:    " + chatid)
+          print("populate_audiodb -      VOICE:     " + voice)
+          print("populate_audiodb -      SENTENCE:  " + sentence)
+        except Exception as e:
+          exc_type, exc_obj, exc_tb = sys.exc_info()
+          fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+          print(exc_type, fname, exc_tb.tb_lineno)
+          print("populate_audiodb - Population KO")
+          print("populate_audiodb -      Error detected, waiting 120 seconds for next generation.")
+          time.sleep(120)
 
     cursor.close()
     return sentence

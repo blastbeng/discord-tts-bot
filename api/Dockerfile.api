@@ -51,6 +51,7 @@ WORKDIR /app
 COPY data data
 COPY templates templates
 COPY utils.py .
+COPY audiodb.py .
 COPY custom_trainer.py .
 COPY insults.py .
 COPY reddit.py .
