@@ -772,6 +772,7 @@ def populate_audiodb(dbpath: str, chatid: str):
           print("populate_audiodb -      CHATID:    " + chatid)
           print("populate_audiodb -      VOICE:     " + voice)
           print("populate_audiodb -      SENTENCE:  " + sentence)
+          time.sleep(10)
         except Exception as e:
           exc_type, exc_obj, exc_tb = sys.exc_info()
           fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]

@@ -225,7 +225,7 @@ def speak(update: Update, context: CallbackContext):
                 url = API_URL + API_PATH_AUDIO + "repeat/learn/user/" + urllib.parse.quote(str(update.message.chat.id)) + "/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(strid) 
 
                 response = requests.get(url)
-                if (response.text != "Internal Server Error" and response.content):
+                if (response.text != "Internal Server Error" and response.content and response.status_code == 200):
                     audio = BytesIO(response.content)
                     context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, title="Messaggio vocale", performer="ScemoPezzente",  filename=get_random_string(12)+ "audio.wav")
                 else:
@@ -297,7 +297,7 @@ def image(update: Update, context: CallbackContext):
                 img_url = API_URL + API_PATH_IMAGES + "search/" + urllib.parse.quote(message)
 
                 response = requests.get(img_url, stream=True)
-                if (response.text != "Internal Server Error" and response.content):
+                if (response.text != "Internal Server Error" and response.content and response.status_code == 200):
                     context.bot.send_photo(chat_id=update.effective_chat.id, photo=response.content, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, filename=get_random_string(12)+ "image.jpeg")
                 else:
                     context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)

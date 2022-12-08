@@ -247,9 +247,9 @@ class AudioRepeatLearnClass(Resource):
     #get_chatbot_by_id(chatid).get_response(text)
     #threading.Timer(0, get_chatbot_by_id(chatid).get_response, args=[text]).start()
     try:
-      tts_out = utils.get_tts(text, voice=voice, timeout=120)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, timeout=120)
       if tts_out is not None:
-        response = send_file(tts_out, chatid=chatid, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.call_on_close(get_chatbot_by_id(chatid).get_response(text)) 
         return response
       else:
