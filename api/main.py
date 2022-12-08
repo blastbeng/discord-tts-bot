@@ -493,9 +493,9 @@ class AudioChuckClass(Resource):
   def get(self):
     try:
       text = utils.get_joke("CHUCK_NORRIS")
-      tts_out = utils.get_tts(text, chatid="X", voice="null", timeout=120)
+      tts_out = utils.get_tts(text, chatid="000000", voice="google", timeout=120)
       if tts_out is not None:
-        return send_file(tts, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
         resp = make_response("TTS Generation Error!", 500)
         return resp
@@ -508,9 +508,9 @@ class AudioRandomJokeClass(Resource):
   def get(self):
     try:
       text = utils.get_joke("")
-      tts_out = utils.get_tts(text, chatid="X", voice="null", timeout=120)
+      tts_out = utils.get_tts(text, chatid="000000", voice="google", timeout=120)
       if tts_out is not None:
-        return send_file(tts, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
         resp = make_response("TTS Generation Error!", 500)
         return resp
