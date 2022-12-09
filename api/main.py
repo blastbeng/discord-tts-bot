@@ -33,6 +33,7 @@ log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 TMP_DIR = os.environ.get("TMP_DIR")
 TMP_DIR_DISCORD = os.environ.get("TMP_DIR_DISCORD")
+ADMIN_PASS = os.environ.get("ADMIN_PASS")
 
 app = Flask(__name__)
 class Config:    
@@ -706,7 +707,7 @@ nsadmin = api.namespace('admin', 'Accumulators Admin APIs')
 @nsadmin.route('/forcedelete/bytext/<string:password>/<string:text>/<string:chatid>')
 class AdminForceDeleteByText(Resource):
   def get (self, password: str, text: str, chatid = "000000"):
-    if password == "dunf0rg3tt0w4tch":
+    if password == ADMIN_PASS:
       return get_response_str(utils.delete_by_text(chatid, text, force=True))
     else:
       return get_response_str("cazzo fai, non sei autorizzato a usare sto schifo di servizio! fuori dalle palle!")

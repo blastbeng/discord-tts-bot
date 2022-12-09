@@ -797,19 +797,23 @@ def populate_audiodb(chatid: str, count: int):
           get_tts(sentence, chatid=chatid, voice=voice, timeout=600)
           print("populate_audiodb - Population OK")
           print("populate_audiodb -      CHATID:    " + chatid)
-          print("populate_audiodb -      VOICE:     " + voice)
+          print("populate_audiodb -      VOICE:     " + key)
           print("populate_audiodb -      SENTENCE:  " + sentence)
-          time.sleep(2)
+          #time.sleep(2)
         except Exception as e:
           exc_type, exc_obj, exc_tb = sys.exc_info()
           fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
           print(exc_type, fname, exc_tb.tb_lineno)
           print("populate_audiodb - Population KO")
           print("populate_audiodb -      CHATID:    " + chatid)
-          print("populate_audiodb -      VOICE:     " + voice)
+          print("populate_audiodb -      VOICE:     " + key)
           print("populate_audiodb -      SENTENCE:  " + sentence)
-          print("populate_audiodb - Error detected, waiting 300 seconds for next generation.")
-          time.sleep(300)
+          if voice != "google":
+            print("populate_audiodb - FakeYou error detected, waiting 30 seconds for next generation.")
+            time.sleep(30)
+          else:
+            print("populate_audiodb - Google tts error detected.")
+
 
     cursor.close()
     return sentence
