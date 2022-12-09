@@ -604,7 +604,7 @@ class UtilsPopulateSentencesApi(Resource):
 @nsutils.route('/delete/bytext/<string:text>/<string:chatid>')
 class UtilsDeleteByText(Resource):
   def get (self, text: str, chatid = "000000"):
-    return get_response_str(utils.delete_by_text('./config/' + get_chatbot_by_id(chatid).storage.database_uri[17:], text, chatid))
+    return get_response_str(utils.delete_by_text(chatid, text))
 
 
 
@@ -612,8 +612,9 @@ class UtilsDeleteByText(Resource):
 @nsutils.route('/audiodb/populate/<string:chatid>')
 class UtilsAudiodbPopulate(Resource):
   def get (self, chatid = "000000"):
-    threading.Timer(0, utils.populate_audiodb, args=['./config/' + get_chatbot_by_id(chatid).storage.database_uri[17:], chatid]).start()
+    threading.Timer(0, utils.populate_audiodb, args=[chatid]).start()
     return "Starting thread populate_audiodb. Watch the logs."
+
 	
 
 @nsutils.route('/upload/trainfile/json')
@@ -641,7 +642,7 @@ class UtilsTrainFile(Resource):
         chatid = "000000"
       trf=request.files['trainfile']
       if not trf and allowed_file(trf):
-        return get_response_str("Error! Please upload a trainfile.txt")
+        return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
       else:
         trainfile=TMP_DIR + '/' + utils.get_random_string(24) + ".txt"
         trf.save(trainfile)
@@ -651,7 +652,7 @@ class UtilsTrainFile(Resource):
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
       print(exc_type, fname, exc_tb.tb_lineno)
-      return get_response_str("Error! Please upload a trainfile.txt")
+      return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
 
 
 @nsutils.route('/fakeyou/get_voices_by_cat/')
@@ -678,6 +679,36 @@ class UtilsDownloadClass(Resource):
 class Healthcheck(Resource):
   def get (self):
     return "Ok!"
+
+
+
+nsdatabase = api.namespace('database', 'Accumulators Database APIs')
+
+@nsdatabase.route('/backup/chatbot/')
+@nsdatabase.route('/backup/chatbot/<string:chatid>')
+class BackupChatbot(Resource):
+  def get (self, chatid = "000000"):
+    utils.backupdb(chatid)
+    return "Databases backed up!"
+
+@nsdatabase.route('/restore/chatbot/')
+@nsdatabase.route('/restore/chatbot/<string:text>/')
+@nsdatabase.route('/restore/chatbot/<string:text>/<string:chatid>')
+class RestoreChatbot(Resource):
+  def get (self, text = None, chatid = "000000"):
+    outtxt = utils.restore(chatid, text)
+    return send_file(outtxt, attachment_filename='trainfile.txt', mimetype="text/plain")
+
+
+nsadmin = api.namespace('admin', 'Accumulators Admin APIs')
+@nsadmin.route('/forcedelete/bytext/<string:password>/<string:text>/')
+@nsadmin.route('/forcedelete/bytext/<string:password>/<string:text>/<string:chatid>')
+class AdminForceDeleteByText(Resource):
+  def get (self, password: str, text: str, chatid = "000000"):
+    if password == "dunf0rg3tt0w4tch":
+      return get_response_str(utils.delete_by_text(chatid, text, force=True))
+    else:
+      return get_response_str("cazzo fai, non sei autorizzato a usare sto schifo di servizio! fuori dalle palle!")
 
 @app.route('/upload')
 def upload_file():
@@ -716,7 +747,7 @@ def scrape_jokes():
 @scheduler.task('interval', id='populate_audiodb', hours=5, misfire_grace_time=900)
 def populate_audiodb():
   chatid, chatbot = random.choice(list(chatbots_dict.items()))
-  utils.populate_audiodb('./config/' + chatbot.storage.database_uri[17:], chatid)
+  utils.populate_audiodb(chatid)
 
   
 #@scheduler.task('cron', id='populate_sentences', hour=4, minute=10, second=0, misfire_grace_time=900)

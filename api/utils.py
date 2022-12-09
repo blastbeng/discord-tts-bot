@@ -548,30 +548,53 @@ def train_txt(trainfile, chatbot: ChatBot, lang: str):
     print(exc_type, fname, exc_tb.tb_lineno)
     print("Error! Please upload a trainfile.txt")
 
-def delete_by_text(dbpath: str, text: str, chatid: str):
+def delete_by_text(chatid: str, text: str, force = False):
   try:
-    sqliteConnection = sqlite3.connect(dbpath)
+    dbfile='./config/'+chatid+"-db.sqlite3"
+    sqliteConnection = sqlite3.connect(dbfile)
     cursor = sqliteConnection.cursor()
 
-    sqlite_delete_query = """DELETE FROM Statement 
-                          WHERE text like ?
-                          OR text like ?
-                          OR text = ?"""
+    sqlite_delete_query = "DELETE FROM Statement WHERE text like '" + text + "%' OR text like '%" + text + "' OR text LIKE '%" + text + "%' OR text = '" + text + "' COLLATE NOCASE"
 
-    data_tuple = (text+'%', 
-                  '%'+text, 
-                  text)
+    data_tuple = ()
+
+    print("delete_by_text - Executing: " + sqlite_delete_query)
 
     cursor.execute(sqlite_delete_query, data_tuple)
     sqliteConnection.commit()
     cursor.close()
 
-    audiodb.delete_by_name(text, chatid)
+    if force:
+      delete_from_audiodb_by_text(chatid, text)
 
-    return('Frasi con parola chiave "' + text + '" cancellate!')
+    return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot e dal db audio!')
   except sqlite3.Error as error:
     print("Failed to delete data from sqlite", error)
     return("Errore!")
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()
+
+
+
+def delete_from_audiodb_by_text(chatid: str, text: str):
+  try:
+    dbfile="./config/audiodb.sqlite3"
+    sqliteConnection = sqlite3.connect(dbfile)
+    cursor = sqliteConnection.cursor()
+
+    sqlite_delete_query = "DELETE FROM Audio WHERE chatid = '" + chatid + "' and (name like '" + text + "%' OR name like '%" + text + "' OR name LIKE '%" + text + "%' OR name = '" + text + "') COLLATE NOCASE"
+
+    data_tuple = ()
+
+    print("delete_from_audiodb_by_text - Executing: " + sqlite_delete_query)
+
+    cursor.execute(sqlite_delete_query, data_tuple)
+    sqliteConnection.commit()
+    cursor.close()
+
+  except sqlite3.Error as error:
+    print("Failed to delete data from sqlite", error)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -744,14 +767,14 @@ def get_random_from_bot(chatid: str):
 
 
 
-def populate_audiodb(dbpath: str, chatid: str):  
+def populate_audiodb(chatid: str):  
   try:
     dbfile=chatid+"-db.sqlite3"
     sqliteConnection = sqlite3.connect('./config/'+dbfile)
     cursor = sqliteConnection.cursor()
 
     
-    sqlite_select_sentences_query = """SELECT text FROM statement ORDER BY RANDOM() LIMIT 100;"""
+    sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY RANDOM() LIMIT 100;"""
 
     data = ()
 
@@ -767,7 +790,7 @@ def populate_audiodb(dbpath: str, chatid: str):
       random.shuffle(listvoices)
       for key, voice in listvoices:
         try:
-          get_tts(sentence, chatid=chatid, voice=voice, timeout=120)
+          get_tts(sentence, chatid=chatid, voice=voice, timeout=600)
           print("populate_audiodb - Population OK")
           print("populate_audiodb -      CHATID:    " + chatid)
           print("populate_audiodb -      VOICE:     " + voice)
@@ -778,7 +801,10 @@ def populate_audiodb(dbpath: str, chatid: str):
           fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
           print(exc_type, fname, exc_tb.tb_lineno)
           print("populate_audiodb - Population KO")
-          print("populate_audiodb -      Error detected, waiting 120 seconds for next generation.")
+          print("populate_audiodb -      CHATID:    " + chatid)
+          print("populate_audiodb -      VOICE:     " + voice)
+          print("populate_audiodb -      SENTENCE:  " + sentence)
+          print("populate_audiodb - Error detected, waiting 120 seconds for next generation.")
           time.sleep(120)
 
     cursor.close()
@@ -791,3 +817,48 @@ def populate_audiodb(dbpath: str, chatid: str):
   finally:
     if sqliteConnection:
         sqliteConnection.close()
+
+
+
+def backupdb(chatid: str):  
+  try:
+    dbfile='./config/'+chatid+"-db.sqlite3"
+    dst="./config/backups/" + chatid + "-db_backup_" + str(time.time()) + ".sqlite3"
+    shutil.copyfile(dbfile, dst)
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    print(exc_type, fname, exc_tb.tb_lineno)
+    raise Exception(e)
+
+def restore(chatid: str, text: str):
+  sentences = ""
+  try:
+    dbfile="./config/audiodb.sqlite3"
+    sqliteConnection = sqlite3.connect(dbfile)
+    cursor = sqliteConnection.cursor()
+
+    sqlite_select_query = """SELECT DISTINCT name FROM Audio"""
+    data_tuple = ()
+
+    if(text is not None):
+      
+      sqlite_select_query = sqlite_select_query + " WHERE chatid = '" + chatid + "' and (name like '" + text + "%' OR name like '%" + text + "' OR name LIKE '%" + text + "%' OR name = '" + text + "') COLLATE NOCASE"
+
+    cursor.execute(sqlite_select_query, data_tuple)
+    records = cursor.fetchall()
+
+    print("restore - Executing: " + sqlite_select_query)
+    
+    for row in records:
+      sentences = sentences + "\n" + row[0] 
+
+    cursor.close()
+
+  except sqlite3.Error as error:
+    print("Failed to select data from sqlite", error)
+    return("Errore!")
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()
+  return BytesIO(bytes(sentences,'utf-8'))
