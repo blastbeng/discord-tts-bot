@@ -767,14 +767,18 @@ def get_random_from_bot(chatid: str):
 
 
 
-def populate_audiodb(chatid: str):  
+def populate_audiodb(chatid: str, count: int):  
   try:
     dbfile=chatid+"-db.sqlite3"
     sqliteConnection = sqlite3.connect('./config/'+dbfile)
     cursor = sqliteConnection.cursor()
+         
+    print("populate_audiodb - Starting Population with parameters:")
+    print("populate_audiodb -      CHATID:    " + chatid)
+    print("populate_audiodb -      COUNT:     " + str(count))
 
     
-    sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY RANDOM() LIMIT 100;"""
+    sqlite_select_sentences_query = "SELECT DISTINCT text FROM statement ORDER BY RANDOM() LIMIT " + str(count) + ";"
 
     data = ()
 
@@ -795,7 +799,7 @@ def populate_audiodb(chatid: str):
           print("populate_audiodb -      CHATID:    " + chatid)
           print("populate_audiodb -      VOICE:     " + voice)
           print("populate_audiodb -      SENTENCE:  " + sentence)
-          time.sleep(10)
+          time.sleep(2)
         except Exception as e:
           exc_type, exc_obj, exc_tb = sys.exc_info()
           fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -804,8 +808,8 @@ def populate_audiodb(chatid: str):
           print("populate_audiodb -      CHATID:    " + chatid)
           print("populate_audiodb -      VOICE:     " + voice)
           print("populate_audiodb -      SENTENCE:  " + sentence)
-          print("populate_audiodb - Error detected, waiting 120 seconds for next generation.")
-          time.sleep(120)
+          print("populate_audiodb - Error detected, waiting 300 seconds for next generation.")
+          time.sleep(300)
 
     cursor.close()
     return sentence

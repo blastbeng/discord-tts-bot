@@ -609,10 +609,11 @@ class UtilsDeleteByText(Resource):
 
 
 @nsutils.route('/audiodb/populate/')
-@nsutils.route('/audiodb/populate/<string:chatid>')
+@nsutils.route('/audiodb/populate/<int:count>/')
+@nsutils.route('/audiodb/populate/<int:count>/<string:chatid>')
 class UtilsAudiodbPopulate(Resource):
-  def get (self, chatid = "000000"):
-    threading.Timer(0, utils.populate_audiodb, args=[chatid]).start()
+  def get (self, count = 100, chatid = "000000"):
+    threading.Timer(0, utils.populate_audiodb, args=[chatid, count]).start()
     return "Starting thread populate_audiodb. Watch the logs."
 
 	
@@ -747,7 +748,7 @@ def scrape_jokes():
 @scheduler.task('interval', id='populate_audiodb', hours=5, misfire_grace_time=900)
 def populate_audiodb():
   chatid, chatbot = random.choice(list(chatbots_dict.items()))
-  utils.populate_audiodb(chatid)
+  utils.populate_audiodb(chatid, 100)
 
   
 #@scheduler.task('cron', id='populate_sentences', hour=4, minute=10, second=0, misfire_grace_time=900)
