@@ -794,7 +794,7 @@ def populate_audiodb(chatid: str, count: int):
       random.shuffle(listvoices)
       for key, voice in listvoices:
         try:
-          get_tts(sentence, chatid=chatid, voice=voice, timeout=600)
+          get_tts(sentence, chatid=chatid, voice=voice, timeout=300)
           print("populate_audiodb - Population OK")
           print("populate_audiodb -      CHATID:    " + chatid)
           print("populate_audiodb -      VOICE:     " + key)

@@ -748,8 +748,8 @@ def scrape_jokes():
   
 @scheduler.task('interval', id='populate_audiodb', hours=5, misfire_grace_time=900)
 def populate_audiodb():
-  chatid, chatbot = random.choice(list(chatbots_dict.items()))
-  utils.populate_audiodb(chatid, 100)
+  #chatid, chatbot = random.choice(list(chatbots_dict.items()))
+  utils.populate_audiodb("000000", 100)
 
   
 #@scheduler.task('cron', id='populate_sentences', hour=4, minute=10, second=0, misfire_grace_time=900)
