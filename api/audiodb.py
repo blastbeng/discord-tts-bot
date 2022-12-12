@@ -30,7 +30,7 @@ def create_empty_tables():
     cursor.execute(sqlite_create_audio_query)
 
   except sqlite3.Error as error:
-    print("Failed to create tables", error)
+    print(datetime.now() + " - ","Failed to create tables", error)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -57,7 +57,7 @@ def insert(name: str, chatid: str, data: BytesIO, voice: str):
     cursor.close()
 
   except sqlite3.Error as error:
-    print("Failed to insert data into sqlite", error)
+    print(datetime.now() + " - ","Failed to insert data into sqlite", error)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -83,7 +83,7 @@ def select(name: str, chatid: str, voice: str):
         audio.seek(0)
 
     except sqlite3.Error as error:
-      print("Failed to read data from sqlite table", error)
+      print(datetime.now() + " - ","Failed to read data from sqlite table", error)
     finally:
       if sqliteConnection:
         sqliteConnection.close()
@@ -112,7 +112,7 @@ def delete_by_name(name: str, chatid: str):
     cursor.close()
 
   except Exception as e:
-    print("Failed to read data from sqlite table", e)
+    print(datetime.now() + " - ","Failed to read data from sqlite table", e)
     raise Exception(e)
   finally:
     if sqliteConnection:

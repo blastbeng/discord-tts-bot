@@ -219,7 +219,7 @@ def create_empty_tables():
     cursor.execute(sqlite_create_users_query)
 
   except sqlite3.Error as error:
-    print("Failed to create tables", error)
+    print(datetime.now() + " - ","Failed to create tables", error)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -260,7 +260,7 @@ def save_temp_tournament(content):
     cursor.close()
 
   except sqlite3.Error as error:
-    print("Failed to insert data into sqlite", error)
+    print(datetime.now() + " - ","Failed to insert data into sqlite", error)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -332,7 +332,7 @@ def regen_tournament(author: str, name: str, description: str):
         "users":        json_user_list
       }
   except sqlite3.Error as error:
-    print("Failed to read data from sqlite table", error)
+    print(datetime.now() + " - ","Failed to read data from sqlite table", error)
   finally:
     if sqliteConnection:
       sqliteConnection.close()

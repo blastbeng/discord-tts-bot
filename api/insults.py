@@ -168,5 +168,5 @@ def get_insults():
         insult = sentence + " " + sentence2 + " " + sentence3
         return insult
     except Exception as e:
-        print(e)
+        print(datetime.now() + " - ",e)
         return "stronzo mi sono spaccato male, blast deve sistemarmi"

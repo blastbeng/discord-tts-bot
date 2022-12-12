@@ -11,6 +11,7 @@ import threading
 import random
 import sys
 import shutil
+import datetime
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask import Flask, request, send_file, Response, jsonify, render_template, make_response, after_this_request, g
@@ -563,98 +564,12 @@ class AudioSearchClass(Resource):
 #class WebhookTest(Resource):
 #  def webhook():
 #    if request.method == 'POST':
-#      print("Data received from Webhook is: ", request.json)
+#      print(datetime.now() + " - ","Data received from Webhook is: ", request.json)
 #    return "Webhook received!"
 
 
 
 nsutils = api.namespace('utils', 'AccumulatorsUtils APIs')
-
-
-@nsutils.route('/sentence/populate/<int:count>/')
-@nsutils.route('/sentence/populate/<int:count>/<string:chatid>')
-class UtilsPopulateSentences(Resource):
-  def get (self, count: int, chatid = "000000"):
-    threading.Timer(0, utils.populate_new_sentences, args=[get_chatbot_by_id(chatid), count, None, False, chatid]).start()
-    return "Starting thread populate_new_sentences with parameters: " + str(count) + ", None. Watch the logs."
-
-
-@nsutils.route('/sentence/populate/parsed/<int:count>/<string:word>/')
-@nsutils.route('/sentence/populate/parsed/<int:count>/<string:word>/<string:chatid>')
-class UtilsPopulateSentencesParsed(Resource):
-  def get (self, count: int, word: str, chatid = "000000"):
-    threading.Timer(0, utils.populate_new_sentences, args=[get_chatbot_by_id(chatid), count, word, False, chatid]).start()
-    return "Starting thread populate_new_sentences with parameters: " + str(count) + ", " + word + ". Watch the logs."
-
-
-@nsutils.route('/sentence/populate/parsed/api/<string:word>/')
-@nsutils.route('/sentence/populate/parsed/api/<string:word>/<string:chatid>')
-class UtilsPopulateSentencesParsedApi(Resource):
-  def get (self, word: str, chatid = "000000"):
-    return get_response_str(utils.populate_new_sentences(get_chatbot_by_id(chatid), 5, word, True, chatid))
-
-
-@nsutils.route('/sentence/populate/api/')
-@nsutils.route('/sentence/populate/api/<string:chatid>')
-class UtilsPopulateSentencesApi(Resource):
-  def get (self, chatid = "000000"):
-    return get_response_str(utils.populate_new_sentences(get_chatbot_by_id(chatid), 5, None, True, chatid))
-
-
-@nsutils.route('/delete/bytext/<string:text>/')
-@nsutils.route('/delete/bytext/<string:text>/<string:chatid>')
-class UtilsDeleteByText(Resource):
-  def get (self, text: str, chatid = "000000"):
-    return get_response_str(utils.delete_by_text(chatid, text))
-
-
-
-@nsutils.route('/audiodb/populate/')
-@nsutils.route('/audiodb/populate/<int:count>/')
-@nsutils.route('/audiodb/populate/<int:count>/<string:chatid>')
-class UtilsAudiodbPopulate(Resource):
-  def get (self, count = 100, chatid = "000000"):
-    threading.Timer(0, utils.populate_audiodb, args=[chatid, count]).start()
-    return "Starting thread populate_audiodb. Watch the logs."
-
-	
-
-@nsutils.route('/upload/trainfile/json')
-class UtilsTrainFile(Resource):
-  def post (self):    
-    try:
-      chatid = request.form.get("chatid")
-      if chatid is None:
-        chatid = "000000"
-      threading.Timer(0, utils.train_json, args=[request.get_json(), get_chatbot_by_id(chatid)]).start()
-      return get_response_str("Done. Watch the logs for errors.")
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
-      return utils.empty_template_trainfile_json()
-	
-
-@nsutils.route('/upload/trainfile/txt')
-class UtilsTrainFile(Resource):
-  def post (self):
-    try:
-      chatid = request.form.get("chatid")
-      if chatid is None:
-        chatid = "000000"
-      trf=request.files['trainfile']
-      if not trf and allowed_file(trf):
-        return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
-      else:
-        trainfile=TMP_DIR + '/' + utils.get_random_string(24) + ".txt"
-        trf.save(trainfile)
-        threading.Timer(0, utils.train_txt, args=[trainfile, get_chatbot_by_id(chatid), request.form.get("language")]).start()
-        return get_response_str("Done. Watch the logs for errors.")
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
-      return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
 
 
 @nsutils.route('/fakeyou/get_voices_by_cat/')
@@ -673,7 +588,7 @@ class UtilsDownloadClass(Resource):
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
+      print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
       return get_response_str("Error downloading from server.")
 
 @limiter.limit("1/second")
@@ -685,6 +600,91 @@ class Healthcheck(Resource):
 
 
 nsdatabase = api.namespace('database', 'Accumulators Database APIs')
+
+@nsdatabase.route('/sentence/populate/<int:count>/')
+@nsdatabase.route('/sentence/populate/<int:count>/<string:chatid>')
+class UtilsPopulateSentences(Resource):
+  def get (self, count: int, chatid = "000000"):
+    threading.Timer(0, utils.populate_new_sentences, args=[get_chatbot_by_id(chatid), count, None, False, chatid]).start()
+    return "Starting thread populate_new_sentences with parameters: " + str(count) + ", None. Watch the logs."
+
+
+@nsdatabase.route('/sentence/populate/parsed/<int:count>/<string:word>/')
+@nsdatabase.route('/sentence/populate/parsed/<int:count>/<string:word>/<string:chatid>')
+class UtilsPopulateSentencesParsed(Resource):
+  def get (self, count: int, word: str, chatid = "000000"):
+    threading.Timer(0, utils.populate_new_sentences, args=[get_chatbot_by_id(chatid), count, word, False, chatid]).start()
+    return "Starting thread populate_new_sentences with parameters: " + str(count) + ", " + word + ". Watch the logs."
+
+
+@nsdatabase.route('/sentence/populate/parsed/api/<string:word>/')
+@nsdatabase.route('/sentence/populate/parsed/api/<string:word>/<string:chatid>')
+class UtilsPopulateSentencesParsedApi(Resource):
+  def get (self, word: str, chatid = "000000"):
+    return get_response_str(utils.populate_new_sentences(get_chatbot_by_id(chatid), 5, word, True, chatid))
+
+
+@nsdatabase.route('/sentence/populate/api/')
+@nsdatabase.route('/sentence/populate/api/<string:chatid>')
+class UtilsPopulateSentencesApi(Resource):
+  def get (self, chatid = "000000"):
+    return get_response_str(utils.populate_new_sentences(get_chatbot_by_id(chatid), 5, None, True, chatid))
+
+
+@nsdatabase.route('/delete/bytext/<string:text>/')
+@nsdatabase.route('/delete/bytext/<string:text>/<string:chatid>')
+class UtilsDeleteByText(Resource):
+  def get (self, text: str, chatid = "000000"):
+    return get_response_str(utils.delete_by_text(chatid, text))
+
+
+
+@nsdatabase.route('/audiodb/populate/')
+@nsdatabase.route('/audiodb/populate/<int:count>/')
+@nsdatabase.route('/audiodb/populate/<int:count>/<string:chatid>')
+class UtilsAudiodbPopulate(Resource):
+  def get (self, count = 100, chatid = "000000"):
+    threading.Timer(0, utils.populate_audiodb, args=[chatid, count]).start()
+    return "Starting thread populate_audiodb. Watch the logs."
+
+	
+
+@nsdatabase.route('/upload/trainfile/json')
+class UtilsTrainFile(Resource):
+  def post (self):    
+    try:
+      chatid = request.form.get("chatid")
+      if chatid is None:
+        chatid = "000000"
+      threading.Timer(0, utils.train_json, args=[request.get_json(), get_chatbot_by_id(chatid)]).start()
+      return get_response_str("Done. Watch the logs for errors.")
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      print(datetime.now() + " - ", exc_type, fname, exc_tb.tb_lineno)
+      return utils.empty_template_trainfile_json()
+	
+
+@nsdatabase.route('/upload/trainfile/txt')
+class UtilsTrainFile(Resource):
+  def post (self):
+    try:
+      chatid = request.form.get("chatid")
+      if chatid is None:
+        chatid = "000000"
+      trf=request.files['trainfile']
+      if not trf and allowed_file(trf):
+        return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
+      else:
+        trainfile=TMP_DIR + '/' + utils.get_random_string(24) + ".txt"
+        trf.save(trainfile)
+        threading.Timer(0, utils.train_txt, args=[trainfile, get_chatbot_by_id(chatid), request.form.get("language")]).start()
+        return get_response_str("Done. Watch the logs for errors.")
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+      return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
 
 @nsdatabase.route('/backup/chatbot/')
 @nsdatabase.route('/backup/chatbot/<string:chatid>')
@@ -738,7 +738,7 @@ def get_chatbot_by_id(chatid = "000000"):
   
   
   
-@scheduler.task('interval', id='scrape_jokes', hours=73, misfire_grace_time=900)
+@scheduler.task('interval', id='scrape_jokes', hours=12, misfire_grace_time=900)
 def scrape_jokes():
   utils.scrape_jokes()
   
@@ -754,7 +754,7 @@ def populate_audiodb():
   
 #@scheduler.task('cron', id='populate_sentences', hour=4, minute=10, second=0, misfire_grace_time=900)
 #def populate_sentences():
-#  print(utils.populate_new_sentences(chatbot, 1000, None, False))
+#  print(datetime.now() + " - ",utils.populate_new_sentences(chatbot, 1000, None, False))
 
 
 

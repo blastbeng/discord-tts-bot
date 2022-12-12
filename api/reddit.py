@@ -28,10 +28,10 @@ reddit = praw.Reddit(
 def search(words: str):
     try:
         for submission in reddit.subreddit("all").search(words):
-            print(submission.title)
+            print(datetime.now() + " - ",submission.title)
     except Esception as error:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print("Failed to scrape from reddit", error)
-        print(exc_type, fname, exc_tb.tb_lineno)
+        print(datetime.now() + " - ","Failed to scrape from reddit", error)
+        print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
     return Post("TODO", "TODO", "TODO")

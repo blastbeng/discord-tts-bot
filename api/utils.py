@@ -247,11 +247,11 @@ def populate_new_sentences(chatbot: ChatBot, count: int, word: str, fromapi: boo
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(exc_type, fname, exc_tb.tb_lineno)
+    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
     if fromapi:
       return "Errore!"
     else:
-      print("Error populating sentences!")
+      print(datetime.now() + " - ","Error populating sentences!")
   finally:
     try:
       os.remove(filename)
@@ -346,22 +346,22 @@ def get_joke(cat: str):
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(exc_type, fname, exc_tb.tb_lineno)
+    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
     return "Riprova tra qualche secondo..."
 
 
 def scrape_jokes():
-  print("--- START : JOKES SCRAPER ---")
-  #print("-----------------------------")
+  print(datetime.now() + " - ","--- START : JOKES SCRAPER ---")
+  #print(datetime.now() + " - ","-----------------------------")
   #scrape_internal("LAPECORASCLERA", "1")
-  #print("-----------------------------")
+  #print(datetime.now() + " - ","-----------------------------")
   #scrape_internal("FUORIDITESTA", "1")
-  print("-----------------------------")
+  print(datetime.now() + " - ","-----------------------------")
   scrape_internal("LAPECORASCLERA", "0")
-  print("-----------------------------")
+  print(datetime.now() + " - ","-----------------------------")
   scrape_internal("FUORIDITESTA", "0")
-  print("-----------------------------")
-  print("---- END : JOKES SCRAPER ----")
+  print(datetime.now() + " - ","-----------------------------")
+  print(datetime.now() + " - ","---- END : JOKES SCRAPER ----")
 
 def scrape_internal(scraper: str, page: str):
   try:
@@ -372,20 +372,20 @@ def scrape_internal(scraper: str, page: str):
     url=url+"?"+params
     r = requests.get(url)
     if r.status_code != 200:
-      print(scraper + ": Error scraping jokes!")
+      print(datetime.now() + " - ",scraper + ": Error scraping jokes!")
       pass
     else:
       full_json = r.text
       full = json.loads(full_json)
-      print(scraper + ": Jokes scraper result")
-      print("status:"+ str(full['status']))
-      print("numberTotal:"+ str(full['numberTotal']))
-      print("numberDone:"+ str(full['numberDone']))
+      print(datetime.now() + " - ",scraper + ": Jokes scraper result")
+      print(datetime.now() + " - ","status:"+ str(full['status']))
+      print(datetime.now() + " - ","numberTotal:"+ str(full['numberTotal']))
+      print(datetime.now() + " - ","numberDone:"+ str(full['numberDone']))
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(exc_type, fname, exc_tb.tb_lineno)
-    print("Error scraping jokes!")
+    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+    print(datetime.now() + " - ","Error scraping jokes!")
 
 def get_random_date():
   offset = '-' + str(random.randint(1, 4)) + 'y'
@@ -458,7 +458,7 @@ def extract_sentences_from_chatbot(filename: str, word: str, distinct: bool, cha
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(exc_type, fname, exc_tb.tb_lineno)
+    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
     return "Error extracting sentences!"
   finally:
     if sqliteConnection:
@@ -475,7 +475,7 @@ def get_random_string(length):
 def train_json(json_req, chatbot: ChatBot):
   try:
     if not json_req:
-      print(empty_template_trainfile_json())
+      print(datetime.now() + " - ",empty_template_trainfile_json())
     else:
       content = json_req
       trainer = TranslatedListTrainer(chatbot, lang=content['language'], translator_provider=TRANSLATOR_PROVIDER, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
@@ -490,12 +490,12 @@ def train_json(json_req, chatbot: ChatBot):
         trainer.train(trainarray)
         i = i + 1
 
-      print(TrainJson("Done.", content['language'], []).__dict__)
+      print(datetime.now() + " - ",TrainJson("Done.", content['language'], []).__dict__)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(exc_type, fname, exc_tb.tb_lineno)
-    print(empty_template_trainfile_json())
+    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+    print(datetime.now() + " - ",empty_template_trainfile_json())
 
 def empty_template_trainfile_json():
   trainJsonSentencesArray=[]
@@ -528,7 +528,7 @@ def allowed_file(filename):
 
 def train_txt(trainfile, chatbot: ChatBot, lang: str):
   try:
-      print("Loading: " + trainfile)
+      print(datetime.now() + " - ","Loading: " + trainfile)
       trainer = TranslatedListTrainer(chatbot, lang=lang, translator_provider=TRANSLATOR_PROVIDER, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
       trainfile_array = []
       with open(trainfile) as file:
@@ -540,13 +540,13 @@ def train_txt(trainfile, chatbot: ChatBot, lang: str):
                 trainfile_array=[]
       if len(trainfile_array) > 0:
         trainer.train(trainfile_array)
-      print("Done. Deleting: " + trainfile)
+      print(datetime.now() + " - ","Done. Deleting: " + trainfile)
       os.remove(trainfile)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(exc_type, fname, exc_tb.tb_lineno)
-    print("Error! Please upload a trainfile.txt")
+    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+    print(datetime.now() + " - ","Error! Please upload a trainfile.txt")
 
 def delete_by_text(chatid: str, text: str, force = False):
   try:
@@ -558,7 +558,7 @@ def delete_by_text(chatid: str, text: str, force = False):
 
     data_tuple = ()
 
-    print("delete_by_text - Executing: " + sqlite_delete_query)
+    print(datetime.now() + " - ","delete_by_text - Executing: " + sqlite_delete_query)
 
     cursor.execute(sqlite_delete_query, data_tuple)
     sqliteConnection.commit()
@@ -569,7 +569,7 @@ def delete_by_text(chatid: str, text: str, force = False):
 
     return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot e dal db audio!')
   except sqlite3.Error as error:
-    print("Failed to delete data from sqlite", error)
+    print(datetime.now() + " - ","Failed to delete data from sqlite", error)
     return("Errore!")
   finally:
     if sqliteConnection:
@@ -587,14 +587,14 @@ def delete_from_audiodb_by_text(chatid: str, text: str):
 
     data_tuple = ()
 
-    print("delete_from_audiodb_by_text - Executing: " + sqlite_delete_query)
+    print(datetime.now() + " - ","delete_from_audiodb_by_text - Executing: " + sqlite_delete_query)
 
     cursor.execute(sqlite_delete_query, data_tuple)
     sqliteConnection.commit()
     cursor.close()
 
   except sqlite3.Error as error:
-    print("Failed to delete data from sqlite", error)
+    print(datetime.now() + " - ","Failed to delete data from sqlite", error)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -635,7 +635,7 @@ def get_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=False)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(exc_type, fname, exc_tb.tb_lineno)
+    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
     if voice == "random" or israndom:
       return get_tts_google(text.strip(), chatid=chatid)
     else:
@@ -688,7 +688,7 @@ def get_fakeyou_voices(category: str):
 
 def generate_ijt(fy,text:str,ttsModelToken:str):
   if fy.v:
-    print("getting job token")
+    print(datetime.now() + " - ","getting job token")
   payload={"uuid_idempotency_token":str(uuid4()),"tts_model_token":ttsModelToken,"inference_text":text}
   handler=fy.session.post(url=fy.baseurl+"tts/inference",data=json.dumps(payload))
   if handler.status_code==200:
@@ -708,7 +708,7 @@ def get_wav_fy(fy,ijt:str, timeout:int):
       hjson=handler.json()
       wavo=wav(hjson)
       if fy.v:
-        print("WAV STATUS :",wavo.status)
+        print(datetime.now() + " - ","WAV STATUS :",wavo.status)
       if wavo.status=="started" and count <= timeout:
         continue
       elif "pending" in wavo.status and count <= timeout:
@@ -759,7 +759,7 @@ def get_random_from_bot(chatid: str):
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(exc_type, fname, exc_tb.tb_lineno)
+    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
     raise Exception(e)
   finally:
     if sqliteConnection:
@@ -773,9 +773,9 @@ def populate_audiodb(chatid: str, count: int):
     sqliteConnection = sqlite3.connect('./config/'+dbfile)
     cursor = sqliteConnection.cursor()
          
-    print("populate_audiodb - Starting Population with parameters:")
-    print("populate_audiodb -      CHATID:    " + chatid)
-    print("populate_audiodb -      COUNT:     " + str(count))
+    print(datetime.now() + " - ","populate_audiodb - Starting Population with parameters:")
+    print(datetime.now() + " - ","populate_audiodb -      CHATID:    " + chatid)
+    print(datetime.now() + " - ","populate_audiodb -      COUNT:     " + str(count))
 
     
     sqlite_select_sentences_query = "SELECT DISTINCT text FROM statement ORDER BY RANDOM() LIMIT " + str(count) + ";"
@@ -795,24 +795,24 @@ def populate_audiodb(chatid: str, count: int):
       for key, voice in listvoices:
         try:
           get_tts(sentence, chatid=chatid, voice=voice, timeout=300)
-          print("populate_audiodb - Population OK")
-          print("populate_audiodb -      CHATID:    " + chatid)
-          print("populate_audiodb -      VOICE:     " + key)
-          print("populate_audiodb -      SENTENCE:  " + sentence)
+          print(datetime.now() + " - ","populate_audiodb - Population OK")
+          print(datetime.now() + " - ","populate_audiodb -      CHATID:    " + chatid)
+          print(datetime.now() + " - ","populate_audiodb -      VOICE:     " + key)
+          print(datetime.now() + " - ","populate_audiodb -      SENTENCE:  " + sentence)
           #time.sleep(2)
         except Exception as e:
           exc_type, exc_obj, exc_tb = sys.exc_info()
           fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-          print(exc_type, fname, exc_tb.tb_lineno)
-          print("populate_audiodb - Population KO")
-          print("populate_audiodb -      CHATID:    " + chatid)
-          print("populate_audiodb -      VOICE:     " + key)
-          print("populate_audiodb -      SENTENCE:  " + sentence)
+          print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+          print(datetime.now() + " - ","populate_audiodb - Population KO")
+          print(datetime.now() + " - ","populate_audiodb -      CHATID:    " + chatid)
+          print(datetime.now() + " - ","populate_audiodb -      VOICE:     " + key)
+          print(datetime.now() + " - ","populate_audiodb -      SENTENCE:  " + sentence)
           if voice != "google":
-            print("populate_audiodb - FakeYou error detected, waiting 30 seconds for next generation.")
+            print(datetime.now() + " - ","populate_audiodb - FakeYou error detected, waiting 30 seconds for next generation.")
             time.sleep(30)
           else:
-            print("populate_audiodb - Google tts error detected.")
+            print(datetime.now() + " - ","populate_audiodb - Google tts error detected.")
 
 
     cursor.close()
@@ -820,7 +820,7 @@ def populate_audiodb(chatid: str, count: int):
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(exc_type, fname, exc_tb.tb_lineno)
+    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
     raise Exception(e)
   finally:
     if sqliteConnection:
@@ -836,7 +836,7 @@ def backupdb(chatid: str):
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(exc_type, fname, exc_tb.tb_lineno)
+    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
     raise Exception(e)
 
 def restore(chatid: str, text: str):
@@ -856,7 +856,7 @@ def restore(chatid: str, text: str):
     cursor.execute(sqlite_select_query, data_tuple)
     records = cursor.fetchall()
 
-    print("restore - Executing: " + sqlite_select_query)
+    print(datetime.now() + " - ","restore - Executing: " + sqlite_select_query)
     
     for row in records:
       sentences = sentences + "\n" + row[0] 
@@ -864,7 +864,7 @@ def restore(chatid: str, text: str):
     cursor.close()
 
   except sqlite3.Error as error:
-    print("Failed to select data from sqlite", error)
+    print(datetime.now() + " - ","Failed to select data from sqlite", error)
     return("Errore!")
   finally:
     if sqliteConnection:

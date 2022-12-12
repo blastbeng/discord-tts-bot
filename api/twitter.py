@@ -64,7 +64,7 @@ def create_empty_tables_cache():
     cursor.execute(sqlite_create_posts_query)
 
   except sqlite3.Error as error:
-    print("Failed to create tables", error)
+    print(datetime.now() + " - ","Failed to create tables", error)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -88,7 +88,7 @@ def create_empty_tables_persistent():
     cursor.execute(sqlite_create_searches_query)
 
   except sqlite3.Error as error:
-    print("Failed to create tables", error)
+    print(datetime.now() + " - ","Failed to create tables", error)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -128,8 +128,8 @@ def scrape(words: str, count: int):
   except Esception as error:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print("Failed to scrape from twitter", error)
-    print(exc_type, fname, exc_tb.tb_lineno)
+    print(datetime.now() + " - ","Failed to scrape from twitter", error)
+    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -153,7 +153,7 @@ def insert_search(words: str):
     cursor.close()
 
   except sqlite3.Error as error:
-    print("Failed to insert data into sqlite", error)
+    print(datetime.now() + " - ","Failed to insert data into sqlite", error)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -176,7 +176,7 @@ def get_all_searches():
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(exc_type, fname, exc_tb.tb_lineno)
+    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
     return []
   finally:
     if sqliteConnection:
@@ -208,7 +208,7 @@ def search_all_random():
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(exc_type, fname, exc_tb.tb_lineno)
+    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
     return Post("Error", "", "")
   finally:
     if sqliteConnection:
@@ -258,7 +258,7 @@ def search_random(word: str, sched, callcount):
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
+      print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
       return Post("Error", "", "")
     finally:
       if sqliteConnection:
