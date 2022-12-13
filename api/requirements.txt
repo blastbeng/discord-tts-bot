@@ -31,3 +31,4 @@ sqlitedict
 Flask-Limiter
 uwsgi-tools
 pydub
+tqdm

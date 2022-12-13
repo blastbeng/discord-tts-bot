@@ -10,7 +10,8 @@ import insults
 import requests
 import sys
 import os
-import datetime
+import io
+from datetime import datetime
 import string
 import fakeyou
 import time
@@ -18,6 +19,7 @@ import wave
 import audioop
 import logging
 import audiodb
+from tqdm import tqdm
 from uuid import uuid4
 from chatterbot import ChatBot
 from chatterbot.conversation import Statement
@@ -26,8 +28,8 @@ from custom_trainer import CustomTrainer
 from chatterbot.comparisons import LevenshteinDistance
 #from chatterbot.comparisons import SpacySimilarity
 #from chatterbot.comparisons import JaccardSimilarity
-#from chatterbot.response_selection import get_random_response
-from chatterbot.response_selection import get_most_frequent_response
+from chatterbot.response_selection import get_random_response
+#from chatterbot.response_selection import get_most_frequent_response
 from gtts import gTTS
 from io import BytesIO
 from pytube import YouTube
@@ -52,7 +54,12 @@ MYMEMORY_TRANSLATOR_EMAIL = os.environ.get("MYMEMORY_TRANSLATOR_EMAIL")
 FAKEYOU_USER = os.environ.get("FAKEYOU_USER")
 FAKEYOU_PASS = os.environ.get("FAKEYOU_PASS")
 
+logging.basicConfig(
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        level=int(os.environ.get("LOG_LEVEL")),
+        datefmt='%Y-%m-%d %H:%M:%S')
 log = logging.getLogger('werkzeug')
+log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 fy=fakeyou.FakeYou()
 fy.login(FAKEYOU_USER,FAKEYOU_PASS)
@@ -64,6 +71,22 @@ EXCEPTION_YOUTUBE_AUDIO = 'Errore nella riproduzione da Youtube.'
 
 wikipedia.set_lang("it")
 
+class TqdmToLogger(io.StringIO):
+    """
+        Output stream for TQDM which will output to logger module instead of
+        the StdOut.
+    """
+    logger = None
+    level = None
+    buf = ''
+    def __init__(self,logger,level=None):
+        super(TqdmToLogger, self).__init__()
+        self.logger = logger
+        self.level = level or logging.INFO
+    def write(self,buf):
+        self.buf = buf.strip('\r\n\t ')
+    def flush(self):
+        self.logger.log(self.level, self.buf)
 
 class YoutubeVideo():
     def __init__(self):
@@ -92,6 +115,7 @@ def ClassFactory(name, argnames, BaseClass=BaseClass):
         BaseClass.__init__(self, name[:-len("Class")])
     newclass = type(name, (BaseClass,),{"__init__": __init__})
     return newclass
+
 
 
 def wiki_summary(testo: str):
@@ -127,6 +151,24 @@ def get_tts_google(text: str, chatid="000000"):
     #return memoryBuff
     #return fp
 
+def populate_tts_google(text: str, chatid="000000"):
+  data = audiodb.select(text, chatid, "google")
+  if data is not None:
+    return False
+  else:
+    tts = gTTS(text=text, lang="it", slow=False)
+    fp = BytesIO()
+    tts.write_to_fp(fp)
+    fp.seek(0)
+    sound = AudioSegment.from_mp3(fp)
+    memoryBuff = BytesIO()
+    sound.export(memoryBuff, format='mp3', bitrate="256")
+    memoryBuff.seek(0)
+    audiodb.insert(text, chatid, memoryBuff, "google")
+    return True
+    #return memoryBuff
+    #return fp
+
 def clean_input(testo: str):
   re_equ = r"(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’]))"
   ck_url = re.findall(re_equ, testo)
@@ -150,7 +192,7 @@ def get_chatterbot(chatid: str, train: bool):
       storage_adapter='chatterbot.storage.SQLStorageAdapter',
       database_uri='sqlite:///config/'+dbfile,
       statement_comparison_function = LevenshteinDistance,
-      response_selection_method = get_most_frequent_response,
+      response_selection_method = get_random_response,
       logic_adapters=[
           {
               'import_path': 'chatterbot.logic.BestMatch',
@@ -247,11 +289,11 @@ def populate_new_sentences(chatbot: ChatBot, count: int, word: str, fromapi: boo
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     if fromapi:
       return "Errore!"
-    else:
-      print(datetime.now() + " - ","Error populating sentences!")
+    #else:
+    #  logging.error("Error populating sentences!", exc_info=1)
   finally:
     try:
       os.remove(filename)
@@ -346,22 +388,13 @@ def get_joke(cat: str):
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return "Riprova tra qualche secondo..."
 
 
 def scrape_jokes():
-  print(datetime.now() + " - ","--- START : JOKES SCRAPER ---")
-  #print(datetime.now() + " - ","-----------------------------")
-  #scrape_internal("LAPECORASCLERA", "1")
-  #print(datetime.now() + " - ","-----------------------------")
-  #scrape_internal("FUORIDITESTA", "1")
-  print(datetime.now() + " - ","-----------------------------")
   scrape_internal("LAPECORASCLERA", "0")
-  print(datetime.now() + " - ","-----------------------------")
   scrape_internal("FUORIDITESTA", "0")
-  print(datetime.now() + " - ","-----------------------------")
-  print(datetime.now() + " - ","---- END : JOKES SCRAPER ----")
 
 def scrape_internal(scraper: str, page: str):
   try:
@@ -372,20 +405,14 @@ def scrape_internal(scraper: str, page: str):
     url=url+"?"+params
     r = requests.get(url)
     if r.status_code != 200:
-      print(datetime.now() + " - ",scraper + ": Error scraping jokes!")
       pass
     else:
       full_json = r.text
       full = json.loads(full_json)
-      print(datetime.now() + " - ",scraper + ": Jokes scraper result")
-      print(datetime.now() + " - ","status:"+ str(full['status']))
-      print(datetime.now() + " - ","numberTotal:"+ str(full['numberTotal']))
-      print(datetime.now() + " - ","numberDone:"+ str(full['numberDone']))
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
-    print(datetime.now() + " - ","Error scraping jokes!")
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 def get_random_date():
   offset = '-' + str(random.randint(1, 4)) + 'y'
@@ -458,7 +485,7 @@ def extract_sentences_from_chatbot(filename: str, word: str, distinct: bool, cha
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return "Error extracting sentences!"
   finally:
     if sqliteConnection:
@@ -475,7 +502,7 @@ def get_random_string(length):
 def train_json(json_req, chatbot: ChatBot):
   try:
     if not json_req:
-      print(datetime.now() + " - ",empty_template_trainfile_json())
+      logging.info(empty_template_trainfile_json())
     else:
       content = json_req
       trainer = TranslatedListTrainer(chatbot, lang=content['language'], translator_provider=TRANSLATOR_PROVIDER, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
@@ -490,12 +517,11 @@ def train_json(json_req, chatbot: ChatBot):
         trainer.train(trainarray)
         i = i + 1
 
-      print(datetime.now() + " - ",TrainJson("Done.", content['language'], []).__dict__)
+      logging.info(TrainJson("Done.", content['language'], []).__dict__, exc_info=1)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
-    print(datetime.now() + " - ",empty_template_trainfile_json())
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 def empty_template_trainfile_json():
   trainJsonSentencesArray=[]
@@ -528,7 +554,7 @@ def allowed_file(filename):
 
 def train_txt(trainfile, chatbot: ChatBot, lang: str):
   try:
-      print(datetime.now() + " - ","Loading: " + trainfile)
+      logging.info("Loading: %s", trainfile)
       trainer = TranslatedListTrainer(chatbot, lang=lang, translator_provider=TRANSLATOR_PROVIDER, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
       trainfile_array = []
       with open(trainfile) as file:
@@ -540,13 +566,12 @@ def train_txt(trainfile, chatbot: ChatBot, lang: str):
                 trainfile_array=[]
       if len(trainfile_array) > 0:
         trainer.train(trainfile_array)
-      print(datetime.now() + " - ","Done. Deleting: " + trainfile)
+      logging.info("Done. Deleting: " + trainfile)
       os.remove(trainfile)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
-    print(datetime.now() + " - ","Error! Please upload a trainfile.txt")
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 def delete_by_text(chatid: str, text: str, force = False):
   try:
@@ -558,7 +583,7 @@ def delete_by_text(chatid: str, text: str, force = False):
 
     data_tuple = ()
 
-    print(datetime.now() + " - ","delete_by_text - Executing: " + sqlite_delete_query)
+    logging.info("delete_by_text - Executing: %s", sqlite_delete_query)
 
     cursor.execute(sqlite_delete_query, data_tuple)
     sqliteConnection.commit()
@@ -569,7 +594,7 @@ def delete_by_text(chatid: str, text: str, force = False):
 
     return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot e dal db audio!')
   except sqlite3.Error as error:
-    print(datetime.now() + " - ","Failed to delete data from sqlite", error)
+    logging.error("Failed to delete data from sqlite", exc_info=1)
     return("Errore!")
   finally:
     if sqliteConnection:
@@ -587,14 +612,14 @@ def delete_from_audiodb_by_text(chatid: str, text: str):
 
     data_tuple = ()
 
-    print(datetime.now() + " - ","delete_from_audiodb_by_text - Executing: " + sqlite_delete_query)
+    logging.info("delete_from_audiodb_by_text - Executing:  %s", sqlite_delete_query, exc_info=1)
 
     cursor.execute(sqlite_delete_query, data_tuple)
     sqliteConnection.commit()
     cursor.close()
 
   except sqlite3.Error as error:
-    print(datetime.now() + " - ","Failed to delete data from sqlite", error)
+    logging.error("Failed to delete data from sqlite", exc_info=1)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -635,11 +660,44 @@ def get_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=False)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     if voice == "random" or israndom:
       return get_tts_google(text.strip(), chatid=chatid)
     else:
       raise Exception(e)
+
+def populate_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=False):
+  try:
+    if voice is None or voice == "null" or voice == "random":
+      voice_to_use = get_random_voice()
+    else:
+      voice_to_use = voice
+    if voice_to_use != "google": 
+      datafy = audiodb.select(text.strip(), chatid, voice_to_use)
+      if datafy is not None:
+        return False
+      else:
+        if bool(random.getrandbits(1)):
+          proxies = {'http': 'http://192.168.1.160:9058'}
+          fy.session.proxies.update(proxies)
+        else:
+          proxies = {}
+          fy.session.proxies.update(proxies)
+        ijt = generate_ijt(fy, text.strip(), voice_to_use)
+        if ijt is not None:
+          out = get_wav_fy(fy,ijt, timeout=timeout)
+          if out is not None:
+            audiodb.insert(text.strip(), chatid, out, voice_to_use)
+            return True
+          raise Exception("FakeYou Generation KO")
+        raise Exception("FakeYou Generation KO")
+    else:
+      return populate_tts_google(text.strip(), chatid=chatid)
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    raise Exception(e)
 
 def get_random_voice():
   localvoices = get_fakeyou_voices("Italiano")
@@ -688,7 +746,7 @@ def get_fakeyou_voices(category: str):
 
 def generate_ijt(fy,text:str,ttsModelToken:str):
   if fy.v:
-    print(datetime.now() + " - ","getting job token")
+    logging.info("FakeYou - getting job token")
   payload={"uuid_idempotency_token":str(uuid4()),"tts_model_token":ttsModelToken,"inference_text":text}
   handler=fy.session.post(url=fy.baseurl+"tts/inference",data=json.dumps(payload))
   if handler.status_code==200:
@@ -708,7 +766,7 @@ def get_wav_fy(fy,ijt:str, timeout:int):
       hjson=handler.json()
       wavo=wav(hjson)
       if fy.v:
-        print(datetime.now() + " - ","WAV STATUS :",wavo.status)
+        logging.info("FakeYou - WAV STATUS: %s", wavo.status, exc_info=1)
       if wavo.status=="started" and count <= timeout:
         continue
       elif "pending" in wavo.status and count <= timeout:
@@ -759,7 +817,7 @@ def get_random_from_bot(chatid: str):
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     raise Exception(e)
   finally:
     if sqliteConnection:
@@ -769,16 +827,29 @@ def get_random_from_bot(chatid: str):
 
 def populate_audiodb(chatid: str, count: int):  
   try:
+    
+    voices = get_fakeyou_voices("Italiano")
+    #voices={}
+    #voices["google"] = "google"
+    listvoices = list(voices.items())
+
+    logging.info("populate_audiodb - STARTED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(count))
+            
     dbfile=chatid+"-db.sqlite3"
+
     sqliteConnection = sqlite3.connect('./config/'+dbfile)
     cursor = sqliteConnection.cursor()
-         
-    print(datetime.now() + " - ","populate_audiodb - Starting Population with parameters:")
-    print(datetime.now() + " - ","populate_audiodb -      CHATID:    " + chatid)
-    print(datetime.now() + " - ","populate_audiodb -      COUNT:     " + str(count))
-
     
-    sqlite_select_sentences_query = "SELECT DISTINCT text FROM statement ORDER BY RANDOM() LIMIT " + str(count) + ";"
+
+    cursor.execute("ATTACH DATABASE ? AS audiodb",("./config/audiodb.sqlite3",))
+
+    sqlite_select_sentences_query = "SELECT DISTINCT * FROM ( "
+    sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT statement.text as name FROM statement WHERE statement.text NOT IN (SELECT audiodb.audio.name from audiodb.audio) ORDER BY RANDOM() LIMIT " + str(count) + ")"
+    sqlite_select_sentences_query = sqlite_select_sentences_query + " UNION "
+    sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio GROUP BY audio.name HAVING COUNT(audio.name) < " + str(len(listvoices)) + " ORDER BY RANDOM() LIMIT " + str(count) + ")"
+    sqlite_select_sentences_query = sqlite_select_sentences_query + ") LIMIT " + str(count);
+
+    log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query)
 
     data = ()
 
@@ -786,45 +857,53 @@ def populate_audiodb(chatid: str, count: int):
     records = cursor.fetchall()
 
     count = 0
+    tqdm_out = TqdmToLogger(logging,level=logging.INFO)
+
+    sentences = [] 
 
     for row in records:
-      sentence = row[0]      
-      voices = get_fakeyou_voices("Italiano")
-      listvoices = list(voices.items())
-      random.shuffle(listvoices)
-      for key, voice in listvoices:
-        try:
-          get_tts(sentence, chatid=chatid, voice=voice, timeout=300)
-          print(datetime.now() + " - ","populate_audiodb - Population OK")
-          print(datetime.now() + " - ","populate_audiodb -      CHATID:    " + chatid)
-          print(datetime.now() + " - ","populate_audiodb -      VOICE:     " + key)
-          print(datetime.now() + " - ","populate_audiodb -      SENTENCE:  " + sentence)
-          #time.sleep(2)
-        except Exception as e:
-          exc_type, exc_obj, exc_tb = sys.exc_info()
-          fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-          print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
-          print(datetime.now() + " - ","populate_audiodb - Population KO")
-          print(datetime.now() + " - ","populate_audiodb -      CHATID:    " + chatid)
-          print(datetime.now() + " - ","populate_audiodb -      VOICE:     " + key)
-          print(datetime.now() + " - ","populate_audiodb -      SENTENCE:  " + sentence)
-          if voice != "google":
-            print(datetime.now() + " - ","populate_audiodb - FakeYou error detected, waiting 30 seconds for next generation.")
-            time.sleep(30)
-          else:
-            print(datetime.now() + " - ","populate_audiodb - Google tts error detected.")
-
+      sentences.append(row[0])
 
     cursor.close()
-    return sentence
+    sqliteConnection.close()
+
+
+    for sentence in tqdm(sentences,file=tqdm_out,desc="populate_audiodb - Progress",mininterval=60,):
+      random.shuffle(listvoices)
+      for key, voice in listvoices:
+      #for key, voice in progressBar(listvoices, prefix = 'populate_audiodb - Progress:', suffix = 'Complete', length = 50):
+        result = False
+        start = True
+        while start:
+          try:
+            generation = ""
+            inserted = ""
+            result = populate_tts(sentence, chatid=chatid, voice=voice, timeout=300)
+            if result:
+              generation="Done"
+              inserted="Done"
+            else:
+              generation="Skipped"
+              inserted="Skipped (Already in db)"
+            logging.info("populate_audiodb\n         CHATID: %s\n         VOICE: %s\n         SENTENCE: %s\n         GENERATION: %s\n         INSERT: %s", chatid, key, sentence, generation, inserted)
+            start = False
+          except Exception as e:
+            start = True
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            logging.error("populate_audiodb\n         CHATID: %s\n         VOICE: %s\n         SENTENCE: %s\n         EXCEPTION: %s %s %s", chatid, key, sentence, exc_type, fname, exc_tb.tb_lineno)
+          finally:
+            if (generation == "Done" and voice != "google") or (start and voice != "google"):
+              time.sleep(30)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     raise Exception(e)
   finally:
     if sqliteConnection:
-        sqliteConnection.close()
+      sqliteConnection.close()
+    logging.info("populate_audiodb - ENDED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(count))
 
 
 
@@ -836,7 +915,7 @@ def backupdb(chatid: str):
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     raise Exception(e)
 
 def restore(chatid: str, text: str):
@@ -856,7 +935,7 @@ def restore(chatid: str, text: str):
     cursor.execute(sqlite_select_query, data_tuple)
     records = cursor.fetchall()
 
-    print(datetime.now() + " - ","restore - Executing: " + sqlite_select_query)
+    logging.info("restore - Executing: %s", sqlite_select_query)
     
     for row in records:
       sentences = sentences + "\n" + row[0] 
@@ -864,7 +943,7 @@ def restore(chatid: str, text: str):
     cursor.close()
 
   except sqlite3.Error as error:
-    print(datetime.now() + " - ","Failed to select data from sqlite", error)
+    logging.error("Failed to select data from sqlite", exc_info=1)
     return("Errore!")
   finally:
     if sqliteConnection:

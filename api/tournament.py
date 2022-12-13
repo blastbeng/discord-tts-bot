@@ -1,17 +1,25 @@
 import os
 import random
 import sqlite3
-
+import logging
 from decimal import Decimal
 from dotenv import load_dotenv
 from itertools import combinations
 from os.path import dirname
 from os.path import join
 from pathlib import Path
+from datetime import datetime
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 TMP_DIR = os.environ.get("TMP_DIR")
+
+logging.basicConfig(
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        level=int(os.environ.get("LOG_LEVEL")),
+        datefmt='%Y-%m-%d %H:%M:%S')
+log = logging.getLogger('werkzeug')
+log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 class TournamentUsers():
   def __init__(self, id, username, image, title):
@@ -219,7 +227,7 @@ def create_empty_tables():
     cursor.execute(sqlite_create_users_query)
 
   except sqlite3.Error as error:
-    print(datetime.now() + " - ","Failed to create tables", error)
+    logging.error("Failed to create tables: %s %s %s", exc_info=1)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -260,7 +268,7 @@ def save_temp_tournament(content):
     cursor.close()
 
   except sqlite3.Error as error:
-    print(datetime.now() + " - ","Failed to insert data into sqlite", error)
+    logging.error("Failed to insert data into sqlite", exc_info=1)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -332,7 +340,7 @@ def regen_tournament(author: str, name: str, description: str):
         "users":        json_user_list
       }
   except sqlite3.Error as error:
-    print(datetime.now() + " - ","Failed to read data from sqlite table", error)
+    logging.error("Failed to read data from sqlite table", exc_info=1)
   finally:
     if sqliteConnection:
       sqliteConnection.close()

@@ -5,6 +5,8 @@ import sys
 import threading
 import tweepy
 import utils
+import logging
+from datetime import datetime
 
 from dotenv import load_dotenv
 from os.path import dirname
@@ -13,6 +15,12 @@ from pathlib import Path
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
+logging.basicConfig(
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        level=int(os.environ.get("LOG_LEVEL")),
+        datefmt='%Y-%m-%d %H:%M:%S')
+log = logging.getLogger('werkzeug')
+log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 TMP_DIR = os.environ.get("TMP_DIR")
 TWITTER_CONSUMER_KEY = os.environ.get("TWITTER_CONSUMER_KEY")
@@ -64,7 +72,7 @@ def create_empty_tables_cache():
     cursor.execute(sqlite_create_posts_query)
 
   except sqlite3.Error as error:
-    print(datetime.now() + " - ","Failed to create tables", error)
+    logging.error("Failed to create tables: %s %s %s", exc_info=1)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -88,7 +96,7 @@ def create_empty_tables_persistent():
     cursor.execute(sqlite_create_searches_query)
 
   except sqlite3.Error as error:
-    print(datetime.now() + " - ","Failed to create tables", error)
+    logging.error("Failed to create tables: %s %s %s", exc_info=1)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -128,8 +136,7 @@ def scrape(words: str, count: int):
   except Esception as error:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(datetime.now() + " - ","Failed to scrape from twitter", error)
-    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -153,7 +160,7 @@ def insert_search(words: str):
     cursor.close()
 
   except sqlite3.Error as error:
-    print(datetime.now() + " - ","Failed to insert data into sqlite", error)
+    logging.error("Failed to insert data into sqlite", exc_info=1)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -176,7 +183,7 @@ def get_all_searches():
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return []
   finally:
     if sqliteConnection:
@@ -208,7 +215,7 @@ def search_all_random():
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return Post("Error", "", "")
   finally:
     if sqliteConnection:
@@ -258,7 +265,7 @@ def search_random(word: str, sched, callcount):
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return Post("Error", "", "")
     finally:
       if sqliteConnection:

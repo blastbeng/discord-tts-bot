@@ -11,7 +11,7 @@ import threading
 import random
 import sys
 import shutil
-import datetime
+from datetime import datetime
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask import Flask, request, send_file, Response, jsonify, render_template, make_response, after_this_request, g
@@ -27,8 +27,10 @@ from dotenv import load_dotenv
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 
-logging.basicConfig(level=int(os.environ.get("LOG_LEVEL")))
-
+logging.basicConfig(
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        level=int(os.environ.get("LOG_LEVEL")),
+        datefmt='%Y-%m-%d %H:%M:%S')
 log = logging.getLogger('werkzeug')
 log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
@@ -564,7 +566,7 @@ class AudioSearchClass(Resource):
 #class WebhookTest(Resource):
 #  def webhook():
 #    if request.method == 'POST':
-#      print(datetime.now() + " - ","Data received from Webhook is: ", request.json)
+#      print(str(datetime.now()) + " -","Data received from Webhook is: ", request.json)
 #    return "Webhook received!"
 
 
@@ -588,7 +590,7 @@ class UtilsDownloadClass(Resource):
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return get_response_str("Error downloading from server.")
 
 @limiter.limit("1/second")
@@ -661,7 +663,7 @@ class UtilsTrainFile(Resource):
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(datetime.now() + " - ", exc_type, fname, exc_tb.tb_lineno)
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return utils.empty_template_trainfile_json()
 	
 
@@ -683,8 +685,14 @@ class UtilsTrainFile(Resource):
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(datetime.now() + " - ",exc_type, fname, exc_tb.tb_lineno)
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
+
+@nsdatabase.route('/jokes/scrape')
+class ScrapeJokesObj(Resource):
+  def get (self):
+    threading.Timer(0, utils.scrape_jokes, args=[]).start()
+    return "Starting thread scrape_jokes. Watch the logs."
 
 @nsdatabase.route('/backup/chatbot/')
 @nsdatabase.route('/backup/chatbot/<string:chatid>')
@@ -743,18 +751,21 @@ def scrape_jokes():
   utils.scrape_jokes()
   
 @scheduler.task('interval', id='login_fakeyou', hours=11, misfire_grace_time=900)
-def scrape_jokes():
+def login_fakeyou():
   utils.login_fakeyou()
   
 @scheduler.task('interval', id='populate_audiodb', hours=5, misfire_grace_time=900)
 def populate_audiodb():
-  #chatid, chatbot = random.choice(list(chatbots_dict.items()))
   utils.populate_audiodb("000000", 100)
-
   
+@scheduler.task('interval', id='backupdb', hours=24, misfire_grace_time=900)
+def backupdb():
+  utils.backupdb("000000")
+
+
 #@scheduler.task('cron', id='populate_sentences', hour=4, minute=10, second=0, misfire_grace_time=900)
 #def populate_sentences():
-#  print(datetime.now() + " - ",utils.populate_new_sentences(chatbot, 1000, None, False))
+#  print(str(datetime.now()) + " -",utils.populate_new_sentences(chatbot, 1000, None, False))
 
 
 

@@ -1,10 +1,23 @@
 import os
 import sqlite3
+import logging
 
 from io import BytesIO
+from dotenv import load_dotenv
 from os.path import dirname
 from os.path import join
 from pathlib import Path
+from datetime import datetime
+
+dotenv_path = join(dirname(__file__), '.env')
+load_dotenv(dotenv_path)
+
+logging.basicConfig(
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        level=int(os.environ.get("LOG_LEVEL")),
+        datefmt='%Y-%m-%d %H:%M:%S')
+log = logging.getLogger('werkzeug')
+log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 def check_db_exists(): 
   fle = Path("./config/audiodb.sqlite3")
@@ -30,7 +43,7 @@ def create_empty_tables():
     cursor.execute(sqlite_create_audio_query)
 
   except sqlite3.Error as error:
-    print(datetime.now() + " - ","Failed to create tables", error)
+    logging.error("Failed to create tables: %s %s %s", exc_info=1)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -57,7 +70,7 @@ def insert(name: str, chatid: str, data: BytesIO, voice: str):
     cursor.close()
 
   except sqlite3.Error as error:
-    print(datetime.now() + " - ","Failed to insert data into sqlite", error)
+    logging.error("Failed to insert data into sqlite", exc_info=1)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -83,7 +96,7 @@ def select(name: str, chatid: str, voice: str):
         audio.seek(0)
 
     except sqlite3.Error as error:
-      print(datetime.now() + " - ","Failed to read data from sqlite table", error)
+      logging.error("Failed to read data from sqlite table", exc_info=1)
     finally:
       if sqliteConnection:
         sqliteConnection.close()
@@ -112,7 +125,7 @@ def delete_by_name(name: str, chatid: str):
     cursor.close()
 
   except Exception as e:
-    print(datetime.now() + " - ","Failed to read data from sqlite table", e)
+    logging.error("Failed to read data from sqlite table", exc_info=1)
     raise Exception(e)
   finally:
     if sqliteConnection:
