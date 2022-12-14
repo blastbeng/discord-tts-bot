@@ -37,6 +37,7 @@ def create_empty_tables():
             chatid VARCHAR(50) NOT NULL,
             data BLOB NOT NULL,
             voice VARCHAR(50) NOT NULL,
+            is_correct INTEGER DEFAULT 0 NOT NULL,
             UNIQUE(name,chatid,voice)
         ); """
 
@@ -54,14 +55,15 @@ def insert(name: str, chatid: str, data: BytesIO, voice: str):
     cursor = sqliteConnection.cursor()
 
     sqlite_insert_audio_query = """INSERT INTO Audio
-                          (name, chatid, data, voice) 
+                          (name, chatid, data, voice, is_correct) 
                            VALUES 
-                          (?, ?, ?, ?)"""
+                          (?, ?, ?, ?, ?)"""
 
     data_audio_tuple = (name, 
                         chatid, 
                         data.read(),
-                        voice)
+                        voice,
+                        0)
 
     cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
 
@@ -76,7 +78,24 @@ def insert(name: str, chatid: str, data: BytesIO, voice: str):
         sqliteConnection.close()
 
 
-def select(name: str, chatid: str, voice: str):
+def select_by_chatid(chatid="000000"):
+  records = None
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
+
+    sqlite_select_query = """SELECT * from Audio WHERE chatid = ?"""
+    cursor.execute(sqlite_select_query, (chatid,))
+    records = cursor.fetchall()
+
+  except sqlite3.Error as error:
+    logging.error("Failed to read data from sqlite table", exc_info=1)
+  finally:
+    if sqliteConnection:
+      sqliteConnection.close()
+  return records
+
+def select_by_name_chatid_voice(name: str, chatid: str, voice: str):
   if chatid == "X":
     return None
   else:
@@ -86,7 +105,7 @@ def select(name: str, chatid: str, voice: str):
       cursor = sqliteConnection.cursor()
 
       sqlite_select_query = """SELECT data from Audio WHERE name = ? AND chatid = ? AND voice = ? """
-      cursor.execute(sqlite_select_query, (name, chatid, voice))
+      cursor.execute(sqlite_select_query, (name, chatid, voice,))
       records = cursor.fetchall()
 
       for row in records:
@@ -101,6 +120,7 @@ def select(name: str, chatid: str, voice: str):
       if sqliteConnection:
         sqliteConnection.close()
     return audio
+
 
 
 def delete_by_name(name: str, chatid: str):

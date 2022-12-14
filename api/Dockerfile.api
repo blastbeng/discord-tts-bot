@@ -26,7 +26,8 @@ RUN apt-get update && \
         procps \
         python3-enchant \
         libpcre3-dev \
-        libpcre3
+        libpcre3 \
+        hunspell-it
         
 RUN echo 'vm.overcommit_memory=1' >> /etc/sysctl.conf
 
@@ -50,6 +51,7 @@ WORKDIR /app
 
 COPY data data
 COPY templates templates
+COPY static static
 COPY utils.py .
 COPY audiodb.py .
 COPY custom_trainer.py .

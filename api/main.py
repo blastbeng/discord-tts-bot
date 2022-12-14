@@ -722,7 +722,13 @@ class AdminForceDeleteByText(Resource):
 
 @app.route('/upload')
 def upload_file():
-   return render_template('upload.html')
+  return render_template('upload.html')
+
+@app.route('/manager')
+def manager():
+  audios = audiodb.select_by_chatid()
+  return render_template('manager.html', audios=audios)
+
 
 
 

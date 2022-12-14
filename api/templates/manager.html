@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>{% block title %} Welcome to FlaskBlog {% endblock %}</h1>
+    {% for audio in audios %}
+        <a href="#">
+            <h2>{{ audio['name'] }}</h2>
+        </a>
+        <span class="badge badge-primary">{{ audio['voice'] }}</span>
+        <hr>
+    {% endfor %}
+{% endblock %}

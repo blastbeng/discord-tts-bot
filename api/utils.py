@@ -134,7 +134,7 @@ def generate(filename: str):
           data = fmp3.read(1024)
 
 def get_tts_google(text: str, chatid="000000"):
-  data = audiodb.select(text, chatid, "google")
+  data = audiodb.select_by_name_chatid_voice(text, chatid, "google")
   if data is not None:
     return data
   else:
@@ -147,12 +147,12 @@ def get_tts_google(text: str, chatid="000000"):
     sound.export(memoryBuff, format='mp3', bitrate="256")
     memoryBuff.seek(0)
     audiodb.insert(text, chatid, memoryBuff, "google")
-    return audiodb.select(text, chatid, "google")
+    return audiodb.select_by_name_chatid_voice(text, chatid, "google")
     #return memoryBuff
     #return fp
 
 def populate_tts_google(text: str, chatid="000000"):
-  data = audiodb.select(text, chatid, "google")
+  data = audiodb.select_by_name_chatid_voice(text, chatid, "google")
   if data is not None:
     return False
   else:
@@ -631,7 +631,7 @@ def get_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=False)
     else:
       voice_to_use = voice
     if voice_to_use != "google": 
-      datafy = audiodb.select(text.strip(), chatid, voice_to_use)
+      datafy = audiodb.select_by_name_chatid_voice(text.strip(), chatid, voice_to_use)
       if datafy is not None:
         return datafy
       else:
@@ -646,7 +646,7 @@ def get_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=False)
           out = get_wav_fy(fy,ijt, timeout=timeout)
           if out is not None:
             audiodb.insert(text.strip(), chatid, out, voice_to_use)
-            return audiodb.select(text.strip(), chatid, voice_to_use)
+            return audiodb.select_by_name_chatid_voice(text.strip(), chatid, voice_to_use)
           elif voice == "random" or voice == "google":
             return get_tts_google(text.strip(), chatid=chatid)
           else:
@@ -673,7 +673,7 @@ def populate_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=F
     else:
       voice_to_use = voice
     if voice_to_use != "google": 
-      datafy = audiodb.select(text.strip(), chatid, voice_to_use)
+      datafy = audiodb.select_by_name_chatid_voice(text.strip(), chatid, voice_to_use)
       if datafy is not None:
         return False
       else:
@@ -878,7 +878,7 @@ def populate_audiodb(chatid: str, count: int):
           try:
             generation = ""
             inserted = ""
-            result = populate_tts(sentence, chatid=chatid, voice=voice, timeout=300)
+            result = populate_tts(sentence, chatid=chatid, voice=voice, timeout=900)
             if result:
               generation="Done"
               inserted="Done"
