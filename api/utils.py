@@ -883,27 +883,23 @@ def populate_audiodb(chatid: str, count: int):
       for key, voice in listvoices:
       #for key, voice in progressBar(listvoices, prefix = 'populate_audiodb - Progress:', suffix = 'Complete', length = 50):
         result = False
-        start = True
-        while start:
-          try:
-            generation = ""
-            inserted = ""
-            result = populate_tts(sentence, chatid=chatid, voice=voice, timeout=900)
-            if result:
-              generation="Done"
-              inserted="Done"
-            else:
-              generation="Skipped"
-              inserted="Skipped (Already in db)"
-            logging.info("populate_audiodb\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         GENERATION: %s\n         INSERT: %s", chatid, voice, key, sentence, generation, inserted)
-            start = False
-          except Exception as e:
-            start = False
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            logging.error("populate_audiodb\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         EXCEPTION: %s %s %s", chatid, voice, key, sentence, exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-          finally:
-            if (generation == "Done" and voice != "google") or (start and voice != "google"):
+        try:
+          generation = ""
+          inserted = ""
+          result = populate_tts(sentence, chatid=chatid, voice=voice, timeout=900)
+          if result:
+            generation="Done"
+            inserted="Done"
+          else:
+            generation="Skipped"
+            inserted="Skipped (Already in db)"
+          logging.info("populate_audiodb\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         GENERATION: %s\n         INSERT: %s", chatid, voice, key, sentence, generation, inserted)
+        except Exception as e:
+          exc_type, exc_obj, exc_tb = sys.exc_info()
+          fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+          logging.error("populate_audiodb\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         EXCEPTION: %s %s %s", chatid, voice, key, sentence, exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+        finally:
+          if generation == "Done" and voice != "google":
               time.sleep(90)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
