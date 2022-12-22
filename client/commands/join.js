@@ -15,11 +15,22 @@ module.exports = {
         .setName('join')
         .setDescription('Il pezzente entra nel canale'),
     async execute(interaction) {
-      if (interaction.member.voice === null 
+      
+            
+        if (interaction.member.voice === null 
             || interaction.member.voice === undefined 
             || interaction.member.voice.channelId === null 
             || interaction.member.voice.channelId === undefined ){
-                interaction.reply({ content: 'Stronzo che cazzo fai? Devi prima entrare in un canale vocale', ephemeral: true });
+                interaction.reply({ content: 'Devi prima entrare in un canale vocale', ephemeral: true });
+        } else if (interaction.member.voice !== null 
+            && interaction.member.voice !== undefined 
+            && interaction.member.voice.channelId !== null 
+            && interaction.member.voice.channelId !== undefined
+            && interaction.member.voice.channelId !== undefined
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3){
+                interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
         } else {
             try {                
                 var connection = null;

@@ -15,15 +15,31 @@ module.exports = {
         .setDescription("Abilita o Disabilita l'attivazione vocale del bot'")
         .addBooleanOption(option => option.setName('bool').setDescription('True o False').setRequired(true)),
     async execute(interaction) {
-        const bool = interaction.options.getBoolean('bool');
-        if(bool){
-            config.ENABLED=true;
-            config.AUTONOMOUS=false;
-            interaction.reply({ content: "L'attivazione vocale del pezzente è stata abilitata", ephemeral: true });
+        if (interaction.member.voice === null 
+            || interaction.member.voice === undefined 
+            || interaction.member.voice.channelId === null 
+            || interaction.member.voice.channelId === undefined ){
+                interaction.reply({ content: 'Devi prima entrare in un canale vocale', ephemeral: true });
+        } else if (interaction.member.voice !== null 
+            && interaction.member.voice !== undefined 
+            && interaction.member.voice.channelId !== null 
+            && interaction.member.voice.channelId !== undefined
+            && interaction.member.voice.channelId !== undefined
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3){
+                interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
         } else {
-            config.ENABLED=false;
-            config.AUTONOMOUS=false;
-            interaction.reply({ content: "L'attivazione vocale del pezzente è stata disabilitata", ephemeral: true });
+            const bool = interaction.options.getBoolean('bool');
+            if(bool){
+                config.ENABLED=true;
+                config.AUTONOMOUS=false;
+                interaction.reply({ content: "L'attivazione vocale del pezzente è stata abilitata", ephemeral: true });
+            } else {
+                config.ENABLED=false;
+                config.AUTONOMOUS=false;
+                interaction.reply({ content: "L'attivazione vocale del pezzente è stata disabilitata", ephemeral: true });
+            }
         }
     }
 }; 

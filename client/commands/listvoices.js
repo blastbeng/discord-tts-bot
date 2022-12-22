@@ -27,24 +27,47 @@ function getSlashCommand() {
 module.exports = {
     data: getSlashCommand(),
     async execute(interaction) {
-        await interaction.reply({ content: 'Carico la lista delle voci disponibili...' + "\nAd esclusione di google, tutte le voci sono fornite da fakeyou con possibile Rate Limiting", ephemeral: true });    
-        try {                
+            
+        if (interaction.member.voice === null 
+            || interaction.member.voice === undefined 
+            || interaction.member.voice.channelId === null 
+            || interaction.member.voice.channelId === undefined ){
+                interaction.reply({ content: 'Devi prima entrare in un canale vocale', ephemeral: true });
+        } else if (interaction.member.voice !== null 
+            && interaction.member.voice !== undefined 
+            && interaction.member.voice.channelId !== null 
+            && interaction.member.voice.channelId !== undefined
+            && interaction.member.voice.channelId !== undefined
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3){
+                interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
+        } else {
+            await interaction.reply({ content: 'Carico la lista delle voci disponibili...' + "\nAd esclusione di google, tutte le voci sono fornite da fakeyou con possibile Rate Limiting", ephemeral: true });    
+            try {                
 
-            var resps="Ad esclusione di google, tutte le voci sono fornite da fakeyou con possibile Rate Limiting\n\n";
+                var resps="Ad esclusione di google, tutte le voci sono fornite da fakeyou con possibile Rate Limiting\n\n";
 
-            const url = api+path_utils+"fakeyou/get_voices_by_cat/Italiano";
+                const url = api+path_utils+"fakeyou/get_voices_by_cat/Italiano";
 
-            const data = syncfetch(url).json();
+                let data;
+                try {
+                    data = syncfetch(url).json();
+                } catch (error) {
+                     console.error("ERRORE!", "["+ error + "]");
+                     data = []
+                     data["errore"] = "errore"
+                }
 
-            for(var attributename in data){
-                resps += attributename + "\n"
+                for(var attributename in data){
+                    resps += attributename + "\n"
+                }
+                await interaction.editReply(resps);
+            } catch (error) {
+                console.error("ERRORE!", "["+ error + "]");
+                await interaction.editReply({ content: 'Si è verificato un errore\n' + error.message, ephemeral: true });   
             }
-            await interaction.editReply(resps);
-        } catch (error) {
-            console.error("ERRORE!", "["+ error + "]");
-            await interaction.editReply({ content: 'Si è verificato un errore\n' + error.message, ephemeral: true });   
         }
-
     }
 
 }; 

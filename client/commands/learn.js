@@ -17,34 +17,51 @@ module.exports = {
         .addStringOption(option => option.setName('input').setDescription('Che cosa vuoi insegnare?').setRequired(true))
         .addStringOption(option => option.setName('definition').setDescription('Definizione').setRequired(true)),
     async execute(interaction) {
-        const words = interaction.options.getString('input');
-        const definition = interaction.options.getString('definition');
-
-        if(!(new RegExp("([a-zA-Z0-9]+://)?([a-zA-Z0-9_]+:[a-zA-Z0-9_]+@)?([a-zA-Z0-9.-]+\\.[A-Za-z]{2,4})(:[0-9]+)?(/.*)?").test(words))
-            && !(new RegExp("([a-zA-Z0-9]+://)?([a-zA-Z0-9_]+:[a-zA-Z0-9_]+@)?([a-zA-Z0-9.-]+\\.[A-Za-z]{2,4})(:[0-9]+)?(/.*)?").test(definition))
-            && words.length <= 500 
-            && definition.length <= 100){
-
-            var guildid=""
-            if(interaction.member.voice.guild.id === GUILD_ID){
-                guildid="000000"
-            }
-            else{
-                guildid = interaction.member.voice.guild.id
-            }
-            var params = api+path_text+"learn/"+encodeURIComponent(words)+"/"+encodeURIComponent(definition)+"/"+encodeURIComponent(guildid);
-
-            fetch(
-                params,
-                {
-                    method: 'GET',
-                    headers: { 'Accept': '*/*' }
-                }
-            ).then(res => {
-                interaction.reply({ content: 'Il pezzente ha imparato: '+words+" => "+definition, ephemeral: true });
-            }); 
+            
+        if (interaction.member.voice === null 
+            || interaction.member.voice === undefined 
+            || interaction.member.voice.channelId === null 
+            || interaction.member.voice.channelId === undefined ){
+                interaction.reply({ content: 'Devi prima entrare in un canale vocale', ephemeral: true });
+        } else if (interaction.member.voice !== null 
+            && interaction.member.voice !== undefined 
+            && interaction.member.voice.channelId !== null 
+            && interaction.member.voice.channelId !== undefined
+            && interaction.member.voice.channelId !== undefined
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3){
+                interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
         } else {
-            interaction.reply({ content: 'Ma che c**** scrivi?!', ephemeral: true });
+            const words = interaction.options.getString('input');
+            const definition = interaction.options.getString('definition');
+
+            if(!(new RegExp("([a-zA-Z0-9]+://)?([a-zA-Z0-9_]+:[a-zA-Z0-9_]+@)?([a-zA-Z0-9.-]+\\.[A-Za-z]{2,4})(:[0-9]+)?(/.*)?").test(words))
+                && !(new RegExp("([a-zA-Z0-9]+://)?([a-zA-Z0-9_]+:[a-zA-Z0-9_]+@)?([a-zA-Z0-9.-]+\\.[A-Za-z]{2,4})(:[0-9]+)?(/.*)?").test(definition))
+                && words.length <= 500 
+                && definition.length <= 100){
+
+                var guildid=""
+                if(interaction.member.voice.guild.id === GUILD_ID){
+                    guildid="000000"
+                }
+                else{
+                    guildid = interaction.member.voice.guild.id
+                }
+                var params = api+path_text+"learn/"+encodeURIComponent(words)+"/"+encodeURIComponent(definition)+"/"+encodeURIComponent(guildid);
+
+                fetch(
+                    params,
+                    {
+                        method: 'GET',
+                        headers: { 'Accept': '*/*' }
+                    }
+                ).then(res => {
+                    interaction.reply({ content: 'Il pezzente ha imparato: '+words+" => "+definition, ephemeral: true });
+                }); 
+            } else {
+                interaction.reply({ content: 'Ma che c**** scrivi?!', ephemeral: true });
+            }
         }
     }
 }; 

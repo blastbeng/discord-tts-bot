@@ -20,5 +20,8 @@
     "AUTONOMOUS"   : true,
     "AUTONOMOUS_TIMEOUT"   : 120000,
     "DOWNLOAD_ENABLED"   : false,
-    "DOWNLOAD_SERVER_URL"   : "https://yourdomain.com"
+    "DOWNLOAD_SERVER_URL"   : "https://yourdomain.com",
+    "ENABLED_CHANNEL_ID_1"   : "1",
+    "ENABLED_CHANNEL_ID_2"   : "2",
+    "ENABLED_CHANNEL_ID_3"   : "3"
 }

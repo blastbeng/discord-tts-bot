@@ -37,6 +37,8 @@ log.setLevel(int(os.environ.get("LOG_LEVEL")))
 TMP_DIR = os.environ.get("TMP_DIR")
 TMP_DIR_DISCORD = os.environ.get("TMP_DIR_DISCORD")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
+API_USER = os.environ.get("API_USER")
+API_PASS = os.environ.get("API_PASS")
 
 app = Flask(__name__)
 class Config:    
@@ -215,6 +217,27 @@ class AudioRepeatClass(Resource):
       @after_this_request
       def clear_cache(response):
         cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+        return make_response(g.get('request_error'), 500)
+
+
+@nsaudio.route('/download/<int:id>')
+class AudioDwonloadClass(Resource):
+  @cache.cached(timeout=7200, query_string=True)
+  def get (self, id: int):
+    try:
+      tts_out = utils.download_tts(id)
+      if tts_out is not None:
+        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+      else:
+        @after_this_request
+        def clear_cache(response):
+          cache.delete_memoized(AudioDwonloadClass.get, self, int)
+          return make_response("TTS Generation Error!", 500)
+    except Exception as e:
+      g.request_error = str(e)
+      @after_this_request
+      def clear_cache(response):
+        cache.delete_memoized(AudioDwonloadClass.get, self, int)
         return make_response(g.get('request_error'), 500)
       
 
@@ -726,7 +749,19 @@ def upload_file():
 
 @app.route('/manager')
 def manager():
-  audios = audiodb.select_by_chatid()
+  voices = utils.get_fakeyou_voices()
+  datas = audiodb.select_by_chatid()
+  audios = []
+  for data in datas:
+    key = [k for k, v in voices.items() if v == data[4]][0]
+    internal = []
+    internal.append(data[0])
+    internal.append(data[1])
+    internal.append("https://"+API_USER+":"+API_PASS+"@discord-voicebot.fabiovalentino.it/chatbot_audio/download/"+ str(data[0]))
+    internal.append(key)
+    internal.append(data[5])
+    audios.append(internal)
+
   return render_template('manager.html', audios=audios)
 
 
@@ -762,7 +797,7 @@ def login_fakeyou():
   
 @scheduler.task('interval', id='populate_audiodb', hours=5, misfire_grace_time=900)
 def populate_audiodb():
-  utils.populate_audiodb("000000", 100)
+  utils.populate_audiodb("000000", 20)
   
 @scheduler.task('interval', id='backupdb', hours=24, misfire_grace_time=900)
 def backupdb():
@@ -787,6 +822,8 @@ cache.init_app(app)
 limiter.init_app(app)
 scheduler.init_app(app)
 scheduler.start()
+utils.login_fakeyou()
+threading.Timer(30, utils.backupdb, args=["000000"]).start()
 
 if __name__ == '__main__':
   app.run()

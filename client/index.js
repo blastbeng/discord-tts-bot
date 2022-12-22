@@ -98,28 +98,33 @@ client.on('voiceStateUpdate', (oldMember, newMember) => {
       if (newMember?.channelId) {
         client.channels.fetch(newMember?.channelId)
                 .then(channel => {
-          const connection_old = getVoiceConnection(newMember?.guild.id);
-          if (connection_old !== null 
-              && connection_old !== undefined
-              && connection_old.joinConfig.channelId !== newMember?.channelId){
-                  connection_old.destroy();
-                  joinVoiceChannel({
-                      channelId: newMember?.channelId,
-                      guildId: newMember?.guild.id,
-                      adapterCreator: channel.guild.voiceAdapterCreator,
-                      selfDeaf: false,
-                      selfMute: false
-                  });
-          } else if (connection_old === null 
-              || connection_old === undefined){
-                  joinVoiceChannel({
-                      channelId: newMember?.channelId,
-                      guildId: newMember?.guild.id,
-                      adapterCreator: channel.guild.voiceAdapterCreator,
-                      selfDeaf: false,
-                      selfMute: false
-                  });
-          }
+            
+                if (newMember?.channelId === config.ENABLED_CHANNEL_ID_1
+                    || newMember?.channelId === config.ENABLED_CHANNEL_ID_2
+                    || newMember?.channelId === config.ENABLED_CHANNEL_ID_3){   
+                    const connection_old = getVoiceConnection(newMember?.guild.id);
+                if (connection_old !== null 
+                    && connection_old !== undefined
+                    && connection_old.joinConfig.channelId !== newMember?.channelId){
+                        connection_old.destroy();
+                        joinVoiceChannel({
+                            channelId: newMember?.channelId,
+                            guildId: newMember?.guild.id,
+                            adapterCreator: channel.guild.voiceAdapterCreator,
+                            selfDeaf: false,
+                            selfMute: false
+                        });
+                } else if (connection_old === null 
+                    || connection_old === undefined){
+                        joinVoiceChannel({
+                            channelId: newMember?.channelId,
+                            guildId: newMember?.guild.id,
+                            adapterCreator: channel.guild.voiceAdapterCreator,
+                            selfDeaf: false,
+                            selfMute: false
+                        });
+                }
+            }
         }).catch(function(error) {
             console.error("ERRORE!", "["+ error + "]");
         });
@@ -360,6 +365,15 @@ client.on('interactionCreate', async interaction => {
                     || interaction.member.voice.channelId === null 
                     || interaction.member.voice.channelId === undefined ){
                         interaction.reply({ content: 'Devi prima entrare in un canale vocale', ephemeral: true });
+                } else if (interaction.member.voice !== null 
+                    && interaction.member.voice !== undefined 
+                    && interaction.member.voice.channelId !== null 
+                    && interaction.member.voice.channelId !== undefined
+                    && interaction.member.voice.channelId !== undefined
+                    && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
+                    && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
+                    && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3){
+                        interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
                 } else {
                     var connection = null;
                     const connection_old = getVoiceConnection(interaction.member.voice.guild.id);
@@ -441,6 +455,15 @@ client.on('interactionCreate', async interaction => {
                     || interaction.member.voice.channelId === null 
                     || interaction.member.voice.channelId === undefined ){
                         interaction.reply({ content: 'Devi prima entrare in un canale vocale', ephemeral: true });
+                } else if (interaction.member.voice !== null 
+                    && interaction.member.voice !== undefined 
+                    && interaction.member.voice.channelId !== null 
+                    && interaction.member.voice.channelId !== undefined
+                    && interaction.member.voice.channelId !== undefined
+                    && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
+                    && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
+                    && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3){
+                        interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
                 } else {
                 
                     var connection = null;
@@ -588,27 +611,31 @@ client.on("messageCreate", (msg) => {
                 && msg.member?.voice != undefined
                 && msg.member?.voice.channel != null
                 && msg.member?.voice.channel != undefined) {
-                const connection_old = getVoiceConnection(msg.member?.voice.guild.id);
-                if (connection_old !== null 
-                    && connection_old !== undefined
-                    && connection_old.joinConfig.channelId !== msg.member?.voice.channelId){
-                        connection_old.destroy();
-                        joinVoiceChannel({
-                            channelId: msg.member?.voice.channel.id,
-                            guildId: msg.member?.voice.channel.guild.id,
-                            adapterCreator: msg.member?.voice.channel.guild.voiceAdapterCreator,
-                            selfDeaf: false,
-                            selfMute: false
-                        });
-                } else if (connection_old === null 
-                    || connection_old === undefined){
-                        joinVoiceChannel({
-                            channelId: msg.member?.voice.channel.id,
-                            guildId: msg.member?.voice.channel.guild.id,
-                            adapterCreator: msg.member?.voice.channel.guild.voiceAdapterCreator,
-                            selfDeaf: false,
-                            selfMute: false
-                        });
+                if (msg.member?.voice.channel.id === config.ENABLED_CHANNEL_ID_1
+                    || msg.member?.voice.channel.id === config.ENABLED_CHANNEL_ID_2
+                    || msg.member?.voice.channel.id === config.ENABLED_CHANNEL_ID_3){                    
+                    const connection_old = getVoiceConnection(msg.member?.voice.guild.id);
+                    if (connection_old !== null 
+                        && connection_old !== undefined
+                        && connection_old.joinConfig.channelId !== msg.member?.voice.channelId){
+                            connection_old.destroy();
+                            joinVoiceChannel({
+                                channelId: msg.member?.voice.channel.id,
+                                guildId: msg.member?.voice.channel.guild.id,
+                                adapterCreator: msg.member?.voice.channel.guild.voiceAdapterCreator,
+                                selfDeaf: false,
+                                selfMute: false
+                            });
+                    } else if (connection_old === null 
+                        || connection_old === undefined){
+                            joinVoiceChannel({
+                                channelId: msg.member?.voice.channel.id,
+                                guildId: msg.member?.voice.channel.guild.id,
+                                adapterCreator: msg.member?.voice.channel.guild.voiceAdapterCreator,
+                                selfDeaf: false,
+                                selfMute: false
+                            });
+                    }
                 }
             }
         } catch (error) {

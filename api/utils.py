@@ -666,6 +666,16 @@ def get_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=False)
     else:
       raise Exception(e)
 
+    
+def download_tts(id: int):
+  try:
+    return audiodb.select_audio_by_id(id)
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    raise Exception(e)
+
 def populate_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=False):
   try:
     if voice is None or voice == "null" or voice == "random":
@@ -696,15 +706,15 @@ def populate_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=F
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno)
     raise Exception(e)
 
 def get_random_voice():
-  localvoices = get_fakeyou_voices("Italiano")
+  localvoices = get_fakeyou_voices()
   title, token = random.choice(list(localvoices.items()))
   return token
 
-def get_fakeyou_voices(category: str):
+def get_fakeyou_voices(category="Italiano"):
   #fy.login(FAKEYOU_USER,FAKEYOU_PASS)
   db = SqliteDict(TMP_DIR+"/fakeyou_voices.sqlite")
   localvoices = {}
@@ -827,8 +837,8 @@ def get_random_from_bot(chatid: str):
 
 def populate_audiodb(chatid: str, count: int):  
   try:
-    
-    voices = get_fakeyou_voices("Italiano")
+    login_fakeyou()
+    voices = get_fakeyou_voices()
     #voices={}
     #voices["google"] = "google"
     listvoices = list(voices.items())
@@ -885,16 +895,16 @@ def populate_audiodb(chatid: str, count: int):
             else:
               generation="Skipped"
               inserted="Skipped (Already in db)"
-            logging.info("populate_audiodb\n         CHATID: %s\n         VOICE: %s\n         SENTENCE: %s\n         GENERATION: %s\n         INSERT: %s", chatid, key, sentence, generation, inserted)
+            logging.info("populate_audiodb\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         GENERATION: %s\n         INSERT: %s", chatid, voice, key, sentence, generation, inserted)
             start = False
           except Exception as e:
-            start = True
+            start = False
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            logging.error("populate_audiodb\n         CHATID: %s\n         VOICE: %s\n         SENTENCE: %s\n         EXCEPTION: %s %s %s", chatid, key, sentence, exc_type, fname, exc_tb.tb_lineno)
+            logging.error("populate_audiodb\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         EXCEPTION: %s %s %s", chatid, voice, key, sentence, exc_type, fname, exc_tb.tb_lineno, exc_info=1)
           finally:
             if (generation == "Done" and voice != "google") or (start and voice != "google"):
-              time.sleep(30)
+              time.sleep(90)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]

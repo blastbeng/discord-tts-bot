@@ -35,11 +35,21 @@ module.exports = {
             words = interaction.options.getUser('user').username;
         }
 
+            
             if (interaction.member.voice === null 
                 || interaction.member.voice === undefined 
                 || interaction.member.voice.channelId === null 
                 || interaction.member.voice.channelId === undefined ){
                     interaction.reply({ content: 'Devi prima entrare in un canale vocale', ephemeral: true });
+            } else if (interaction.member.voice !== null 
+                && interaction.member.voice !== undefined 
+                && interaction.member.voice.channelId !== null 
+                && interaction.member.voice.channelId !== undefined
+                && interaction.member.voice.channelId !== undefined
+                && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
+                && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
+                && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3){
+                    interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
             } else {
                 var connection = null;
                 const connection_old = getVoiceConnection(interaction.member.voice.guild.id);

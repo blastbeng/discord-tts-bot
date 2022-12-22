@@ -83,8 +83,7 @@ def select_by_chatid(chatid="000000"):
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
     cursor = sqliteConnection.cursor()
-
-    sqlite_select_query = """SELECT * from Audio WHERE chatid = ?"""
+    sqlite_select_query = " SELECT DISTINCT * from Audio WHERE chatid = ?"
     cursor.execute(sqlite_select_query, (chatid,))
     records = cursor.fetchall()
 
@@ -119,6 +118,32 @@ def select_by_name_chatid_voice(name: str, chatid: str, voice: str):
     finally:
       if sqliteConnection:
         sqliteConnection.close()
+    return audio
+
+def select_audio_by_id(id: int):
+  audio = None
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
+
+    sqlite_select_query = """SELECT data from Audio WHERE id = ? """
+    cursor.execute(sqlite_select_query, (id,))
+    records = cursor.fetchall()
+
+    for row in records:
+      data   =  row[0]
+      cursor.close()
+      audio = BytesIO(data)
+      audio.seek(0)
+
+  except sqlite3.Error as error:
+    logging.error("Failed to read data from sqlite table", exc_info=1)
+  finally:
+    if sqliteConnection:
+      sqliteConnection.close()
+  if audio is None:
+    raise Exception("Audio not found")
+  else:
     return audio
 
 
