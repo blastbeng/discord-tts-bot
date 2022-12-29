@@ -221,7 +221,7 @@ class AudioRepeatClass(Resource):
 
 
 @nsaudio.route('/download/<int:id>')
-class AudioDwonloadClass(Resource):
+class AudioDownloadClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, id: int):
     try:
@@ -348,7 +348,8 @@ class AudioAskNoLearnClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, chatid = "000000"):
     try:
-      tts_out = utils.get_tts(get_chatbot_by_id(chatid).get_response(text, learn=False).text, chatid=chatid, timeout=120)
+      text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
+      tts_out = utils.get_tts(text_response, chatid=chatid, timeout=120)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -370,8 +371,8 @@ class AudioAskNoLearnRandomClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, chatid = "000000"):
     try:
-      text = get_chatbot_by_id(chatid).get_response(text, learn=False).text
-      tts_out = utils.get_tts(text, voice="random", chatid=chatid, timeout=120)
+      text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
+      tts_out = utils.get_tts(text_response, voice="random", chatid=chatid, timeout=120)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -385,6 +386,23 @@ class AudioAskNoLearnRandomClass(Resource):
       def clear_cache(response):
         cache.delete_memoized(AudioAskNoLearnRandomClass.get, self, str, str, str)
         return make_response(g.get('request_error'), 500)
+
+
+@nsaudio.route('/ask/nolearn/nocache/google/<string:text>/')
+@nsaudio.route('/ask/nolearn/nocache/google/<string:text>/<string:chatid>')
+class AudioAskNoLearnNoCacheGoogleClass(Resource):
+  #@cache.cached(timeout=1, query_string=True)
+  def get (self, text: str, chatid = "000000"):
+    try:
+      text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
+      tts_out = utils.get_tts(text_response, voice="google", chatid=chatid, timeout=120)
+      if tts_out is not None:
+        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+      else:
+        return make_response('request_error', 500)
+    except Exception as e:
+      g.request_error = str(e)
+      return make_response(g.get('request_error'), 500)
 
 
 @nsaudio.route('/ask/user/<string:user>/<string:text>/')
@@ -660,7 +678,8 @@ class UtilsPopulateSentencesApi(Resource):
 @nsdatabase.route('/delete/bytext/<string:text>/<string:chatid>')
 class UtilsDeleteByText(Resource):
   def get (self, text: str, chatid = "000000"):
-    return get_response_str(utils.delete_by_text(chatid, text))
+    #return get_response_str(utils.delete_by_text(chatid, text))
+    return get_response_str('Frasi con parola chiave "' + text + '" cancellate dal db chatbot!')
 
 
 

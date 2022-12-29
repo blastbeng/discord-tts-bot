@@ -36,7 +36,9 @@ module.exports = {
         }
 
             
-            if (interaction.member.voice === null 
+            if (!interaction.member._roles.includes(config.ENABLED_ROLE)){
+                interaction.reply({ content: "Non sei abilitato all'utilizzo di questo bot.", ephemeral: true });
+            } else if (interaction.member.voice === null 
                 || interaction.member.voice === undefined 
                 || interaction.member.voice.channelId === null 
                 || interaction.member.voice.channelId === undefined ){
@@ -44,7 +46,6 @@ module.exports = {
             } else if (interaction.member.voice !== null 
                 && interaction.member.voice !== undefined 
                 && interaction.member.voice.channelId !== null 
-                && interaction.member.voice.channelId !== undefined
                 && interaction.member.voice.channelId !== undefined
                 && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
                 && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2

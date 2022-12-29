@@ -23,5 +23,9 @@
     "DOWNLOAD_SERVER_URL"   : "https://yourdomain.com",
     "ENABLED_CHANNEL_ID_1"   : "1",
     "ENABLED_CHANNEL_ID_2"   : "2",
-    "ENABLED_CHANNEL_ID_3"   : "3"
+    "ENABLED_CHANNEL_ID_3"   : "3",
+    "PROWLARR_HOST"   : "192.168.1.160",
+    "PROWLARR_PORT"   : "9696",
+    "PROWLARR_API_KEY"   : "XXXXXXXXXXX",
+    "ENABLED_ROLE" : '1'
 }

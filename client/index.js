@@ -360,7 +360,9 @@ client.on('interactionCreate', async interaction => {
                         await interaction.reply({ content: 'Il pezzente non si trova in nessun canale', ephemeral: true });
                     }
             }else if(interaction.customId === 'insult'){
-                if (interaction.member.voice === null 
+                if (!interaction.member._roles.includes(config.ENABLED_ROLE)){
+                    interaction.reply({ content: "Non sei abilitato all'utilizzo di questo bot.", ephemeral: true });
+                } else if (interaction.member.voice === null 
                     || interaction.member.voice === undefined 
                     || interaction.member.voice.channelId === null 
                     || interaction.member.voice.channelId === undefined ){
@@ -368,7 +370,6 @@ client.on('interactionCreate', async interaction => {
                 } else if (interaction.member.voice !== null 
                     && interaction.member.voice !== undefined 
                     && interaction.member.voice.channelId !== null 
-                    && interaction.member.voice.channelId !== undefined
                     && interaction.member.voice.channelId !== undefined
                     && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
                     && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
@@ -450,7 +451,9 @@ client.on('interactionCreate', async interaction => {
             }
         } else if (interaction.isSelectMenu()) {
             if(interaction.customId === 'videoselect'){
-                if (interaction.member.voice === null 
+                if (!interaction.member._roles.includes(config.ENABLED_ROLE)){
+                    interaction.reply({ content: "Non sei abilitato all'utilizzo di questo bot.", ephemeral: true });
+                } else if (interaction.member.voice === null 
                     || interaction.member.voice === undefined 
                     || interaction.member.voice.channelId === null 
                     || interaction.member.voice.channelId === undefined ){
@@ -458,7 +461,6 @@ client.on('interactionCreate', async interaction => {
                 } else if (interaction.member.voice !== null 
                     && interaction.member.voice !== undefined 
                     && interaction.member.voice.channelId !== null 
-                    && interaction.member.voice.channelId !== undefined
                     && interaction.member.voice.channelId !== undefined
                     && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
                     && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
