@@ -900,7 +900,7 @@ def populate_audiodb(chatid: str, count: int):
           fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
           logging.error("populate_audiodb\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         EXCEPTION: %s %s %s", chatid, voice, key, sentence, exc_type, fname, exc_tb.tb_lineno, exc_info=1)
         finally:
-          if voice != "google":
+          if voice != "google" and inserted == "Done":
               time.sleep(60)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
