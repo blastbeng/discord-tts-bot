@@ -78,6 +78,22 @@ def insert(name: str, chatid: str, data: BytesIO, voice: str):
         sqliteConnection.close()
 
 
+def select_list_by_chatid(chatid="000000"):
+  records = None
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
+    sqlite_select_query = " SELECT DISTINCT * from Audio WHERE chatid = ? ORDER BY name, voice"
+    cursor.execute(sqlite_select_query, (chatid,))
+    records = cursor.fetchall()
+
+  except sqlite3.Error as error:
+    logging.error("Failed to read data from sqlite table", exc_info=1)
+  finally:
+    if sqliteConnection:
+      sqliteConnection.close()
+  return records
+
 def select_by_chatid(chatid="000000"):
   records = None
   try:

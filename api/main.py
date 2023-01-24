@@ -36,6 +36,7 @@ log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 TMP_DIR = os.environ.get("TMP_DIR")
 TMP_DIR_DISCORD = os.environ.get("TMP_DIR_DISCORD")
+ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
 API_USER = os.environ.get("API_USER")
 API_PASS = os.environ.get("API_PASS")
@@ -119,7 +120,7 @@ class AudioRepeatLearnUserClass(Resource):
 @nstext.route('/ask/<string:text>/')
 @nstext.route('/ask/<string:text>/<string:chatid>')
 class TextAskClass(Resource):
-  @cache.cached(timeout=7200, query_string=True)
+  @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, chatid = "000000"):
     return get_response_str(get_chatbot_by_id(chatid).get_response(text).text)
 
@@ -134,7 +135,7 @@ class TextAskNoLearnClass(Resource):
 @nstext.route('/ask/user/<string:user>/<string:text>/')
 @nstext.route('/ask/user/<string:user>/<string:text>/<string:chatid>')
 class TextAskUserClass(Resource):
-  @cache.cached(timeout=7200, query_string=True)
+  @cache.cached(timeout=10, query_string=True)
   def get (self, user: str, text: str, chatid = "000000"):
     dolearn = False;
     if user not in previousMessages:
@@ -323,7 +324,7 @@ class AudioRepeatLearnUserClass(Resource):
 @nsaudio.route('/ask/<string:text>/')
 @nsaudio.route('/ask/<string:text>/<string:chatid>')
 class AudioAskClass(Resource):
-  @cache.cached(timeout=7200, query_string=True)
+  @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, chatid = "000000"):
     try:
       tts_out = utils.get_tts(get_chatbot_by_id(chatid).get_response(text).text, chatid=chatid, timeout=120)
@@ -345,7 +346,7 @@ class AudioAskClass(Resource):
 @nsaudio.route('/ask/nolearn/<string:text>/')
 @nsaudio.route('/ask/nolearn/<string:text>/<string:chatid>')
 class AudioAskNoLearnClass(Resource):
-  @cache.cached(timeout=7200, query_string=True)
+  @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, chatid = "000000"):
     try:
       text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
@@ -368,7 +369,7 @@ class AudioAskNoLearnClass(Resource):
 @nsaudio.route('/ask/nolearn/random/<string:text>/')
 @nsaudio.route('/ask/nolearn/random/<string:text>/<string:chatid>')
 class AudioAskNoLearnRandomClass(Resource):
-  @cache.cached(timeout=7200, query_string=True)
+  @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, chatid = "000000"):
     try:
       text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
@@ -391,7 +392,7 @@ class AudioAskNoLearnRandomClass(Resource):
 @nsaudio.route('/ask/nolearn/nocache/google/<string:text>/')
 @nsaudio.route('/ask/nolearn/nocache/google/<string:text>/<string:chatid>')
 class AudioAskNoLearnNoCacheGoogleClass(Resource):
-  #@cache.cached(timeout=1, query_string=True)
+  @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, chatid = "000000"):
     try:
       text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
@@ -408,7 +409,7 @@ class AudioAskNoLearnNoCacheGoogleClass(Resource):
 @nsaudio.route('/ask/user/<string:user>/<string:text>/')
 @nsaudio.route('/ask/user/<string:user>/<string:text>/<string:chatid>')
 class AudioAskUserClass(Resource):
-  @cache.cached(timeout=7200, query_string=True)
+  @cache.cached(timeout=10, query_string=True)
   def get (self, user: str, text: str, chatid = "000000"):
     dolearn = False;
     if user not in previousMessages:
@@ -621,6 +622,12 @@ class FakeYouGetVoicesByCatClass(Resource):
   def get(self, category = "Italiano"):
     return jsonify(utils.get_fakeyou_voices(category))
 
+@nsutils.route('/fakeyou/listvoices/')
+@nsutils.route('/fakeyou/listvoices/<string:lang>')
+class FakeYouListVoices(Resource):
+  def get(self, lang = "it"):
+    return jsonify(utils.list_fakeyou_voices(lang))
+
 
 @nsutils.route('/download/<string:filename>')
 class UtilsDownloadClass(Resource):
@@ -768,20 +775,18 @@ def upload_file():
 
 @app.route('/manager')
 def manager():
-  voices = utils.get_fakeyou_voices()
-  datas = audiodb.select_by_chatid()
-  audios = []
-  for data in datas:
-    key = [k for k, v in voices.items() if v == data[4]][0]
-    internal = []
-    internal.append(data[0])
-    internal.append(data[1])
-    internal.append("https://"+API_USER+":"+API_PASS+"@discord-voicebot.fabiovalentino.it/chatbot_audio/download/"+ str(data[0]))
-    internal.append(key)
-    internal.append(data[5])
-    audios.append(internal)
+  return render_template('list.html', audios=utils.get_audios_list_for_ft())
 
-  return render_template('manager.html', audios=audios)
+@app.route('/admin', methods=['GET', 'POST'])
+def admin():
+  default_value = ''
+  user = request.form.get('user', default_value)
+  psw = request.form.get('psw', default_value)
+  if user == ADMIN_USER and psw == ADMIN_PASS:  
+    return render_template('admin.html', audios=utils.get_audios_for_ft())
+  else:
+    return render_template('unhautorized.html')
+
 
 
 

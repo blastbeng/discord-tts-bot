@@ -726,6 +726,8 @@ def get_fakeyou_voices(category="Italiano"):
   else:
     localvoices["Annunciatore Pokemon Stadium"] = "TM:4j7nw0gv2mhy"
     localvoices["Caparezza"]                    = "TM:nk1h2vqxhzdc"
+    localvoices["Checco Zalone"]                = "TM:pvw8tsm764rw"
+    localvoices["Christian De Sica"]            = "TM:120y78vm4nyb"
     localvoices["Duke Nukem"]                   = "TM:cq3p31567cbh"
     localvoices["Gerry Scotti"]                 = "TM:5ggf3m5w2mhq"
     localvoices["Goku"]                         = "TM:eb0rmkq6fxtj"
@@ -733,12 +735,15 @@ def get_fakeyou_voices(category="Italiano"):
     localvoices["Homer Simpson"]                = "TM:dq50arje7sq4"
     localvoices["Mario Giordano"]               = "TM:xd8srfb4v5w6"
     localvoices["Papa Francesco"]               = "TM:8bqjb9x51vz3"  
+    localvoices["Paolo Bonolis"]                = "TM:zdag8n18q9ct"
     localvoices["Peter Griffin"]                = "TM:s493mhsbek15" 
     localvoices["Richard Benson"]               = "TM:esw7xh74gvt7" 
     localvoices["Roberto Benigni"]              = "TM:vjfm5tdz02b2" 
     localvoices["Silvio Berlusconi"]            = "TM:22e5sxvt2dvk"
     db["Annunciatore Pokemon Stadium"]          = "TM:4j7nw0gv2mhy"
     db["Caparezza"]                             = "TM:nk1h2vqxhzdc"
+    db["Checco Zalone"]                         = "TM:pvw8tsm764rw"
+    db["Christian De Sica"]                     = "TM:120y78vm4nyb"
     db["Duke Nukem"]                            = "TM:cq3p31567cbh"
     db["Gerry Scotti"]                          = "TM:5ggf3m5w2mhq"
     db["Goku"]                                  = "TM:eb0rmkq6fxtj"
@@ -746,6 +751,7 @@ def get_fakeyou_voices(category="Italiano"):
     db["Homer Simpson"]                         = "TM:dq50arje7sq4"
     db["Mario Giordano"]                        = "TM:xd8srfb4v5w6"
     db["Papa Francesco"]                        = "TM:8bqjb9x51vz3"   
+    db["Paolo Bonolis"]                         = "TM:zdag8n18q9ct"
     db["Peter Griffin"]                         = "TM:s493mhsbek15" 
     db["Richard Benson"]                        = "TM:esw7xh74gvt7" 
     db["Roberto Benigni"]                       = "TM:vjfm5tdz02b2" 
@@ -753,6 +759,16 @@ def get_fakeyou_voices(category="Italiano"):
     db.commit()
     return localvoices
   db.close()
+
+def list_fakeyou_voices(lang:str):
+  voices=fy.list_voices(size=0)
+  foundvoices = {}
+		
+  for langTag,voiceJson in zip(voices.langTag,voices.json):
+    if lang.lower() in langTag.lower():
+      foundvoices[voiceJson["title"]] = voiceJson["model_token"]
+		
+  return foundvoices
 
 
 def generate_ijt(fy,text:str,ttsModelToken:str):
@@ -885,22 +901,20 @@ def populate_audiodb(chatid: str, count: int):
       #for key, voice in progressBar(listvoices, prefix = 'populate_audiodb - Progress:', suffix = 'Complete', length = 50):
         result = False
         try:
+          logging.info("populate_audiodb - START ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s", chatid, voice, key, sentence)
           generation = ""
           inserted = ""
           result = populate_tts(sentence, chatid=chatid, voice=voice, timeout=120)
           if result:
-            generation="Done"
             inserted="Done"
           else:
-            generation="Skipped"
             inserted="Skipped (Already in db)"
-          logging.info("populate_audiodb\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         GENERATION: %s\n         INSERT: %s", chatid, voice, key, sentence, generation, inserted)
+          logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
         except Exception as e:
-          exc_type, exc_obj, exc_tb = sys.exc_info()
-          fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-          logging.error("populate_audiodb\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         EXCEPTION: %s %s %s", chatid, voice, key, sentence, exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+          inserted="Failed"
+          logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted, exc_info=1)
         finally:
-          if voice != "google" and inserted == "Done":
+          if voice != "google" and (inserted == "Done" or inserted == "Failed"):
               time.sleep(60)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -956,3 +970,33 @@ def restore(chatid: str, text: str):
     if sqliteConnection:
         sqliteConnection.close()
   return BytesIO(bytes(sentences,'utf-8'))
+
+def get_audios_for_ft():
+  voices = get_fakeyou_voices()
+  datas = audiodb.select_by_chatid()
+  audios = []
+  for data in datas:
+    key = [k for k, v in voices.items() if v == data[4]][0]
+    internal = []
+    internal.append(data[0])
+    internal.append(data[1])
+    #internal.append("https://"+API_USER+":"+API_PASS+"@discord-voicebot.fabiovalentino.it/chatbot_audio/download/"+ str(data[0]))
+    internal.append("https://discord-voicebot.fabiovalentino.it/chatbot_audio/download/"+ str(data[0]))
+    internal.append(key)
+    internal.append(data[5])
+    audios.append(internal)
+  return audios
+
+def get_audios_list_for_ft():
+  voices = get_fakeyou_voices()
+  datas = audiodb.select_list_by_chatid()
+  audios = []
+  for data in datas:
+    key = [k for k, v in voices.items() if v == data[4]][0]
+    internal = []
+    internal.append(data[1])
+    #internal.append("https://"+API_USER+":"+API_PASS+"@discord-voicebot.fabiovalentino.it/chatbot_audio/download/"+ str(data[0]))
+    internal.append("https://discord-voicebot.fabiovalentino.it/chatbot_audio/download/"+ str(data[0]))
+    internal.append(key)
+    audios.append(internal)
+  return audios
