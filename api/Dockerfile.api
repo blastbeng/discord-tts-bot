@@ -61,6 +61,7 @@ COPY tournament.py .
 COPY image.py .
 COPY main.py .
 COPY config.py .
+COPY voices.json .
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 

@@ -717,48 +717,12 @@ def get_random_voice():
 
 def get_fakeyou_voices(category="Italiano"):
   #fy.login(FAKEYOU_USER,FAKEYOU_PASS)
-  db = SqliteDict(TMP_DIR+"/fakeyou_voices.sqlite")
   localvoices = {}
-  if len(db) > 0:
-    for key, item in db.items():
-      localvoices[key] = item
-    return localvoices
-  else:
-    localvoices["Annunciatore Pokemon Stadium"] = "TM:4j7nw0gv2mhy"
-    localvoices["Caparezza"]                    = "TM:nk1h2vqxhzdc"
-    localvoices["Checco Zalone"]                = "TM:pvw8tsm764rw"
-    localvoices["Christian De Sica"]            = "TM:120y78vm4nyb"
-    localvoices["Duke Nukem"]                   = "TM:cq3p31567cbh"
-    localvoices["Gerry Scotti"]                 = "TM:5ggf3m5w2mhq"
-    localvoices["Goku"]                         = "TM:eb0rmkq6fxtj"
-    localvoices["google"]                       = "google"
-    localvoices["Homer Simpson"]                = "TM:dq50arje7sq4"
-    localvoices["Mario Giordano"]               = "TM:xd8srfb4v5w6"
-    localvoices["Papa Francesco"]               = "TM:8bqjb9x51vz3"  
-    localvoices["Paolo Bonolis"]                = "TM:zdag8n18q9ct"
-    localvoices["Peter Griffin"]                = "TM:s493mhsbek15" 
-    localvoices["Richard Benson"]               = "TM:esw7xh74gvt7" 
-    localvoices["Roberto Benigni"]              = "TM:vjfm5tdz02b2" 
-    localvoices["Silvio Berlusconi"]            = "TM:22e5sxvt2dvk"
-    db["Annunciatore Pokemon Stadium"]          = "TM:4j7nw0gv2mhy"
-    db["Caparezza"]                             = "TM:nk1h2vqxhzdc"
-    db["Checco Zalone"]                         = "TM:pvw8tsm764rw"
-    db["Christian De Sica"]                     = "TM:120y78vm4nyb"
-    db["Duke Nukem"]                            = "TM:cq3p31567cbh"
-    db["Gerry Scotti"]                          = "TM:5ggf3m5w2mhq"
-    db["Goku"]                                  = "TM:eb0rmkq6fxtj"
-    db["google"]                                = "google"
-    db["Homer Simpson"]                         = "TM:dq50arje7sq4"
-    db["Mario Giordano"]                        = "TM:xd8srfb4v5w6"
-    db["Papa Francesco"]                        = "TM:8bqjb9x51vz3"   
-    db["Paolo Bonolis"]                         = "TM:zdag8n18q9ct"
-    db["Peter Griffin"]                         = "TM:s493mhsbek15" 
-    db["Richard Benson"]                        = "TM:esw7xh74gvt7" 
-    db["Roberto Benigni"]                       = "TM:vjfm5tdz02b2" 
-    db["Silvio Berlusconi"]                     = "TM:22e5sxvt2dvk"
-    db.commit()
-    return localvoices
-  db.close()
+  with open('voices.json') as filejson:
+    loaded = json.load(filejson)
+    for iterator in loaded:
+      localvoices[iterator] = loaded[iterator]
+  return localvoices
 
 def list_fakeyou_voices(lang:str):
   voices=fy.list_voices(size=0)
