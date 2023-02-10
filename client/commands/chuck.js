@@ -10,6 +10,7 @@ const fetch = require('node-fetch');
 const path = config.CACHE_DIR;
 const api=config.API_URL;
 const path_jokes_audio=config.API_PATH_JOKES_AUDIO
+const MESSAGES_CHANNEL_ID = config.MESSAGES_CHANNEL_ID;
 
 module.exports = {
     data: new SlashCommandBuilder()

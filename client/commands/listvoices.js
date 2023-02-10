@@ -29,11 +29,10 @@ module.exports = {
     async execute(interaction) {
             
         if (!interaction.member._roles.includes(config.ENABLED_ROLE)){
-            interaction.reply({ content: "Non sei abilitato all'utilizzo di questo bot.", ephemeral: true });
+            await interaction.reply({ content: "Non sei abilitato all'utilizzo di questo bot.", ephemeral: true });
         } else {
-            await interaction.reply({ content: 'Carico la lista delle voci disponibili...' + "\nAd esclusione di google, tutte le voci sono fornite da fakeyou con possibile Rate Limiting", ephemeral: true });    
             try {                
-
+                await interaction.deferReply();
                 var resps="Ad esclusione di google, tutte le voci sono fornite da fakeyou con possibile Rate Limiting\n\n";
 
                 const url = api+path_utils+"fakeyou/get_voices_by_cat/Italiano";
@@ -50,10 +49,10 @@ module.exports = {
                 for(var attributename in data){
                     resps += attributename + "\n"
                 }
-                await interaction.editReply(resps);
+                await interaction.reply({ content: resps, ephemeral: true });
             } catch (error) {
                 console.error("ERRORE!", "["+ error + "]");
-                await interaction.editReply({ content: 'Si è verificato un errore\n' + error.message, ephemeral: true });   
+                await interaction.reply({ content: 'Si è verificato un errore\n' + error.message, ephemeral: true });   
             }
         }
     }

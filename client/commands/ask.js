@@ -11,7 +11,9 @@ const path = config.CACHE_DIR;
 const api=config.API_URL;
 const text="&text=";
 const path_audio=config.API_PATH_AUDIO
+const path_text=config.API_PATH_TEXT
 const GUILD_ID = config.GUILD_ID;
+const MESSAGES_CHANNEL_ID = config.MESSAGES_CHANNEL_ID;
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -109,7 +111,25 @@ module.exports = {
                                         });
                                         interaction.editReply({ content: "Il pezzente sta rispondendo\nAd esclusione di google, tutte le voci sono fornite da fakeyou con possibile Rate Limiting\nTesto: " + words, ephemeral: true });    
                                         player.play(resource);      
-                                        console.log("Il pezzente sta rispondendo", "[words: "+ words +"]");
+                                        //console.log("Il pezzente sta rispondendo", "[words: "+ words +"]");
+
+                                        var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);
+                                        fetch(
+                                            params,
+                                            {
+                                                method: 'GET',
+                                                headers: { 'Accept': '*/*' }
+                                            }
+                                        ).then((result) => result.text())
+                                        .then((res) => {
+                                            try {
+                                                interaction.client.guilds.cache.get(config.GUILD_ID).channels.cache.get(MESSAGES_CHANNEL_ID).send(res);
+                                            } catch (error) {
+                                                console.error("ERRORE!", "["+ error + "]");
+                                            }
+                                        }).catch(function(error) {
+                                            console.error("ERRORE!", "["+ error + "]");
+                                        }); 
                                     });
                                 }).catch(function(error) {
                                     console.error("ERRORE!", "["+ error + "]");

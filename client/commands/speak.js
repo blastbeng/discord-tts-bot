@@ -14,7 +14,9 @@ const path = config.CACHE_DIR;
 const api=config.API_URL;
 const text="&text=";
 const path_audio=config.API_PATH_AUDIO
+const path_text=config.API_PATH_TEXT
 const path_utils=config.API_PATH_UTILS
+const MESSAGES_CHANNEL_ID = config.MESSAGES_CHANNEL_ID;
 let data;
 
 
@@ -204,6 +206,31 @@ module.exports = {
 
 
                                             player.play(resource);
+
+                                            var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);
+                                            fetch(
+                                                params,
+                                                {
+                                                    method: 'GET',
+                                                    headers: { 'Accept': '*/*' }
+                                                }
+                                            ).then((result) => result.text())
+                                            .then((res) => {
+                                                try {
+                                                    channel = interaction.client.guilds.cache.get(config.GUILD_ID).channels.cache.get(MESSAGES_CHANNEL_ID)
+                                                    if (res === undefined || res === "") {
+                                                        console.error("ERRORE!", "[res is empty]");
+                                                    } else if (channel === undefined ) {
+                                                        console.error("ERRORE!", "[channel is empty]");
+                                                    } else {
+                                                        channel.send(res);
+                                                    }
+                                                } catch (error) {
+                                                    console.error("ERRORE!", "["+ error + "]");
+                                                }
+                                            }).catch(function(error) {
+                                                console.error("ERRORE!", "["+ error + "]");
+                                            }); 
                                             
                                         });
                                     }).catch(function(error) {

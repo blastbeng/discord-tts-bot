@@ -14,6 +14,7 @@ const hostname=config.API_HOSTNAME;
 const api=config.API_URL;
 const path_audio=config.API_PATH_AUDIO
 const path_text=config.API_PATH_TEXT
+const MESSAGES_CHANNEL_ID = config.MESSAGES_CHANNEL_ID;
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('wikipedia')
@@ -47,10 +48,18 @@ module.exports = {
                 } else {
                     connection = connection_old;
                 }
+
+                var guildid=""
+                if(interaction.member.voice.guild.id === GUILD_ID){
+                    guildid="000000"
+                }
+                else{
+                    guildid = interaction.member.voice.guild.id
+                }
                 
                 connection = joinVoiceChannel({
                     channelId: interaction.member.voice.channelId,
-                    guildId: interaction.guildId,
+                    guildId: guildid,
                     adapterCreator: interaction.guild.voiceAdapterCreator,
                     selfDeaf: false,
                     selfMute: false
@@ -102,7 +111,25 @@ module.exports = {
                                         });
                                         player.play(resource);
                                         interaction.editReply({ content: "Il pezzente ha cercato su Wikipedia: "+words, ephemeral: true });          
-                                        console.log("Il pezzente ha cercato su Wikipedia:", words);                    
+                                        //console.log("Il pezzente ha cercato su Wikipedia:", words);       
+
+                                        var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);
+                                        fetch(
+                                            params,
+                                            {
+                                                method: 'GET',
+                                                headers: { 'Accept': '*/*' }
+                                            }
+                                        ).then((result) => result.text())
+                                        .then((res) => {
+                                            try {
+                                                interaction.client.guilds.cache.get(config.GUILD_ID).channels.cache.get(MESSAGES_CHANNEL_ID).send(res);
+                                            } catch (error) {
+                                                console.error("ERRORE!", "["+ error + "]");
+                                            }
+                                        }).catch(function(error) {
+                                            console.error("ERRORE!", "["+ error + "]");
+                                        });              
                                     });
                                 }).catch(function(error) {
                                     console.error("ERRORE!", "["+ error + "]");

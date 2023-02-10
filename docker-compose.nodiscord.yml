@@ -85,7 +85,7 @@ services:
     ports:
       - '192.168.1.160:9058:9051'
     image: dockage/tor-privoxy
-     restart: "no"
+    restart: "no"
 networks:
   caching:
     driver: bridge

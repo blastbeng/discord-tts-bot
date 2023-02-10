@@ -19,6 +19,8 @@ logging.basicConfig(
 log = logging.getLogger('werkzeug')
 log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
+GUILD_ID = os.environ.get("GUILD_ID")
+
 def check_db_exists(): 
   fle = Path("./config/audiodb.sqlite3")
   fle.touch(exist_ok=True)
@@ -78,7 +80,7 @@ def insert(name: str, chatid: str, data: BytesIO, voice: str):
         sqliteConnection.close()
 
 
-def select_list_by_chatid(chatid="000000"):
+def select_list_by_chatid(chatid=GUILD_ID):
   records = None
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
@@ -94,7 +96,7 @@ def select_list_by_chatid(chatid="000000"):
       sqliteConnection.close()
   return records
 
-def select_by_chatid(chatid="000000"):
+def select_by_chatid(chatid=GUILD_ID):
   records = None
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")

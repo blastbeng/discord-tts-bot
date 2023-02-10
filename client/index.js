@@ -30,6 +30,7 @@ const cron = require('node-cron');
 const TOKEN = config.BOT_TOKEN;
 const path = config.CACHE_DIR;
 const GUILD_ID = config.GUILD_ID;
+const MESSAGES_CHANNEL_ID = config.MESSAGES_CHANNEL_ID;
 
 
 cron.schedule('0 */5 * * * *', () => {
@@ -604,6 +605,24 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
+client.on("messageDelete", (messageDelete) => {
+
+    if (messageDelete.channel.id === MESSAGES_CHANNEL_ID){
+        console.log("Someone deleted:" + messageDelete.content);
+        var params = api+path_text+"admin/forcedelete/bytext/"+encodeURIComponent(config.ADMIN_PASS)+"/"+encodeURIComponent(messageDelete.content);
+        fetch(
+        params,
+            {
+                method: 'GET',
+                headers: { 'Accept': '*/*' }
+            }
+        ).catch(function(error) {
+            console.error("ERRORE!", "["+ error + "]");
+        });
+    }
+
+});
+
 client.on("messageCreate", (msg) => {
         try{            
             if (msg.channelId === '972093345306411010' && !msg.member?.user.bot) {
@@ -747,6 +766,24 @@ client.on("speech", (msg) => {
                                     inputType: StreamType.Arbitrary,
                                 }));
                             });
+                            var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);
+                            fetch(
+                                params,
+                                {
+                                    method: 'GET',
+                                    headers: { 'Accept': '*/*' }
+                                }
+                            ).then((result) => result.text())
+                            .then((res) => {
+                                try {
+                                    //client.channels.fetch(MESSAGES_CHANNEL_ID).send(res); 
+                                    client.guilds.cache.get(config.GUILD_ID).channels.cache.get(MESSAGES_CHANNEL_ID).send(res);
+                                } catch (error) {
+                                    console.error("ERRORE!", "["+ error + "]");
+                                }
+                            }).catch(function(error) {
+                                console.error("ERRORE!", "["+ error + "]");
+                            }); 
                             //console.log("Speech running.", "[differenctMs: " + differenctMs +"]", "[bcSpeech: " + bcSpeech +"]", "[bcAuto: " +bcAuto +"]", "[config.AUTONOMOUS: " + config.AUTONOMOUS +"]", "[msg.content: " + msg.content +"]");
                         }).catch(function(error) {
                             console.error("ERRORE!", "["+ error + "]");
