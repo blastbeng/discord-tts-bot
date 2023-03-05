@@ -776,7 +776,6 @@ client.on("speech", (msg) => {
                             ).then((result) => result.text())
                             .then((res) => {
                                 try {
-                                    //client.channels.fetch(MESSAGES_CHANNEL_ID).send(res); 
                                     client.guilds.cache.get(config.GUILD_ID).channels.cache.get(MESSAGES_CHANNEL_ID).send(res);
                                 } catch (error) {
                                     console.error("ERRORE!", "["+ error + "]");
@@ -802,5 +801,9 @@ client.on("speech", (msg) => {
         console.error(error);
       }
     });
+
+
+
+
 
 client.login(TOKEN);

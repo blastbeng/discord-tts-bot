@@ -217,7 +217,7 @@ module.exports = {
                                             ).then((result) => result.text())
                                             .then((res) => {
                                                 try {
-                                                    channel = interaction.client.guilds.cache.get(config.GUILD_ID).channels.cache.get(MESSAGES_CHANNEL_ID)
+                                                    channel = interaction.client.guilds.cache.get(config.GUILD_ID).channels.cache.get(MESSAGES_CHANNEL_ID);
                                                     if (res === undefined || res === "") {
                                                         console.error("ERRORE!", "[res is empty]");
                                                     } else if (channel === undefined ) {

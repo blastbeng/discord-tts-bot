@@ -123,7 +123,33 @@ module.exports = {
                                     });
                                     player.play(resource);      
                                     interaction.editReply({ content: 'Il pezzente sta insultando', ephemeral: true });  
-                                    console.log("Il pezzente sta insultando");          
+                                    //console.log("Il pezzente sta insultando");      
+                                    
+                                    var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);
+                                    fetch(
+                                        params,
+                                        {
+                                            method: 'GET',
+                                            headers: { 'Accept': '*/*' }
+                                        }
+                                    ).then((result) => result.text())
+                                    .then((res) => {
+                                        try {
+                                            channel = interaction.client.guilds.cache.get(config.GUILD_ID).channels.cache.get(MESSAGES_CHANNEL_ID);
+                                            if (res === undefined || res === "") {
+                                                console.error("ERRORE!", "[res is empty]");
+                                            } else if (channel === undefined ) {
+                                                console.error("ERRORE!", "[channel is empty]");
+                                            } else {
+                                                channel.send(res);
+                                            }
+                                        } catch (error) {
+                                            console.error("ERRORE!", "["+ error + "]");
+                                        }
+                                    }).catch(function(error) {
+                                        console.error("ERRORE!", "["+ error + "]");
+                                    }); 
+
                                 });
                             }).catch(function(error) {
                                 console.error("ERRORE!", "["+ error + "]");

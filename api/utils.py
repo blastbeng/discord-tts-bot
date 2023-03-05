@@ -964,3 +964,20 @@ def get_audios_list_for_ft():
     internal.append(key)
     audios.append(internal)
   return audios
+
+def save_lastsaid_tmpdir(chatid: str, text: str):
+  f = open(TMP_DIR + '/' + chatid + "_lastsaid.txt", "w")
+  f.write(text)
+  f.close
+
+def load_lastsaid_tmpdir(chatid: str):
+  with open(TMP_DIR + '/' + chatid + "_lastsaid.txt") as f:
+    first_line = f.readline().strip('\n')
+  return first_line
+
+def clean_lastsaid():
+  dir_name = TMP_DIR + '/'
+  test = os.listdir(dir_name)
+  for item in test:
+    if item.endswith(".txt"):
+      os.remove(os.path.join(dir_name, item))
