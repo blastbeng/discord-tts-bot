@@ -5,9 +5,10 @@ const {
     ActionRowBuilder, 
     ButtonBuilder,
     EmbedBuilder,
-    ButtonStyle
+    ButtonStyle,
+    GatewayIntentBits 
 } = require('discord.js');
-const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType  } = require('@discordjs/voice');
+const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, NoSubscriberBehavior, createAudioResource, AudioPlayerStatus, StreamType } = require('@discordjs/voice');
 const { addSpeechEvent } = require("discord-speech-recognition");
 const {
     REST
@@ -18,11 +19,37 @@ const {
 const fs = require('fs');
 const findRemoveSync = require('find-remove');
 const config = require("./config.json");
-require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
+//require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
 const http = require("http");
 const wait = require('node:timers/promises').setTimeout;
 require( 'console-stamp' )( console );
-const client = new Client({ intents: 32767 });
+//const client = new Client({ intents: 32767 });
+//const client = new Client({ intents: [32767, GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
+const { createReadStream } = require('fs')
+const client = new Client({
+	intents: [
+		GatewayIntentBits.AutoModerationConfiguration,
+		GatewayIntentBits.AutoModerationExecution,
+		GatewayIntentBits.DirectMessageReactions,
+		GatewayIntentBits.DirectMessageTyping,
+		GatewayIntentBits.DirectMessages,
+		GatewayIntentBits.GuildBans,
+		GatewayIntentBits.GuildEmojisAndStickers,
+		GatewayIntentBits.GuildIntegrations,
+		GatewayIntentBits.GuildInvites,
+		GatewayIntentBits.GuildMembers,
+		GatewayIntentBits.GuildMessageReactions,
+		GatewayIntentBits.GuildMessageTyping,
+		GatewayIntentBits.GuildMessages,
+		GatewayIntentBits.GuildPresences,
+		GatewayIntentBits.GuildScheduledEvents,
+		GatewayIntentBits.GuildVoiceStates,
+		GatewayIntentBits.GuildWebhooks,
+		GatewayIntentBits.Guilds,
+		GatewayIntentBits.MessageContent
+	],
+});
+
 addSpeechEvent(client, { lang: "it-IT", profanityFilter: false });
 
 const cron = require('node-cron');
@@ -45,10 +72,13 @@ cron.schedule('0 */5 * * * *', () => {
 });
 
 
-const player = createAudioPlayer();
-player.on('error', error => {
-    console.error("ERRORE!", "["+ error + "]");  
+
+const player = createAudioPlayer({
+	behaviors: {
+		noSubscriber: NoSubscriberBehavior.Play,
+	},
 });
+
 
 const fetch = require('node-fetch');
 
@@ -64,6 +94,7 @@ let lastSpeech = 0;
 
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 
+let playAsStream = true;
 
 const commands = [];
 
@@ -345,8 +376,11 @@ client.on('interactionCreate', async interaction => {
                 const connection = getVoiceConnection(interaction.member.voice.guild.id);
                 if (connection !== null
                     && connection !== undefined){
-                        connection.subscribe(player);
+                        const subscription = connection.subscribe(player);
                         player.stop();
+                        if(subscription) {
+                            setTimeout(() => subscription.unsubscribe(), 15000)
+                        }
                         await interaction.reply({ content: 'Il pezzente ha smesso di riprodurre', ephemeral: true });
                     } else {
                         await interaction.reply({ content: 'Il pezzente non sta riproducendo nulla', ephemeral: true });
@@ -374,7 +408,8 @@ client.on('interactionCreate', async interaction => {
                     && interaction.member.voice.channelId !== undefined
                     && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
                     && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
-                    && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3){
+                    && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3
+                    && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_4){
                         interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
                 } else {
                     var connection = null;
@@ -427,15 +462,26 @@ client.on('interactionCreate', async interaction => {
         
         
                                 dest.on('finish', function(){      
-                                    connection.subscribe(player);                      
-                                    const resource = createAudioResource(outFile, {
-                                        inputType: StreamType.Arbitrary,
-                                    });
+                                    const subscription = connection.subscribe(player);       
+                                    let resource;
+                                    if (playAsStream) {
+                                        resource = createAudioResource(createReadStream(outfile), {
+                                            inputType: StreamType.Arbitrary,
+                                        });
+                                        playAsStream = false;
+                                    } else {
+                                        resource = createAudioResource(outfile, {
+                                            inputType: StreamType.Arbitrary,
+                                        });
+                                    } 
                                     player.on('error', error => {
                                         console.error("ERRORE!", "["+ error + "]");
                                         interaction.editReply({ content: 'Si è verificato un errore\n' + error.message, ephemeral: true });     
                                     });
-                                    player.play(resource);      
+                                    player.play(resource);
+                                    if(subscription) {
+                                        setTimeout(() => subscription.unsubscribe(), 15000)
+                                    }  
                                     console.log('Il pezzente sta insultando');
                                     interaction.editReply({ content: 'Il pezzente sta insultando', ephemeral: true });          
                                 });
@@ -465,7 +511,8 @@ client.on('interactionCreate', async interaction => {
                     && interaction.member.voice.channelId !== undefined
                     && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
                     && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
-                    && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3){
+                    && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3
+                    && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_4){
                         interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
                 } else {
                 
@@ -514,15 +561,26 @@ client.on('interactionCreate', async interaction => {
                                     dest.on('error', reject);        
 
                                     dest.on('finish', function(){      
-                                        connection.subscribe(player);                      
-                                        const resource = createAudioResource(outFile, {
-                                            inputType: StreamType.Arbitrary,
-                                        });
+                                        const subscription = connection.subscribe(player);
+                                        let resource;
+                                        if (playAsStream) {
+                                            resource = createAudioResource(createReadStream(outfile), {
+                                                inputType: StreamType.Arbitrary,
+                                            });
+                                            playAsStream = false;
+                                        } else {
+                                            resource = createAudioResource(outfile, {
+                                                inputType: StreamType.Arbitrary,
+                                            });
+                                        } 
                                         player.on('error', error => {
                                             console.error("ERRORE!", "["+ error + "]");
                                             interaction.editReply({ content: 'Si è verificato un errore\n' + error.message, ephemeral: true });     
                                         });
-                                        player.play(resource); 
+                                        player.play(resource);   
+                                        if(subscription) {
+                                            setTimeout(() => subscription.unsubscribe(), 15000)
+                                        }    
                                         console.log('youtube.mp3');
                                         const row = new ActionRowBuilder()
                                         .addComponents(
@@ -761,10 +819,22 @@ client.on("speech", (msg) => {
                             res.body.on('end', () => resolve());
                             dest.on('error', reject);        
                             dest.on('finish', function(){     
-                                connection.subscribe(player);
-                                player.play(createAudioResource(outFile, {
-                                    inputType: StreamType.Arbitrary,
-                                }));
+                                const subscription = connection.subscribe(player);
+                                let resource;
+                                if (playAsStream) {
+                                    resource = createAudioResource(createReadStream(outfile), {
+                                        inputType: StreamType.Arbitrary,
+                                    });
+                                    playAsStream = false;
+                                } else {
+                                    resource = createAudioResource(outfile, {
+                                        inputType: StreamType.Arbitrary,
+                                    });
+                                } 
+                                player.play(resource);
+                                if(subscription) {
+                                    setTimeout(() => subscription.unsubscribe(), 15000)
+                                }  
                             });
                             var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);
                             fetch(

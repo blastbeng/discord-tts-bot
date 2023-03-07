@@ -1,14 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { joinVoiceChannel, getVoiceConnection, createAudioPlayer } = require('@discordjs/voice');
 require( 'console-stamp' )( console );
-const fs = require('fs');
 const config = require("../config.json");
-const player = createAudioPlayer();
-const fetch = require('node-fetch');
-
-const path = config.CACHE_DIR;
-const api=config.API_URL;
-const path_audio=config.API_PATH_AUDIO
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -30,7 +23,8 @@ module.exports = {
             && interaction.member.voice.channelId !== undefined
             && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
             && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
-            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3){
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_4){
                 interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
         } else {
             try {                

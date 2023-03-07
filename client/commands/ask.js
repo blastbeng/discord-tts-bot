@@ -1,12 +1,16 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, StreamType  } = require('@discordjs/voice');
+const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, NoSubscriberBehavior, createAudioResource, StreamType  } = require('@discordjs/voice');
 require( 'console-stamp' )( console );
 const fs = require('fs');
 const config = require("../config.json");
-require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
-const player = createAudioPlayer();
+//require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
+const player = createAudioPlayer({
+	behaviors: {
+		noSubscriber: NoSubscriberBehavior.Play,
+	},
+});
 const fetch = require('node-fetch');
-
+const { createReadStream } = require('fs')
 const path = config.CACHE_DIR;
 const api=config.API_URL;
 const text="&text=";
@@ -15,6 +19,7 @@ const path_text=config.API_PATH_TEXT
 const GUILD_ID = config.GUILD_ID;
 const MESSAGES_CHANNEL_ID = config.MESSAGES_CHANNEL_ID;
 
+let playAsStream = true;
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('ask')
@@ -34,7 +39,8 @@ module.exports = {
             && interaction.member.voice.channelId !== undefined
             && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
             && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
-            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3){
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_4){
                 interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
         }else {
             var connection = null;
@@ -96,21 +102,27 @@ module.exports = {
                                     dest.on('error', reject);        
 
                                     dest.on('finish', function(){               
-                                        connection.subscribe(player);             
-                                        const resource = createAudioResource(outFile, {
-                                            inputType: StreamType.Arbitrary,
-                                        });
-                                        player.on('error', error => {
-                                            console.error("ERRORE!", "["+ error + "]");
-                                            interaction.editReply({ content: 'Si è verificato un errore\n' + error.message, ephemeral: true });     
-                                        });
-                                        
+                                        const subscription = connection.subscribe(player);
+                                        let resource;
+                                        if (playAsStream) {
+                                            resource = createAudioResource(createReadStream(outfile), {
+                                                inputType: StreamType.Arbitrary,
+                                            });
+                                            playAsStream = false;
+                                        } else {
+                                            resource = createAudioResource(outfile, {
+                                                inputType: StreamType.Arbitrary,
+                                            });
+                                        } 
                                         player.on('error', error => {
                                             console.error("ERRORE!", "["+ error + "]");
                                             interaction.editReply({ content: 'Si è verificato un errore\n' + error.message, ephemeral: true });     
                                         });
                                         interaction.editReply({ content: "Il pezzente sta rispondendo\nAd esclusione di google, tutte le voci sono fornite da fakeyou con possibile Rate Limiting\nTesto: " + words, ephemeral: true });    
-                                        player.play(resource);      
+                                        player.play(resource); 
+                                        if(subscription) {
+                                            setTimeout(() => subscription.unsubscribe(), 15000)
+                                        }      
                                         //console.log("Il pezzente sta rispondendo", "[words: "+ words +"]");
 
                                         var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);

@@ -736,8 +736,7 @@ def list_fakeyou_voices(lang:str):
 
 
 def generate_ijt(fy,text:str,ttsModelToken:str):
-  if fy.v:
-    logging.info("FakeYou - getting job token")
+  logging.info("FakeYou - getting job token")
   payload={"uuid_idempotency_token":str(uuid4()),"tts_model_token":ttsModelToken,"inference_text":text}
   handler=fy.session.post(url=fy.baseurl+"tts/inference",data=json.dumps(payload))
   if handler.status_code==200:
@@ -756,8 +755,7 @@ def get_wav_fy(fy,ijt:str, timeout:int):
     if handler.status_code==200:
       hjson=handler.json()
       wavo=wav(hjson)
-      if fy.v:
-        logging.info("FakeYou - WAV STATUS: %s", wavo.status, exc_info=1)
+      logging.info("FakeYou - WAV STATUS: %s", wavo.status, exc_info=1)
       if wavo.status=="started" and count <= timeout:
         continue
       elif "pending" in wavo.status and count <= timeout:

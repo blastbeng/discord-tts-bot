@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 require( 'console-stamp' )( console );
 const fs = require('fs');
+const syncfetch = require('sync-fetch')
 const config = require("../config.json");
 const fetch = require('node-fetch');
 
@@ -8,6 +9,7 @@ const path = config.CACHE_DIR;
 const api=config.API_URL;
 const text="&text=";
 const path_text=config.API_PATH_TEXT
+const path_utils=config.API_PATH_UTILS
 
 function getSlashCommand() {
     const url = api+path_utils+"fakeyou/get_voices_by_cat/Italiano";

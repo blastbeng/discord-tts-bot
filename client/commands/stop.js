@@ -1,7 +1,11 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { getVoiceConnection, createAudioPlayer } = require('@discordjs/voice');
+const { getVoiceConnection, NoSubscriberBehavior, createAudioPlayer } = require('@discordjs/voice');
 require( 'console-stamp' )( console );
-const player = createAudioPlayer();
+const player = createAudioPlayer({
+	behaviors: {
+		noSubscriber: NoSubscriberBehavior.Play,
+	},
+});
 const fetch = require('node-fetch');
 const config = require("../config.json");
 
@@ -20,6 +24,9 @@ module.exports = {
                 if (connection_old !== null && connection_old !== undefined){
                     connection_old.subscribe(player);
                     player.stop();
+                    if(subscription) {
+                        setTimeout(() => subscription.unsubscribe(), 15000)
+                    }      
                     interaction.reply({ content: 'Il pezzente ha smesso di parlare', ephemeral: true });
                 }  
             } catch (error) {

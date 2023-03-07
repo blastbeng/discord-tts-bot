@@ -1,13 +1,18 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
-const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, StreamType  } = require('@discordjs/voice');
+const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, NoSubscriberBehavior, createAudioResource, StreamType  } = require('@discordjs/voice');
 require( 'console-stamp' )( console );
 const fs = require('fs');
 const config = require("../config.json");
-require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
-const player = createAudioPlayer();
+//require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
+const player = createAudioPlayer({
+	behaviors: {
+		noSubscriber: NoSubscriberBehavior.Play,
+	},
+});
 const fetch = require('node-fetch');
 const syncfetch = require('sync-fetch')
+const { createReadStream } = require('fs')
 const GUILD_ID = config.GUILD_ID;
 
 const path = config.CACHE_DIR;
@@ -19,6 +24,7 @@ const path_utils=config.API_PATH_UTILS
 const MESSAGES_CHANNEL_ID = config.MESSAGES_CHANNEL_ID;
 let data;
 
+let playAsStream = true;
 
 function getSlashCommand() {
     const url = api+path_utils+"fakeyou/get_voices_by_cat/Italiano";
@@ -66,7 +72,8 @@ module.exports = {
             && interaction.member.voice.channelId !== undefined
             && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_1
             && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_2
-            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3){
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3
+            && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_4){
                 interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
         } else {
             var connection = null;
@@ -167,10 +174,19 @@ module.exports = {
                                         dest.on('error', reject);
 
                                         dest.on('finish', function(){      
-                                            connection.subscribe(player);                      
-                                            const resource = createAudioResource(outFile, {
-                                                inputType: StreamType.Arbitrary,
-                                            });
+                                            const subscription = connection.subscribe(player);     
+                                            
+                                            let resource;
+                                            if (playAsStream) {
+                                                resource = createAudioResource(createReadStream(outfile), {
+                                                    inputType: StreamType.Arbitrary,
+                                                });
+                                            playAsStream = false;
+                                            } else {
+                                                resource = createAudioResource(outfile, {
+                                                    inputType: StreamType.Arbitrary,
+                                                });
+                                            }          
                                             
                                             player.on('error', error => {
                                                 console.error("ERRORE!", "["+ error + "]");
@@ -206,6 +222,9 @@ module.exports = {
 
 
                                             player.play(resource);
+                                            if(subscription) {
+                                                setTimeout(() => subscription.unsubscribe(), 15000)
+                                            }  
 
                                             var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);
                                             fetch(

@@ -3,7 +3,7 @@ const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
 require( 'console-stamp' )( console );
 const fs = require('fs');
 const config = require("../config.json");
-require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
+//require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
 const fetch = require('node-fetch');
 const syncfetch = require('sync-fetch')
 const GUILD_ID = config.GUILD_ID;

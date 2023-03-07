@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const { joinVoiceChannel, getVoiceConnection  } = require('@discordjs/voice');
 require( 'console-stamp' )( console );
 const config = require("../config.json");
-require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
+//require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
 
 const path = config.CACHE_DIR;
 const api=config.API_URL;
