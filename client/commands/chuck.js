@@ -129,7 +129,7 @@ module.exports = {
                                     player.play(resource);
                                 }
 
-                                setTimeout(() => unsubscribeConnection(), 15_000)  
+                                //setTimeout(() => unsubscribeConnection(), 15_000)  
                                 console.log("Il pezzente sta rispondendo con una frase su Chuck Norris");  
                             });
                         }).catch(function(error) {

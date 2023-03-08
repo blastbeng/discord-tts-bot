@@ -149,7 +149,7 @@ module.exports = {
                                         }
 
 
-                                        setTimeout(() => unsubscribeConnection(), 15_000)
+                                        //setTimeout(() => unsubscribeConnection(), 15_000)
                                         interaction.editReply({ content: "Il pezzente ha cercato su Wikipedia: "+words, ephemeral: true });          
                                         //console.log("Il pezzente ha cercato su Wikipedia:", words);       
 

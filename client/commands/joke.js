@@ -134,7 +134,7 @@ module.exports = {
                                 }
 
 
-                                setTimeout(() => unsubscribeConnection(), 15_000)
+                                //setTimeout(() => unsubscribeConnection(), 15_000)
                                 interaction.editReply({ content: "Il pezzente sta rispondendo con qualche disagiata", ephemeral: true });  
                                 console.log("Il pezzente sta rispondendo con qualche disagiata");    
                             });

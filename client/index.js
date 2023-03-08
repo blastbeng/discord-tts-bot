@@ -523,7 +523,7 @@ client.on('interactionCreate', async interaction => {
                                     }
 
                                     
-                                    setTimeout(() => unsubscribeConnection(), 15_000)
+                                    //setTimeout(() => unsubscribeConnection(), 15_000)
                                     console.log('Il pezzente sta insultando');
                                     interaction.editReply({ content: 'Il pezzente sta insultando', ephemeral: true });          
                                 });
@@ -623,7 +623,7 @@ client.on('interactionCreate', async interaction => {
 
 
                                         
-                                        setTimeout(() => unsubscribeConnection(), 15_000)
+                                        //setTimeout(() => unsubscribeConnection(), 15_000)
                                         console.log('youtube.mp3');
                                         const row = new ActionRowBuilder()
                                         .addComponents(
@@ -895,7 +895,7 @@ client.on("speech", (msg) => {
                                     player.play(resource);
                                 }
                                 
-                                setTimeout(() => unsubscribeConnection(), 15_000) 
+                                //setTimeout(() => unsubscribeConnection(), 15_000) 
                             });
                             var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);
                             fetch(

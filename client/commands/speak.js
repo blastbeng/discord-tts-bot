@@ -238,7 +238,7 @@ module.exports = {
                                             }
                                            
                                             
-                                            setTimeout(() => unsubscribeConnection(), 15_000)
+                                            //setTimeout(() => unsubscribeConnection(), 15_000)
 
                                             var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);
                                             fetch(

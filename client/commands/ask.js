@@ -149,7 +149,7 @@ module.exports = {
                                         }
 
 
-                                        setTimeout(() => unsubscribeConnection(), 15_000) 
+                                        //setTimeout(() => unsubscribeConnection(), 15_000) 
                                         console.log("Il pezzente sta rispondendo", "[words: "+ words +"]");
 
                                         var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);

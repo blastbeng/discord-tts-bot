@@ -168,7 +168,7 @@ module.exports = {
                                         player.play(resource);
                                     }
 
-                                    setTimeout(() => unsubscribeConnection(), 15_000)    
+                                    //setTimeout(() => unsubscribeConnection(), 15_000)    
                                     interaction.editReply({ content: 'Il pezzente sta insultando', ephemeral: true });  
                                     //console.log("Il pezzente sta insultando");      
                                     
