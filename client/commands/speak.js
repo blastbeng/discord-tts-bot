@@ -1,14 +1,13 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
-const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, NoSubscriberBehavior, createAudioResource, StreamType  } = require('@discordjs/voice');
+const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
 require( 'console-stamp' )( console );
 const fs = require('fs');
 const config = require("../config.json");
 //require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
-const player = createAudioPlayer({
-	behaviors: {
-		noSubscriber: NoSubscriberBehavior.Play,
-	},
+const player = createAudioPlayer();
+player.on('error', error => {
+    console.error("ERRORE!", "["+ error + "]");    
 });
 const fetch = require('node-fetch');
 const syncfetch = require('sync-fetch')
@@ -23,8 +22,18 @@ const path_text=config.API_PATH_TEXT
 const path_utils=config.API_PATH_UTILS
 const MESSAGES_CHANNEL_ID = config.MESSAGES_CHANNEL_ID;
 let data;
+let connection;
 
-let playAsStream = true;
+function unsubscribeConnection() {
+    if ( connection !== null
+        && connection !== undefined 
+        && connection.state !== null 
+        && connection.state !== undefined 
+        && connection.state.subscription !== null
+        && connection.state.subscription !== undefined) {
+        connection.state.subscription.unsubscribe();
+    } 
+}
 
 function getSlashCommand() {
     const url = api+path_utils+"fakeyou/get_voices_by_cat/Italiano";
@@ -76,23 +85,41 @@ module.exports = {
             && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_4){
                 interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
         } else {
-            var connection = null;
             const connection_old = getVoiceConnection(interaction.member.voice.guild.id);
-            if (connection_old !== null 
+            if ((connection_old === undefined 
+                || connection_old === null) 
+                || 
+                (connection_old !== null 
                 && connection_old !== undefined
-                && connection_old.joinConfig.channelId !== interaction.member.voice.channelId){
-                connection_old.destroy();
+                && connection_old.joinConfig.channelId !== interaction.member.voice.channelId)){
+                    if (connection_old !== undefined 
+                        && connection_old !== null) {
+                            connection_old.destroy();
+                        }
+            
+                connection = joinVoiceChannel({
+                    channelId: interaction.member.voice.channelId,
+                    guildId: interaction.guildId,
+                    adapterCreator: interaction.guild.voiceAdapterCreator,
+                    selfDeaf: false,
+                    selfMute: false
+                });
+
+                connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
+                    try {
+                        await Promise.race([
+                            entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+                            entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+                        ]);
+                        // Seems to be reconnecting to a new channel - ignore disconnect
+                    } catch (error) {
+                        // Seems to be a real disconnect which SHOULDN'T be recovered from
+                        connection.destroy();
+                    }
+                });
             } else {
                 connection = connection_old;
             }
-            
-            connection = joinVoiceChannel({
-                channelId: interaction.member.voice.channelId,
-                guildId: interaction.guildId,
-                adapterCreator: interaction.guild.voiceAdapterCreator,
-                selfDeaf: false,
-                selfMute: false
-            });
 
             const words = interaction.options.getString('input');
 
@@ -167,39 +194,15 @@ module.exports = {
                                                         .join('_');
                                         file = file + ".mp3";
 
-                                        var outFile = path+"/"+file;
+                                        let outFile = path+"/"+file;
                                         const dest = fs.createWriteStream(outFile);
                                         res.body.pipe(dest);
                                         res.body.on('end', () => resolve());
                                         dest.on('error', reject);
 
-                                        dest.on('finish', function(){      
-                                            const subscription = connection.subscribe(player);     
+                                        dest.on('finish', function(){   
+                                            let resource = createAudioResource(outFile); //let resource = createAudioResource(createReadStream(outFile));      
                                             
-                                            let resource;
-                                            if (playAsStream) {
-                                                resource = createAudioResource(createReadStream(outfile), {
-                                                    inputType: StreamType.Arbitrary,
-                                                });
-                                            playAsStream = false;
-                                            } else {
-                                                resource = createAudioResource(outfile, {
-                                                    inputType: StreamType.Arbitrary,
-                                                });
-                                            }          
-                                            
-                                            player.on('error', error => {
-                                                console.error("ERRORE!", "["+ error + "]");
-                                                const row = new ActionRowBuilder()
-                                                .addComponents(
-                                                    new ButtonBuilder()
-                                                        .setCustomId('errore')
-                                                        .setLabel("ERRORE! Attendi almeno altri 30 secondi.")
-                                                        .setStyle(ButtonStyle.Danger)
-                                                        .setDisabled(true));
-                                                        
-                                                interaction.editReply({ content: "Testo: " + words + " \nVoce: " + voicename + "\n\n" + error.message, ephemeral: true, components: [row] });      
-                                            });
                                             var outcontent = "Il pezzente sta parlando\nAd esclusione di google, tutte le voci sono fornite da fakeyou con possibile Rate Limiting\nTesto: " 
                                                     + words 
                                                     + "  \nVoce: " 
@@ -220,11 +223,22 @@ module.exports = {
 
                                             interaction.editReply({ content: outcontent, ephemeral: true });    
 
-
-                                            player.play(resource);
-                                            if(subscription) {
-                                                setTimeout(() => subscription.unsubscribe(), 15000)
-                                            }  
+                                            if ( connection !== null 
+                                                && connection !== undefined
+                                                && connection.state !== null  
+                                                && connection.state !== undefined
+                                                && connection.state.subscription !== null 
+                                                && connection.state.subscription !== undefined
+                                                && connection.state.subscription.player !== null 
+                                                && connection.state.subscription.player !== undefined){
+                                                    connection.state.subscription.player.play(resource);
+                                            } else {
+                                                connection.subscribe(player);
+                                                player.play(resource);
+                                            }
+                                           
+                                            
+                                            setTimeout(() => unsubscribeConnection(), 15_000)
 
                                             var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);
                                             fetch(

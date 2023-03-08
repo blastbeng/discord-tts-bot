@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
-const { joinVoiceChannel, getVoiceConnection } = require('@discordjs/voice');
+const { joinVoiceChannel, getVoiceConnection, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
 require( 'console-stamp' )( console );
 const config = require("../config.json");
 const http = require("http");
@@ -8,6 +8,19 @@ const http = require("http");
 const port=config.API_PORT;
 const hostname=config.API_HOSTNAME;
 const path_text=config.API_PATH_TEXT
+
+let connection;
+
+function unsubscribeConnection() {
+    if ( connection !== null
+        && connection !== undefined 
+        && connection.state !== null 
+        && connection.state !== undefined 
+        && connection.state.subscription !== null
+        && connection.state.subscription !== undefined) {
+        connection.state.subscription.unsubscribe();
+    } 
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -19,23 +32,41 @@ module.exports = {
         if (!interaction.member._roles.includes(config.ENABLED_ROLE)){
             interaction.reply({ content: "Non sei abilitato all'utilizzo di questo bot.", ephemeral: true });
         } else {
-            var connection = null;
             const connection_old = getVoiceConnection(interaction.member.voice.guild.id);
-            if (connection_old !== null 
+            if ((connection_old === undefined 
+                || connection_old === null) 
+                || 
+                (connection_old !== null 
                 && connection_old !== undefined
-                && connection_old.joinConfig.channelId !== interaction.member.voice.channelId){
-                    connection_old.destroy();
+                && connection_old.joinConfig.channelId !== newMember?.channelId)){
+                    if (connection_old !== undefined 
+                        && connection_old !== null) {
+                            connection_old.destroy();
+                        }
+                
+                    connection = joinVoiceChannel({
+                        channelId: interaction.member.voice.channelId,
+                        guildId: interaction.guildId,
+                        adapterCreator: interaction.guild.voiceAdapterCreator,
+                        selfDeaf: false,
+                        selfMute: false
+                    });
+
+                    connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
+                        try {
+                            await Promise.race([
+                                entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+                                entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+                            ]);
+                            // Seems to be reconnecting to a new channel - ignore disconnect
+                        } catch (error) {
+                            // Seems to be a real disconnect which SHOULDN'T be recovered from
+                            connection.destroy();
+                        }
+                    });
                 } else {
                     connection = connection_old;
                 }
-                
-                connection = joinVoiceChannel({
-                    channelId: interaction.member.voice.channelId,
-                    guildId: interaction.guildId,
-                    adapterCreator: interaction.guild.voiceAdapterCreator,
-                    selfDeaf: false,
-                    selfMute: false
-                });
                 var errorMsg = "";
                 
 

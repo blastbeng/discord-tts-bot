@@ -8,7 +8,7 @@ const {
     ButtonStyle,
     GatewayIntentBits 
 } = require('discord.js');
-const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, NoSubscriberBehavior, createAudioResource, AudioPlayerStatus, StreamType } = require('@discordjs/voice');
+const { generateDependencyReport, joinVoiceChannel, getVoiceConnection, createAudioPlayer, VoiceConnectionStatus, entersState, createAudioResource } = require('@discordjs/voice');
 const { addSpeechEvent } = require("discord-speech-recognition");
 const {
     REST
@@ -18,6 +18,7 @@ const {
 } = require('discord-api-types/v9');
 const fs = require('fs');
 const findRemoveSync = require('find-remove');
+const syncfetch = require('sync-fetch')
 const config = require("./config.json");
 //require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
 const http = require("http");
@@ -25,7 +26,6 @@ const wait = require('node:timers/promises').setTimeout;
 require( 'console-stamp' )( console );
 //const client = new Client({ intents: 32767 });
 //const client = new Client({ intents: [32767, GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
-const { createReadStream } = require('fs')
 const client = new Client({
 	intents: [
 		GatewayIntentBits.AutoModerationConfiguration,
@@ -33,7 +33,6 @@ const client = new Client({
 		GatewayIntentBits.DirectMessageReactions,
 		GatewayIntentBits.DirectMessageTyping,
 		GatewayIntentBits.DirectMessages,
-		GatewayIntentBits.GuildBans,
 		GatewayIntentBits.GuildEmojisAndStickers,
 		GatewayIntentBits.GuildIntegrations,
 		GatewayIntentBits.GuildInvites,
@@ -51,6 +50,8 @@ const client = new Client({
 });
 
 addSpeechEvent(client, { lang: "it-IT", profanityFilter: false });
+
+console.log(generateDependencyReport());
 
 const cron = require('node-cron');
 
@@ -71,14 +72,24 @@ cron.schedule('0 */5 * * * *', () => {
                                                
 });
 
+let connection;
 
+function unsubscribeConnection() {
+    if ( connection !== null
+        && connection !== undefined 
+        && connection.state !== null 
+        && connection.state !== undefined 
+        && connection.state.subscription !== null
+        && connection.state.subscription !== undefined) {
+        connection.state.subscription.unsubscribe();
+    } 
+}
 
-const player = createAudioPlayer({
-	behaviors: {
-		noSubscriber: NoSubscriberBehavior.Play,
-	},
+const player = createAudioPlayer();
+
+player.on('error', error => {
+    console.error("ERRORE!", "["+ error + "]");  
 });
-
 
 const fetch = require('node-fetch');
 
@@ -95,6 +106,7 @@ let lastSpeech = 0;
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 
 let playAsStream = true;
+
 
 const commands = [];
 
@@ -135,26 +147,38 @@ client.on('voiceStateUpdate', (oldMember, newMember) => {
                     || newMember?.channelId === config.ENABLED_CHANNEL_ID_2
                     || newMember?.channelId === config.ENABLED_CHANNEL_ID_3){   
                     const connection_old = getVoiceConnection(newMember?.guild.id);
-                if (connection_old !== null 
-                    && connection_old !== undefined
-                    && connection_old.joinConfig.channelId !== newMember?.channelId){
-                        connection_old.destroy();
-                        joinVoiceChannel({
+                    if ((connection_old === undefined 
+                        || connection_old === null) 
+                        || 
+                        (connection_old !== null 
+                        && connection_old !== undefined
+                        && connection_old.joinConfig.channelId !== newMember?.channelId)){
+                            if (connection_old !== undefined 
+                                && connection_old !== null) {
+                                    connection_old.destroy();
+                                }
+                        connection = joinVoiceChannel({
                             channelId: newMember?.channelId,
                             guildId: newMember?.guild.id,
                             adapterCreator: channel.guild.voiceAdapterCreator,
                             selfDeaf: false,
                             selfMute: false
                         });
-                } else if (connection_old === null 
-                    || connection_old === undefined){
-                        joinVoiceChannel({
-                            channelId: newMember?.channelId,
-                            guildId: newMember?.guild.id,
-                            adapterCreator: channel.guild.voiceAdapterCreator,
-                            selfDeaf: false,
-                            selfMute: false
+
+                        connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
+                            try {
+                                await Promise.race([
+                                    entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+                                    entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+                                ]);
+                                // Seems to be reconnecting to a new channel - ignore disconnect
+                            } catch (error) {
+                                // Seems to be a real disconnect which SHOULDN'T be recovered from
+                                connection.destroy();
+                            }
                         });
+                } else {
+                        connection = connection_old;
                 }
             }
         }).catch(function(error) {
@@ -181,7 +205,7 @@ function escapeRegExp(string){
 
 client.on('interactionCreate', async interaction => {
     try{
-        if (!interaction.isSelectMenu() && !interaction.isCommand() && !interaction.isButton()) return;
+        if (!interaction.isStringSelectMenu() && !interaction.isCommand() && !interaction.isButton()) return;
         if (interaction.isCommand()){        
             const command = client.commands.get(interaction.commandName);
             if (!command) return;
@@ -373,20 +397,25 @@ client.on('interactionCreate', async interaction => {
             } else if(interaction.customId === 'tournament_publish'){
                 await interaction.reply({ embeds: [ interaction.message.embeds[0] ], ephemeral: false });
             } else if(interaction.customId === 'stop'){
-                const connection = getVoiceConnection(interaction.member.voice.guild.id);
+                connection = getVoiceConnection(interaction.member.voice.guild.id);
                 if (connection !== null
                     && connection !== undefined){
-                        const subscription = connection.subscribe(player);
-                        player.stop();
-                        if(subscription) {
-                            setTimeout(() => subscription.unsubscribe(), 15000)
+                        if ( connection !== null 
+                            && connection !== undefined
+                            && connection.state !== null  
+                            && connection.state !== undefined
+                            && connection.state.subscription !== null 
+                            && connection.state.subscription !== undefined
+                            && connection.state.subscription.player !== null 
+                            && connection.state.subscription.player !== undefined){
+                                connection.state.subscription.player.stop();
                         }
                         await interaction.reply({ content: 'Il pezzente ha smesso di riprodurre', ephemeral: true });
                     } else {
                         await interaction.reply({ content: 'Il pezzente non sta riproducendo nulla', ephemeral: true });
                     }
             } else if(interaction.customId === 'leave'){
-                const connection = getVoiceConnection(interaction.member.voice.guild.id);
+                connection = getVoiceConnection(interaction.member.voice.guild.id);
                 if (connection !== null
                     && connection !== undefined){
                         connection.destroy();
@@ -412,23 +441,39 @@ client.on('interactionCreate', async interaction => {
                     && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_4){
                         interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
                 } else {
-                    var connection = null;
                     const connection_old = getVoiceConnection(interaction.member.voice.guild.id);
                     if (connection_old !== null 
                         && connection_old !== undefined
                         && connection_old.joinConfig.channelId !== interaction.member.voice.channelId){
-                        connection_old.destroy();
+                            if (connection_old !== undefined 
+                                && connection_old !== null) {
+                                    connection_old.destroy();
+                                }
+                        connection = joinVoiceChannel({
+                            channelId: interaction.member.voice.channelId,
+                            guildId: interaction.guildId,
+                            adapterCreator: interaction.guild.voiceAdapterCreator,
+                            selfDeaf: false,
+                            selfMute: false
+                        });
+
+                        connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
+                            try {
+                                await Promise.race([
+                                    entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+                                    entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+                                ]);
+                                // Seems to be reconnecting to a new channel - ignore disconnect
+                            } catch (error) {
+                                // Seems to be a real disconnect which SHOULDN'T be recovered from
+                                connection.destroy();
+                            }
+                        });
                     } else {
                         connection = connection_old;
                     }
                     
-                    connection = joinVoiceChannel({
-                        channelId: interaction.member.voice.channelId,
-                        guildId: interaction.guildId,
-                        adapterCreator: interaction.guild.voiceAdapterCreator,
-                        selfDeaf: false,
-                        selfMute: false
-                    });
+                    
     
                     var guildid=""
                     if(interaction.member.voice.guild.id === GUILD_ID){
@@ -454,34 +499,31 @@ client.on('interactionCreate', async interaction => {
                             new Promise((resolve, reject) => {
                                 var file = Math.random().toString(36).slice(2)+".mp3";
                                 //var file = "temp.mp3";
-                                var outFile = path+"/"+file;
+                                let outFile = path+"/"+file;
                                 const dest = fs.createWriteStream(outFile);
                                 res.body.pipe(dest);
                                 res.body.on('end', () => resolve());
                                 dest.on('error', reject);        
         
         
-                                dest.on('finish', function(){      
-                                    const subscription = connection.subscribe(player);       
-                                    let resource;
-                                    if (playAsStream) {
-                                        resource = createAudioResource(createReadStream(outfile), {
-                                            inputType: StreamType.Arbitrary,
-                                        });
-                                        playAsStream = false;
+                                dest.on('finish', function(){            
+                                    let resource = createAudioResource(outFile); //let resource = createAudioResource(createReadStream(outFile));
+                                    if ( connection !== null 
+                                        && connection !== undefined
+                                        && connection.state !== null  
+                                        && connection.state !== undefined
+                                        && connection.state.subscription !== null 
+                                        && connection.state.subscription !== undefined
+                                        && connection.state.subscription.player !== null 
+                                        && connection.state.subscription.player !== undefined){
+                                            connection.state.subscription.player.play(resource);
                                     } else {
-                                        resource = createAudioResource(outfile, {
-                                            inputType: StreamType.Arbitrary,
-                                        });
-                                    } 
-                                    player.on('error', error => {
-                                        console.error("ERRORE!", "["+ error + "]");
-                                        interaction.editReply({ content: 'Si è verificato un errore\n' + error.message, ephemeral: true });     
-                                    });
-                                    player.play(resource);
-                                    if(subscription) {
-                                        setTimeout(() => subscription.unsubscribe(), 15000)
-                                    }  
+                                        connection.subscribe(player);
+                                        player.play(resource);
+                                    }
+
+                                    
+                                    setTimeout(() => unsubscribeConnection(), 15_000)
                                     console.log('Il pezzente sta insultando');
                                     interaction.editReply({ content: 'Il pezzente sta insultando', ephemeral: true });          
                                 });
@@ -496,7 +538,7 @@ client.on('interactionCreate', async interaction => {
                     }); 
                 }
             }
-        } else if (interaction.isSelectMenu()) {
+        } else if (interaction.isStringSelectMenu()) {
             if(interaction.customId === 'videoselect'){
                 if (!interaction.member._roles.includes(config.ENABLED_ROLE)){
                     interaction.reply({ content: "Non sei abilitato all'utilizzo di questo bot.", ephemeral: true });
@@ -515,26 +557,42 @@ client.on('interactionCreate', async interaction => {
                     && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_4){
                         interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
                 } else {
-                
-                    var connection = null;
                     const connection_old = getVoiceConnection(interaction.member.voice.guild.id);
-                    if (connection_old !== null 
+                    if ((connection_old === undefined 
+                        || connection_old === null) 
+                        || 
+                        (connection_old !== null 
                         && connection_old !== undefined
-                        && connection_old.joinConfig.channelId !== interaction.member.voice.channelId){
-                            connection_old.destroy();
+                        && connection_old.joinConfig.channelId !== interaction.member.voice.channelId)){
+                            if (connection_old !== undefined 
+                                && connection_old !== null) {
+                                    connection_old.destroy();
+                                }
+                        
+                            connection = joinVoiceChannel({
+                                channelId: interaction.member.voice.channelId,
+                                guildId: interaction.guildId,
+                                adapterCreator: interaction.guild.voiceAdapterCreator,
+                                selfDeaf: false,
+                                selfMute: false
+                            });
+
+                            connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
+                                try {
+                                    await Promise.race([
+                                        entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+                                        entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+                                    ]);
+                                    // Seems to be reconnecting to a new channel - ignore disconnect
+                                } catch (error) {
+                                    // Seems to be a real disconnect which SHOULDN'T be recovered from
+                                    connection.destroy();
+                                }
+                            });
                         } else {
                             connection = connection_old;
                         }
-                        
-                        connection = joinVoiceChannel({
-                            channelId: interaction.member.voice.channelId,
-                            guildId: interaction.guildId,
-                            adapterCreator: interaction.guild.voiceAdapterCreator,
-                            selfDeaf: false,
-                            selfMute: false
-                        });
-                    if (connection !== null
-                        && connection !== undefined){
+                    if (connection){
                         var video = interaction.values[0];
                         var params = api+path_music+'youtube/get?url='+encodeURIComponent(video);
                         await interaction.deferUpdate();
@@ -554,33 +612,18 @@ client.on('interactionCreate', async interaction => {
                                 new Promise((resolve, reject) => {
                                     var file = "youtube.mp3";
                                     //var file = "temp.mp3";
-                                    var outFile = path+"/"+file;
+                                    let outFile = path+"/"+file;
                                     const dest = fs.createWriteStream(outFile);
                                     res.body.pipe(dest);
                                     res.body.on('end', () => resolve());
                                     dest.on('error', reject);        
 
-                                    dest.on('finish', function(){      
-                                        const subscription = connection.subscribe(player);
-                                        let resource;
-                                        if (playAsStream) {
-                                            resource = createAudioResource(createReadStream(outfile), {
-                                                inputType: StreamType.Arbitrary,
-                                            });
-                                            playAsStream = false;
-                                        } else {
-                                            resource = createAudioResource(outfile, {
-                                                inputType: StreamType.Arbitrary,
-                                            });
-                                        } 
-                                        player.on('error', error => {
-                                            console.error("ERRORE!", "["+ error + "]");
-                                            interaction.editReply({ content: 'Si è verificato un errore\n' + error.message, ephemeral: true });     
-                                        });
-                                        player.play(resource);   
-                                        if(subscription) {
-                                            setTimeout(() => subscription.unsubscribe(), 15000)
-                                        }    
+                                    dest.on('finish', function(){
+                                        let resource = createAudioResource(outFile); //let resource = createAudioResource(createReadStream(outFile));
+
+
+                                        
+                                        setTimeout(() => unsubscribeConnection(), 15_000)
                                         console.log('youtube.mp3');
                                         const row = new ActionRowBuilder()
                                         .addComponents(
@@ -694,26 +737,39 @@ client.on("messageCreate", (msg) => {
                     || msg.member?.voice.channel.id === config.ENABLED_CHANNEL_ID_2
                     || msg.member?.voice.channel.id === config.ENABLED_CHANNEL_ID_3){                    
                     const connection_old = getVoiceConnection(msg.member?.voice.guild.id);
-                    if (connection_old !== null 
+                    if ((connection_old === undefined 
+                        || connection_old === null) 
+                        || 
+                        (connection_old !== null 
                         && connection_old !== undefined
-                        && connection_old.joinConfig.channelId !== msg.member?.voice.channelId){
-                            connection_old.destroy();
-                            joinVoiceChannel({
+                        && connection_old.joinConfig.channelId !== msg.member?.voice.channel.id)){
+                        //&& connection_old.joinConfig.channelId !== newMember?.channelId)){
+                if (connection_old !== undefined 
+                    && connection_old !== null) {
+                        connection_old.destroy();
+                    }
+                            connection = joinVoiceChannel({
                                 channelId: msg.member?.voice.channel.id,
                                 guildId: msg.member?.voice.channel.guild.id,
                                 adapterCreator: msg.member?.voice.channel.guild.voiceAdapterCreator,
                                 selfDeaf: false,
                                 selfMute: false
                             });
-                    } else if (connection_old === null 
-                        || connection_old === undefined){
-                            joinVoiceChannel({
-                                channelId: msg.member?.voice.channel.id,
-                                guildId: msg.member?.voice.channel.guild.id,
-                                adapterCreator: msg.member?.voice.channel.guild.voiceAdapterCreator,
-                                selfDeaf: false,
-                                selfMute: false
+
+                            connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
+                                try {
+                                    await Promise.race([
+                                        entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+                                        entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+                                    ]);
+                                    // Seems to be reconnecting to a new channel - ignore disconnect
+                                } catch (error) {
+                                    // Seems to be a real disconnect which SHOULDN'T be recovered from
+                                    connection.destroy();
+                                }
                             });
+                    } else {
+                            connection = connection_old;
                     }
                 }
             }
@@ -726,37 +782,31 @@ client.on("messageCreate", (msg) => {
 
 client.on("speech", (msg) => {
 
-    try{    
-        const connection = getVoiceConnection(msg.member?.voice.guild.id);
-        if(connection
-            && msg.content !== null 
+    try{
+        let content;
+        if( msg.content
             && msg.content !== ''
-            && msg.content !== undefined 
-            && msg.content !== 'undefined'
+            && msg.content !== 'undefined') {
+            content = msg.content;
+        } 
+        //if (msg.error) {
+        //    console.error("ERRORE!", "[onSpeechError: "+ msg.error + "]");
+        //}
+             
+        const connection = getVoiceConnection(msg.member?.voice.guild.id);
+        if(connection !== null && connection !== undefined
             && config.ENABLED) {
-
-            //var regex = '\\b';
-            //regex += escapeRegExp(msg.content.toLowerCase());
-            //regex += '\\b';
-
-            var wordsss = msg.content.toLowerCase();
-
-            //let randMinutes = Math.floor(Math.random() * 59);
-            //let date_ob = new Date();
-            //let minutes = date_ob.getMinutes();
-            // TEST
-            // randMinutes = date_ob.getMinutes();
-            // TEST
 
             var bcAuto = false;
             var bcSpeech = false;
 
             if(config.AUTONOMOUS) {
                 bcAuto = true;
-            } else if (new RegExp('^pezzente', "i").test(wordsss) 
-                || new RegExp('^scemo', "i").test(wordsss) 
-                || new RegExp('^bot', "i").test(wordsss) 
-                || new RegExp('^boat', "i").test(wordsss)) {
+            } else if ( content && 
+                (new RegExp('^pezzente', "i").test(content.toLowerCase()) 
+                || new RegExp('^scemo', "i").test(content.toLowerCase()) 
+                || new RegExp('^bot', "i").test(content.toLowerCase()) 
+                || new RegExp('^boat', "i").test(content.toLowerCase()))) {
                 bcSpeech = true;
             }
             
@@ -764,15 +814,26 @@ client.on("speech", (msg) => {
 
             differenctMs = (new Date()).getTime() - lastSpeech;
 
-            if (new RegExp('^disabilita', "i").test(wordsss)
-                || new RegExp('^disable', "i").test(wordsss)) {
+            if (content && 
+                (new RegExp('^disabilita', "i").test(content.toLowerCase())
+                || new RegExp('^disable', "i").test(content.toLowerCase()))) {
                 config.AUTONOMOUS = false;
             } else if ((bcAuto && (differenctMs > config.AUTONOMOUS_TIMEOUT)) || bcSpeech) {
                 lastSpeech = (new Date()).getTime();
+                
+
+                if ( content === undefined || content === null ) {
+                    var url = api+path_text+"random/";
+                    try {
+                        content = syncfetch(url).text();
+                    } catch (error) {
+                        console.error("ERRORE!", "["+ error + "]");
+                    } 
+                }
                     
-                var words = msg.content.toLowerCase()
+                var words = content.toLowerCase()
                 if(!config.AUTONOMOUS){
-                    words = msg.content.toLowerCase()
+                    words = content.toLowerCase()
                     .replace(/pezzente/, "")
                     .replace(/scemo/, "")
                     .replace(/bot/, "")
@@ -781,7 +842,7 @@ client.on("speech", (msg) => {
                 }
 
                 if (words === ''){
-                    words = msg.content.toLowerCase();
+                    words = content.toLowerCase();
                 }
 
                 var params = ""
@@ -813,28 +874,28 @@ client.on("speech", (msg) => {
                         new Promise((resolve, reject) => {
                             var file = Math.random().toString(36).slice(2)+".mp3";
                             //var file = "temp.mp3";
-                            var outFile = path+"/"+file;
+                            let outFile = path+"/"+file;
                             const dest = fs.createWriteStream(outFile);
                             res.body.pipe(dest);
                             res.body.on('end', () => resolve());
                             dest.on('error', reject);        
                             dest.on('finish', function(){     
-                                const subscription = connection.subscribe(player);
-                                let resource;
-                                if (playAsStream) {
-                                    resource = createAudioResource(createReadStream(outfile), {
-                                        inputType: StreamType.Arbitrary,
-                                    });
-                                    playAsStream = false;
+                                let resource = createAudioResource(outFile); //let resource = createAudioResource(createReadStream(outFile));
+                                if ( connection !== null 
+                                    && connection !== undefined
+                                    && connection.state !== null  
+                                    && connection.state !== undefined
+                                    && connection.state.subscription !== null 
+                                    && connection.state.subscription !== undefined
+                                    && connection.state.subscription.player !== null 
+                                    && connection.state.subscription.player !== undefined){
+                                        connection.state.subscription.player.play(resource);
                                 } else {
-                                    resource = createAudioResource(outfile, {
-                                        inputType: StreamType.Arbitrary,
-                                    });
-                                } 
-                                player.play(resource);
-                                if(subscription) {
-                                    setTimeout(() => subscription.unsubscribe(), 15000)
-                                }  
+                                    connection.subscribe(player);
+                                    player.play(resource);
+                                }
+                                
+                                setTimeout(() => unsubscribeConnection(), 15_000) 
                             });
                             var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);
                             fetch(
@@ -861,7 +922,7 @@ client.on("speech", (msg) => {
                 }).catch(function(error) {
                     console.error("ERRORE!", "["+ error + "]");
                 }); 
-            } else if (msg.content.toLowerCase().includes('stop') || msg.content.toLowerCase().includes('ferma')) {
+            } else if (content && (content.toLowerCase().includes('stop') || content.toLowerCase().includes('ferma'))) {
                     player.stop();
             //} else {
             //    console.log("Speech not running.", "[differenctMs: " + differenctMs +"]", "[bcSpeech: " + bcSpeech +"]", "[bcAuto: " +bcAuto +"]", "[config.AUTONOMOUS: " + config.AUTONOMOUS +"]", "[msg.content: " + msg.content +"]");

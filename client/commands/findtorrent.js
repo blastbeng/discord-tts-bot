@@ -57,7 +57,7 @@ module.exports = {
             ).then(res => {
                 new Promise((resolve, reject) => {
                     var file = Math.random().toString(36).slice(2)+".json";     
-                    var outFile = path+"/"+file;
+                    let outFile = path+"/"+file;
                     const dest = fs.createWriteStream(outFile);
                     res.body.pipe(dest);
                     res.body.on('end', () => resolve());

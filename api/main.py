@@ -223,7 +223,7 @@ class AudioRepeatClass(Resource):
   def get (self, text: str, voice: str, chatid = "000000"):
     try:
       utils.save_lastsaid_tmpdir(chatid, text)
-      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, timeout=120)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -263,15 +263,14 @@ class AudioDownloadClass(Resource):
 
 @nsaudio.route('/random/')
 @nsaudio.route('/random/<string:voice>/')
-@nsaudio.route('/random/<string:voice>/<int:timeout>/')
-@nsaudio.route('/random/<string:voice>/<int:timeout>/<string:chatid>')
+@nsaudio.route('/random/<string:voice>/<string:chatid>')
 class AudioRandomClass(Resource):
   @cache.cached(timeout=2, query_string=True)
-  def get (self, voice = "google", timeout = 120, chatid = "000000"):
+  def get (self, voice = "google", chatid = "000000"):
     try:
       chatbot_resp = utils.get_random_from_bot(chatid)
       utils.save_lastsaid_tmpdir(chatid, chatbot_resp)
-      tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice=voice, timeout=timeout, israndom=True)
+      tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice=voice, israndom=True)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -296,7 +295,7 @@ class AudioRepeatLearnClass(Resource):
     #threading.Timer(0, get_chatbot_by_id(chatid).get_response, args=[text]).start()
     try:
       utils.save_lastsaid_tmpdir(chatid, text)
-      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, timeout=120)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.call_on_close(get_chatbot_by_id(chatid).get_response(text)) 
@@ -321,7 +320,7 @@ class AudioRepeatLearnUserClass(Resource):
   def get (self, user: str, text: str, voice: str, chatid = "000000"):
     try:
       utils.save_lastsaid_tmpdir(chatid, text)
-      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, timeout=120)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice)
       if tts_out is not None:     
         def learnthis(user: str, text: str):
           if user in previousMessages:
@@ -351,7 +350,7 @@ class AudioAskClass(Resource):
     try:
       chatbot_resp = get_chatbot_by_id(chatid).get_response(text).text
       utils.save_lastsaid_tmpdir(chatid, chatbot_resp)
-      tts_out = utils.get_tts(chatbot_resp, chatid=chatid, timeout=120)
+      tts_out = utils.get_tts(chatbot_resp, chatid=chatid)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -375,7 +374,7 @@ class AudioAskNoLearnClass(Resource):
     try:
       text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
       utils.save_lastsaid_tmpdir(chatid, text_response)
-      tts_out = utils.get_tts(text_response, chatid=chatid, timeout=120)
+      tts_out = utils.get_tts(text_response, chatid=chatid)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -399,7 +398,7 @@ class AudioAskNoLearnRandomClass(Resource):
     try:
       text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
       utils.save_lastsaid_tmpdir(chatid, text_response)
-      tts_out = utils.get_tts(text_response, voice="random", chatid=chatid, timeout=120)
+      tts_out = utils.get_tts(text_response, voice="random", chatid=chatid)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -423,7 +422,7 @@ class AudioAskNoLearnNoCacheGoogleClass(Resource):
     try:
       text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
       utils.save_lastsaid_tmpdir(chatid, text_response)
-      tts_out = utils.get_tts(text_response, voice="google", chatid=chatid, timeout=120)
+      tts_out = utils.get_tts(text_response, voice="google", chatid=chatid)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -447,7 +446,7 @@ class AudioAskUserClass(Resource):
       utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid))
     previousMessages[user] = chatbot_response
     try:
-      tts_out = utils.get_tts(chatbot_response, chatid=chatid, timeout=120)
+      tts_out = utils.get_tts(chatbot_response, chatid=chatid)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -470,7 +469,7 @@ class AudioSearchClass(Resource):
     try:
       wikisaid = utils.wiki_summary(text)
       utils.save_lastsaid_tmpdir(chatid, wikisaid)
-      tts_out = utils.get_tts(wikisaid, chatid=chatid, voice="null", timeout=120)
+      tts_out = utils.get_tts(wikisaid, chatid=chatid, voice="null")
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -501,7 +500,7 @@ class AudioInsultClass(Resource):
       if text and text != '' and text != 'none':
         sentence = text + " " + sentence
       utils.save_lastsaid_tmpdir(chatid, sentence)
-      tts_out = utils.get_tts(sentence, chatid=chatid, voice="google", timeout=120)
+      tts_out = utils.get_tts(sentence, chatid=chatid, voice="google")
       if tts_out is not None:    
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.call_on_close(get_chatbot_by_id(chatid).get_response(sentence)) 
@@ -575,7 +574,7 @@ class AudioChuckClass(Resource):
     try:
       text = utils.get_joke("CHUCK_NORRIS")
       lastsaid["000000"] = text
-      tts_out = utils.get_tts(text, chatid="000000", voice="google", timeout=120)
+      tts_out = utils.get_tts(text, chatid="000000", voice="google")
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -591,7 +590,7 @@ class AudioRandomJokeClass(Resource):
     try:
       text = utils.get_joke("")
       lastsaid["000000"] = text
-      tts_out = utils.get_tts(text, chatid="000000", voice="google", timeout=120)
+      tts_out = utils.get_tts(text, chatid="000000", voice="google")
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -887,8 +886,8 @@ cache.init_app(app)
 limiter.init_app(app)
 scheduler.init_app(app)
 scheduler.start()
-utils.login_fakeyou()
 utils.clean_lastsaid()
+utils.login_fakeyou()
 threading.Timer(30, utils.backupdb, args=["000000"]).start()
 
 if __name__ == '__main__':

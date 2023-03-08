@@ -126,7 +126,7 @@ module.exports = {
                                                         .join('_');
                                         file = file + ".mp3";
 
-                                        var outFile = path+"/"+file;
+                                        let outFile = path+"/"+file;
                                         const dest = fs.createWriteStream(outFile);
                                         res.body.pipe(dest);
                                         res.body.on('end', () => resolve());

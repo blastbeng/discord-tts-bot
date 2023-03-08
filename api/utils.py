@@ -62,7 +62,6 @@ log = logging.getLogger('werkzeug')
 log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 fy=fakeyou.FakeYou()
-fy.login(FAKEYOU_USER,FAKEYOU_PASS)
 
 fake = Faker()
 
@@ -625,7 +624,7 @@ def delete_from_audiodb_by_text(chatid: str, text: str):
     if sqliteConnection:
         sqliteConnection.close()
 
-def get_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=False):
+def get_tts(text: str, chatid="000000", voice=None, israndom=False):
   try:
     if voice is None or voice == "null" or voice == "random":
       voice_to_use = get_random_voice()
@@ -642,16 +641,14 @@ def get_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=False)
         else:
           proxies = {}
           fy.session.proxies.update(proxies)
-        ijt = generate_ijt(fy, text.strip(), voice_to_use)
-        if ijt is not None:
-          out = get_wav_fy(fy,ijt, timeout=timeout)
-          if out is not None:
-            audiodb.insert(text.strip(), chatid, out, voice_to_use)
-            return audiodb.select_by_name_chatid_voice(text.strip(), chatid, voice_to_use)
-          elif voice == "random" or voice == "google":
-            return get_tts_google(text.strip(), chatid=chatid)
-          else:
-            return None
+        wav = fy.say(text.strip(), voice_to_use)
+        if wav is not None:
+          sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
+          out = BytesIO()
+          sound.export(out, format='mp3', bitrate="256")
+          out.seek(0)
+          audiodb.insert(text.strip(), chatid, out, voice_to_use)
+          return audiodb.select_by_name_chatid_voice(text.strip(), chatid, voice_to_use)
         elif voice == "random" or voice == "google":
           return get_tts_google(text.strip(), chatid=chatid)
         else:
@@ -677,7 +674,7 @@ def download_tts(id: int):
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     raise Exception(e)
 
-def populate_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=False):
+def populate_tts(text: str, chatid="000000", voice=None, israndom=False):
   try:
     if voice is None or voice == "null" or voice == "random":
       voice_to_use = get_random_voice()
@@ -694,13 +691,14 @@ def populate_tts(text: str, chatid="000000", voice=None, timeout=120, israndom=F
         else:
           proxies = {}
           fy.session.proxies.update(proxies)
-        ijt = generate_ijt(fy, text.strip(), voice_to_use)
-        if ijt is not None:
-          out = get_wav_fy(fy,ijt, timeout=timeout)
-          if out is not None:
-            audiodb.insert(text.strip(), chatid, out, voice_to_use)
-            return True
-          raise Exception("FakeYou Generation KO")
+        wav = fy.say(text.strip(), voice_to_use)
+        if wav is not None:
+          sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
+          out = BytesIO()
+          sound.export(out, format='mp3', bitrate="256")
+          out.seek(0)
+          audiodb.insert(text.strip(), chatid, out, voice_to_use)
+          return True
         raise Exception("FakeYou Generation KO")
     else:
       return populate_tts_google(text.strip(), chatid=chatid)
@@ -734,53 +732,13 @@ def list_fakeyou_voices(lang:str):
 		
   return foundvoices
 
-
-def generate_ijt(fy,text:str,ttsModelToken:str):
-  logging.info("FakeYou - getting job token")
-  payload={"uuid_idempotency_token":str(uuid4()),"tts_model_token":ttsModelToken,"inference_text":text}
-  handler=fy.session.post(url=fy.baseurl+"tts/inference",data=json.dumps(payload))
-  if handler.status_code==200:
-    ijt=handler.json()["inference_job_token"]
-    return ijt
-  elif handler.status_code==400:
-    raise RequestError("FakeYou: voice or text error.")
-  elif handler.status_code==429:
-    raise TooManyRequests("FakeYou: too many requests.")
-
-
-def get_wav_fy(fy,ijt:str, timeout:int):
-  count = 0
-  while True:
-    handler=fy.session.get(url=fy.baseurl+f"tts/job/{ijt}")
-    if handler.status_code==200:
-      hjson=handler.json()
-      wavo=wav(hjson)
-      logging.info("FakeYou - WAV STATUS: %s", wavo.status, exc_info=1)
-      if wavo.status=="started" and count <= timeout:
-        continue
-      elif "pending" in wavo.status and count <= timeout:
-        count = count + 2
-        time.sleep(2)
-        continue
-      elif "attempt_failed" in wavo.status and count <=2:
-        raise TtsAttemptFailed("FakeYou: TTS generation failed.")
-      elif "complete_success" in wavo.status and count <= timeout:
-        content=fy.session.get("https://storage.googleapis.com/vocodes-public"+wavo.maybePublicWavPath).content
-        fp = BytesIO(content)
-        fp.seek(0)
-        sound = AudioSegment.from_wav(fp)
-        memoryBuff = BytesIO()
-        sound.export(memoryBuff, format='mp3', bitrate="256")
-        memoryBuff.seek(0)
-        return memoryBuff
-        #return fp
-      elif count > timeout:
-        raise RequestError("FakeYou: generation is taking longer than " + str(timeout) + " seconds, forcing timeout.")
-    elif handler.status_code==429:
-      raise TooManyRequests("FakeYou: too many requests.")
-
 def login_fakeyou():
-  fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+  try:
+    fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno)
 
 def get_random_from_bot(chatid: str):
   try:
@@ -866,7 +824,7 @@ def populate_audiodb(chatid: str, count: int):
           logging.info("populate_audiodb - START ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s", chatid, voice, key, sentence)
           generation = ""
           inserted = ""
-          result = populate_tts(sentence, chatid=chatid, voice=voice, timeout=120)
+          result = populate_tts(sentence, chatid=chatid, voice=voice)
           if result:
             inserted="Done"
           else:

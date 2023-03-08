@@ -1,15 +1,9 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, NoSubscriberBehavior, createAudioResource, StreamType  } = require('@discordjs/voice');
+const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, NoSubscriberBehavior, StreamType  } = require('@discordjs/voice');
 require( 'console-stamp' )( console );
 const fs = require('fs');
 const config = require("../config.json");
 //require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
-const player = createAudioPlayer({
-	behaviors: {
-		noSubscriber: NoSubscriberBehavior.Play,
-	},
-});
-const fetch = require('node-fetch');
 const syncfetch = require('sync-fetch')
 const GUILD_ID = config.GUILD_ID;
 
