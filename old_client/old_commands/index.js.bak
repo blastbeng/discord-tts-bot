@@ -20,7 +20,7 @@ const fs = require('fs');
 const findRemoveSync = require('find-remove');
 const syncfetch = require('sync-fetch')
 const config = require("./config.json");
-//require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
+require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
 const http = require("http");
 const wait = require('node:timers/promises').setTimeout;
 require( 'console-stamp' )( console );

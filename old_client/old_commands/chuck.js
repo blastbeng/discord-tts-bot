@@ -1,21 +1,19 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
+const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, VoiceConnectionStatus, entersState  } = require('@discordjs/voice');
 require( 'console-stamp' )( console );
 const fs = require('fs');
 const config = require("../config.json");
 //require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
 const player = createAudioPlayer();
 player.on('error', error => {
-    console.error("ERRORE!", "["+ error + "]");   
-});   
+    console.error("ERRORE!", "["+ error + "]");    
+});
 const fetch = require('node-fetch');
 const { createReadStream } = require('fs')
-
-
 const path = config.CACHE_DIR;
 const api=config.API_URL;
 const path_jokes_audio=config.API_PATH_JOKES_AUDIO
-
+const MESSAGES_CHANNEL_ID = config.MESSAGES_CHANNEL_ID;
 
 let connection;
 
@@ -30,14 +28,11 @@ function unsubscribeConnection() {
     } 
 }
 
-
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('joke')
-        .setDescription('barzelletta a caso'),
+        .setName('chuck')
+        .setDescription('Chuck Norris.'),
     async execute(interaction) {
-        
-            
         if (!interaction.member._roles.includes(config.ENABLED_ROLE)){
             interaction.reply({ content: "Non sei abilitato all'utilizzo di questo bot.", ephemeral: true });
         } else if (interaction.member.voice === null 
@@ -61,7 +56,7 @@ module.exports = {
                 || 
                 (connection_old !== null 
                 && connection_old !== undefined
-                && connection_old.joinConfig.channelId !== newMember?.channelId)){
+                && connection_old.joinConfig.channelId !== interaction.member.voice.channelId)){
                     if (connection_old !== undefined 
                         && connection_old !== null) {
                             connection_old.destroy();
@@ -74,26 +69,13 @@ module.exports = {
                     selfDeaf: false,
                     selfMute: false
                 });
-
-                connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
-                    try {
-                        await Promise.race([
-                            entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
-                            entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
-                        ]);
-                        // Seems to be reconnecting to a new channel - ignore disconnect
-                    } catch (error) {
-                        // Seems to be a real disconnect which SHOULDN'T be recovered from
-                        connection.destroy();
-                    }
-                });
             } else {
                 connection = connection_old;
             }
             //interaction.deferReply({ ephemeral: true});
-            interaction.reply({ content: "Il pezzente sta generando l'audio", ephemeral: true }).then(data => {        
+            interaction.reply({ content: "Il pezzente sta generando l'audio", ephemeral: true }).then(data => {            
 
-                var params = api+path_jokes_audio+"random";
+                var params = api+path_jokes_audio+"chuck";
 
                 fetch(
                     params,
@@ -106,7 +88,7 @@ module.exports = {
                         res.text().then((text) => {
                             console.error("ERRORE!", text);
                             interaction.editReply({ content: "Errore!: \n\n" + text, ephemeral: true });
-                        });       
+                        });      
                     } else {
                         new Promise((resolve, reject) => {
                             var file = Math.random().toString(36).slice(2)+".mp3";
@@ -117,8 +99,9 @@ module.exports = {
                             res.body.on('end', () => resolve());
                             dest.on('error', reject);        
 
-                            dest.on('finish', function(){  
+                            dest.on('finish', function(){      
                                 let resource = createAudioResource(outFile); //let resource = createAudioResource(createReadStream(outFile));
+                                interaction.editReply({ content: "Il pezzente sta rispondendo con una frase su Chuck Norris", ephemeral: true });    
                                 if ( connection !== null 
                                     && connection !== undefined
                                     && connection.state !== null  
@@ -133,10 +116,8 @@ module.exports = {
                                     player.play(resource);
                                 }
 
-
-                                //setTimeout(() => unsubscribeConnection(), 15_000)
-                                interaction.editReply({ content: "Il pezzente sta rispondendo con qualche disagiata", ephemeral: true });  
-                                console.log("Il pezzente sta rispondendo con qualche disagiata");    
+                                //setTimeout(() => unsubscribeConnection(), 15_000)  
+                                console.log("Il pezzente sta rispondendo con una frase su Chuck Norris");  
                             });
                         }).catch(function(error) {
                             console.error("ERRORE!", "["+ error + "]");

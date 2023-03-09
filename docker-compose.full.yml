@@ -67,20 +67,25 @@ services:
   discord-voicebot-client:
     build:
       context: ./client
-      dockerfile: Dockerfile.client
+      dockerfile: Dockerfile
     container_name: discord-voicebot-client
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Rome
-    image: "blastbeng/discord-voicebot-client:1.0.0"
-    restart: "no"
     depends_on:
       discord-voicebot-api-balancer:
         condition: service_healthy
     volumes:
-      - "./config.json:/usr/src/app/config.json"
-      - "/tmp/discord-voicebot-discord:/tmp/discord-voicebot-discord"
+      - ".env:/app/.env"
+    image: "blastbeng/discord-voicebot-client:1.0.0"
+    restart: "no"
+  discord-voicebot-tor:
+    container_name: discord-voicebot-tor
+    ports:
+      - '192.168.1.160:9058:9051'
+    image: dockage/tor-privoxy
+    restart: "no"
   discord-voicebot-telegram:
     build:
       context: ./telegram

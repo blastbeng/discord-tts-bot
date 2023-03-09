@@ -2,7 +2,8 @@ FROM python:3.8-slim-bullseye
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
-         locales
+         locales \
+         ffmpeg
 
 RUN sed -i '/it_IT.UTF-8/s/^# //g' /etc/locale.gen && \
     locale-gen

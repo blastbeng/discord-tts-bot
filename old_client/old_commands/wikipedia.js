@@ -6,16 +6,18 @@ const config = require("../config.json");
 //require('events').EventEmitter.prototype._maxListeners = config.MAX_LISTENERS;
 const player = createAudioPlayer();
 player.on('error', error => {
-    console.error("ERRORE!", "["+ error + "]");    
+    console.error("ERRORE!", "["+ error + "]");     
 });
 const fetch = require('node-fetch');
+const http = require("http");
 const { createReadStream } = require('fs')
+
 const path = config.CACHE_DIR;
+const port=config.API_PORT;
+const hostname=config.API_HOSTNAME;
 const api=config.API_URL;
-const text="&text=";
 const path_audio=config.API_PATH_AUDIO
 const path_text=config.API_PATH_TEXT
-const GUILD_ID = config.GUILD_ID;
 const MESSAGES_CHANNEL_ID = config.MESSAGES_CHANNEL_ID;
 
 let connection;
@@ -33,10 +35,12 @@ function unsubscribeConnection() {
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('ask')
-        .setDescription('Chiedi o scrivi qualcosa al pezzente')
-        .addStringOption(option => option.setName('input').setDescription('Che cosa vuoi chiedere?').setRequired(true)),
-    async execute(interaction) {  
+        .setName('wikipedia')
+        .setDescription('Il pezzente cerca qualcosa su wikipedia')      
+        .addStringOption(option => option.setName('input').setDescription('Che cosa vuoi cercare?').setRequired(true)),
+    async execute(interaction) {     
+
+           
         if (!interaction.member._roles.includes(config.ENABLED_ROLE)){
             interaction.reply({ content: "Non sei abilitato all'utilizzo di questo bot.", ephemeral: true });
         } else if (interaction.member.voice === null 
@@ -53,60 +57,45 @@ module.exports = {
             && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_3
             && interaction.member.voice.channelId !== config.ENABLED_CHANNEL_ID_4){
                 interaction.reply({ content: "Impossibile utilizzare questo comando in questo canale vocale.", ephemeral: true });
-        }else {
-            const connection_old = getVoiceConnection(interaction.member.voice.guild.id);
-            if ((connection_old === undefined 
-                || connection_old === null) 
-                || 
-                (connection_old !== null 
-                && connection_old !== undefined
-                && connection_old.joinConfig.channelId !== newMember?.channelId)){
-                    if (connection_old !== undefined 
-                        && connection_old !== null) {
-                            connection_old.destroy();
-                        }
-                
+        } else {
+                const connection_old = getVoiceConnection(interaction.member.voice.guild.id);
+                if ((connection_old === undefined 
+                    || connection_old === null) 
+                    || 
+                    (connection_old !== null 
+                    && connection_old !== undefined
+                    && connection_old.joinConfig.channelId !== interaction.member.voice.channelId)){
+                        if (connection_old !== undefined 
+                            && connection_old !== null) {
+                                connection_old.destroy();
+                            }
+
+                    var guildid=""
+                    if(interaction.member.voice.guild.id === GUILD_ID){
+                        guildid="000000"
+                    }
+                    else{
+                        guildid = interaction.member.voice.guild.id
+                    }
+                    
                     connection = joinVoiceChannel({
                         channelId: interaction.member.voice.channelId,
-                        guildId: interaction.guildId,
+                        guildId: guildid,
                         adapterCreator: interaction.guild.voiceAdapterCreator,
                         selfDeaf: false,
                         selfMute: false
                     });
-
-                    connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
-                        try {
-                            await Promise.race([
-                                entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
-                                entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
-                            ]);
-                            // Seems to be reconnecting to a new channel - ignore disconnect
-                        } catch (error) {
-                            // Seems to be a real disconnect which SHOULDN'T be recovered from
-                            connection.destroy();
-                        }
-                    });
                 } else {
                     connection = connection_old;
                 }
-            //interaction.deferReply({ ephemeral: true});       
 
-            const words = interaction.options.getString('input');
-            
-            if (words.length <= 500) {
+                const words = interaction.options.getString('input');
 
-                interaction.reply({ content: "Il pezzente sta generando l'audio", ephemeral: true }).then(data => {     
+                if (words.length <= 500) {
+                    
+                    interaction.reply({ content: "Il pezzente sta generando l'audio", ephemeral: true }).then(data => {          
 
-                    if(!(new RegExp("([a-zA-Z0-9]+://)?([a-zA-Z0-9_]+:[a-zA-Z0-9_]+@)?([a-zA-Z0-9.-]+\\.[A-Za-z]{2,4})(:[0-9]+)?(/.*)?").test(words))){
-                        
-                        var guildid=""
-                        if(interaction.member.voice.guild.id === GUILD_ID){
-                            guildid="000000"
-                        }
-                        else{
-                            guildid = interaction.member.voice.guild.id
-                        }
-                        var params = api+path_audio+"ask/user/"+encodeURIComponent(interaction.member.user.username)+"/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);
+                        var params = api+path_audio+"search/"+encodeURIComponent(words);
 
                         fetch(
                             params,
@@ -119,7 +108,7 @@ module.exports = {
                                 res.text().then((text) => {
                                     console.error("ERRORE!", text);
                                     interaction.editReply({ content: "Errore!: \n\n" + text, ephemeral: true });
-                                });         
+                                });    
                             } else {
                                 new Promise((resolve, reject) => {
                                     var file = Math.random().toString(36).slice(2)+".mp3";
@@ -130,10 +119,8 @@ module.exports = {
                                     res.body.on('end', () => resolve());
                                     dest.on('error', reject);        
 
-                                    dest.on('finish', function(){               
+                                    dest.on('finish', function(){  
                                         let resource = createAudioResource(outFile); //let resource = createAudioResource(createReadStream(outFile));
-                                        interaction.editReply({ content: "Il pezzente sta rispondendo\nAd esclusione di google, tutte le voci sono fornite da fakeyou con possibile Rate Limiting\nTesto: " + words, ephemeral: true });    
-                                        
                                         if ( connection !== null 
                                             && connection !== undefined
                                             && connection.state !== null  
@@ -149,8 +136,9 @@ module.exports = {
                                         }
 
 
-                                        //setTimeout(() => unsubscribeConnection(), 15_000) 
-                                        console.log("Il pezzente sta rispondendo", "[words: "+ words +"]");
+                                        //setTimeout(() => unsubscribeConnection(), 15_000)
+                                        interaction.editReply({ content: "Il pezzente ha cercato su Wikipedia: "+words, ephemeral: true });          
+                                        //console.log("Il pezzente ha cercato su Wikipedia:", words);       
 
                                         var params = api+path_text+"lastsaid/"+encodeURIComponent(words)+"/"+encodeURIComponent(guildid);
                                         fetch(
@@ -168,7 +156,7 @@ module.exports = {
                                             }
                                         }).catch(function(error) {
                                             console.error("ERRORE!", "["+ error + "]");
-                                        }); 
+                                        });              
                                     });
                                 }).catch(function(error) {
                                     console.error("ERRORE!", "["+ error + "]");
@@ -177,15 +165,13 @@ module.exports = {
                             }
                         }).catch(function(error) {
                             console.error("ERRORE!", "["+ error + "]");
-                            interaction.editReply({ content: 'Si è verificato un errore\n' + error.message, ephemeral: true });   
-                        });
-                    } else {
-                        interaction.editReply({ content: 'Ma che c**** scrivi?!', ephemeral: true });
-                    }
-                });
-            } else {
-                interaction.reply({ content: 'Errore! Caratteri massimi consentiti: 500', ephemeral: true });    
+                            interaction.editReply({ content: 'Si è verificato un errore', ephemeral: true });   
+                        }); 
+                    });
+                } else {
+                    interaction.reply({ content: 'Errore! Caratteri massimi consentiti: 500', ephemeral: true });    
+                }
             }
-        }
+
     }
 }; 

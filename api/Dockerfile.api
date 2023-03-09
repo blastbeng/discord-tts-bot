@@ -56,8 +56,6 @@ COPY utils.py .
 COPY audiodb.py .
 COPY custom_trainer.py .
 COPY insults.py .
-COPY reddit.py .
-COPY tournament.py .
 COPY image.py .
 COPY main.py .
 COPY config.py .

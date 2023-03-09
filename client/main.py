@@ -1,0 +1,152 @@
+import os
+import sys
+from typing import Optional
+from pathlib import Path
+from os.path import join, dirname
+from dotenv import load_dotenv
+
+import discord
+from discord import app_commands
+
+
+dotenv_path = join(dirname(__file__), '.env')
+load_dotenv(dotenv_path)
+
+MY_GUILD = discord.Object(id=os.environ.get("GUILD_ID")) 
+
+
+class MyClient(discord.Client):
+    def __init__(self, *, intents: discord.Intents):
+        super().__init__(intents=intents)
+        self.tree = app_commands.CommandTree(self)
+
+    async def setup_hook(self):
+        self.tree.copy_global_to(guild=MY_GUILD)
+        await self.tree.sync(guild=MY_GUILD)
+
+
+intents = discord.Intents.default()
+client = MyClient(intents=intents)
+
+
+@client.event
+async def on_ready():
+    print(f'Logged in as {client.user} (ID: {client.user.id})')
+    print('------')
+
+@client.tree.command()
+async def join(interaction: discord.Interaction):
+    """Entra dal canale."""
+    if interaction.user.voice and interaction.user.voice.channel:
+        if client.voice_clients and client.voice_clients[0].channel.id != interaction.user.voice.channel.id:
+            await client.voice_clients[0].disconnect()
+            await interaction.user.voice.channel.connect()
+        elif not client.voice_clients:
+            await interaction.user.voice.channel.connect()
+        await interaction.response.send_message("Entro nel canale", ephemeral = True)
+    else:
+        await interaction.response.send_message("Devi essere connesso a un canale vocale per usare questo comando", ephemeral = True)
+
+@client.tree.command()
+async def leave(interaction: discord.Interaction):
+    """Esce dal canale."""
+    if interaction.user.voice and interaction.user.voice.channel:
+        if client.voice_clients and client.voice_clients[0].channel.id == interaction.user.voice.channel.id:
+            await client.voice_clients[0].disconnect()
+            await interaction.response.send_message("Esco dal canale", ephemeral = True)
+        else:
+            await interaction.response.send_message("Non mi trovo nel tuo canale vocale", ephemeral = True)       
+    else:
+        await interaction.response.send_message("Devi essere connesso a un canale vocale per usare questo comando", ephemeral = True)
+
+@client.tree.command()
+@app_commands.rename(text='text')
+@app_commands.describe(text='Il testo da ripetere')
+async def speak(interaction: discord.Interaction, text: str):
+    """Ripete un testo."""
+    if interaction.user.voice and interaction.user.voice.channel:
+        if client.voice_clients and client.voice_clients[0].channel.id != interaction.user.voice.channel.id:
+            await client.voice_clients[0].disconnect()
+            await interaction.user.voice.channel.connect()
+        elif not client.voice_clients:
+            await interaction.user.voice.channel.connect()
+        
+        client.voice_clients[0].play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+text+"/google/"), after=lambda e: print('Ho riprodotto: ' + text))
+
+        await interaction.response.send_message("Riproduco: " + text, ephemeral = True)
+    else:
+        await interaction.response.send_message("Devi essere connesso a un canale vocale per usare questo comando", ephemeral = True)
+
+@client.tree.command()
+@app_commands.rename(text='text')
+@app_commands.describe(text="L'oggetto o persona da insultare")
+async def insult(interaction: discord.Interaction, text: str):
+    """Ripete un testo."""
+    if interaction.user.voice and interaction.user.voice.channel:
+        if client.voice_clients and client.voice_clients[0].channel.id != interaction.user.voice.channel.id:
+            await client.voice_clients[0].disconnect()
+            await interaction.user.voice.channel.connect()
+        elif not client.voice_clients:
+            await interaction.user.voice.channel.connect()
+        
+        client.voice_clients[0].play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"insult?text="+text), after=lambda e: print('Ho insultato: ' + text))
+
+        await interaction.response.send_message("Insulto: " + text, ephemeral = True)
+    else:
+        await interaction.response.send_message("Devi essere connesso a un canale vocale per usare questo comando", ephemeral = True)
+
+@client.tree.context_menu(name='Insult')
+async def insult_tree(interaction: discord.Interaction, member: discord.Member):
+    if interaction.user.voice and interaction.user.voice.channel:
+        if client.voice_clients and client.voice_clients[0].channel.id != interaction.user.voice.channel.id:
+            await client.voice_clients[0].disconnect()
+            await interaction.user.voice.channel.connect()
+        elif not client.voice_clients:
+            await interaction.user.voice.channel.connect()
+        
+        client.voice_clients[0].play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"insult?text="+member.name), after=lambda e: print('Ho insultato: ' + member.name))
+
+        await interaction.response.send_message("Insulto " + member.name, ephemeral = True)
+    else:
+        await interaction.response.send_message("Devi essere connesso a un canale vocale per usare questo comando", ephemeral = True)
+
+@client.tree.command()
+async def random(interaction: discord.Interaction):
+    """Riproduce una frase casuale."""
+    if interaction.user.voice and interaction.user.voice.channel:
+        if client.voice_clients and client.voice_clients[0].channel.id != interaction.user.voice.channel.id:
+            await client.voice_clients[0].disconnect()
+            await interaction.user.voice.channel.connect()
+        elif not client.voice_clients:
+            await interaction.user.voice.channel.connect()
+            
+        client.voice_clients[0].play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/"), after=lambda e: print('Riproduco un audio causale'))
+
+        await interaction.response.send_message("Riproduco audio casuali per " + str(count) + " volte", ephemeral = True)
+    else:
+        await interaction.response.send_message("Devi essere connesso a un canale vocale per usare questo comando", ephemeral = True)
+
+@client.tree.context_menu(name='Random')
+async def random_tree(interaction: discord.Interaction, member: discord.Member):
+    if interaction.user.voice and interaction.user.voice.channel:
+        if client.voice_clients and client.voice_clients[0].channel.id != interaction.user.voice.channel.id:
+            await client.voice_clients[0].disconnect()
+            await interaction.user.voice.channel.connect()
+        elif not client.voice_clients:
+            await interaction.user.voice.channel.connect()
+            
+        client.voice_clients[0].play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/"), after=lambda e: print('Riproduco un audio causale'))
+
+        await interaction.response.send_message("Riproduco un audio casuale", ephemeral = True)
+    else:
+        await interaction.response.send_message("Devi essere connesso a un canale vocale per usare questo comando", ephemeral = True)
+
+@client.tree.command()
+async def restart(interaction: discord.Interaction):
+    """Riavvia il bot."""
+    await interaction.response.send_message("Riavvio il bot", ephemeral = True)
+    os.execv(sys.executable, ['python'] + sys.argv)
+
+
+
+client.run(os.environ.get("BOT_TOKEN"))

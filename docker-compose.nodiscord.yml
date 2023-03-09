@@ -64,6 +64,12 @@ services:
     networks:
       - caching
     restart: "no"
+  discord-voicebot-tor:
+    container_name: discord-voicebot-tor
+    ports:
+      - '192.168.1.160:9058:9051'
+    image: dockage/tor-privoxy
+    restart: "no"
   discord-voicebot-telegram:
     build:
       context: ./telegram

@@ -5,7 +5,6 @@ import logging
 import image
 import utils
 import insults
-import tournament
 import audiodb
 import requests
 import json
@@ -57,7 +56,7 @@ scheduler = APScheduler()
 
 limiter = Limiter(
     key_func=get_remote_address,
-    default_limits=["10/minute"],
+    default_limits=["60/minute"],
     storage_uri="memory://",
 )
 
@@ -88,12 +87,6 @@ class TextRepeatClass(Resource):
   def get (self, text: str, chatid = "000000"):
     return get_response_str(text)
 
-
-@nstext.route('/lastsaid/<string:text>/')
-@nstext.route('/lastsaid/<string:text>/<string:chatid>')
-class TextRepeatClass(Resource):
-  def get (self, text: str, chatid = "000000"):
-    return get_response_str(utils.load_lastsaid_tmpdir(chatid))
 
 
 @nstext.route('/random/')
@@ -133,7 +126,6 @@ class TextAskClass(Resource):
   @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, chatid = "000000"):
     chatbot_response = get_chatbot_by_id(chatid).get_response(text).text
-    utils.save_lastsaid_tmpdir(chatid, chatbot_response)
     return get_response_str(chatbot_response)
 
 
@@ -142,7 +134,6 @@ class TextAskClass(Resource):
 class TextAskNoLearnClass(Resource):
   def get (self, text: str, chatid = "000000"):
     chatbot_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
-    utils.save_lastsaid_tmpdir(chatid, chatbot_response)
     return get_response_str(chatbot_response)
 
 
@@ -155,7 +146,7 @@ class TextAskUserClass(Resource):
     if user not in previousMessages:
       dolearn=True
     chatbot_response = get_chatbot_by_id(chatid).get_response(text, learn=dolearn).text
-    utils.save_lastsaid_tmpdir(chatid, chatbot_response)
+    
     if user in previousMessages:
       utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid))
     previousMessages[user] = chatbot_response
@@ -168,7 +159,6 @@ class TextSearchClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, chatid = "000000"):
     wikisaid = utils.wiki_summary(text)
-    utils.save_lastsaid_tmpdir(chatid, wikisaid)
     return get_response_str(wikisaid)
 
 
@@ -194,23 +184,11 @@ class TextInsultClass(Resource):
     text = request.args.get("text")
     if text and text != '' and text != 'none':
       sentence = text + " " + sentence
-    utils.save_lastsaid_tmpdir(chatid, sentence)
     response = Response(sentence)
     response.call_on_close(get_chatbot_by_id(chatid).get_response(sentence)) 
     return response
 
 
-
-@nstext.route('/tournament')
-class TextTournamentClass(Resource): 
-  def post (self):
-    return jsonify(tournament.generate_tournament(request.get_json()));
-
-@nstext.route('/tournament/regen')
-class TextTournamentRegenClass(Resource): 
-  def post (self):
-    content = request.get_json()
-    return jsonify(tournament.regen_tournament(content['author'], content['name'], content['description']));
 
 
 nsaudio = api.namespace('chatbot_audio', 'Accumulators Chatbot TTS audio APIs')
@@ -222,7 +200,6 @@ class AudioRepeatClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, voice: str, chatid = "000000"):
     try:
-      utils.save_lastsaid_tmpdir(chatid, text)
       tts_out = utils.get_tts(text, chatid=chatid, voice=voice)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -269,7 +246,6 @@ class AudioRandomClass(Resource):
   def get (self, voice = "google", chatid = "000000"):
     try:
       chatbot_resp = utils.get_random_from_bot(chatid)
-      utils.save_lastsaid_tmpdir(chatid, chatbot_resp)
       tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice=voice, israndom=True)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -294,7 +270,6 @@ class AudioRepeatLearnClass(Resource):
     #get_chatbot_by_id(chatid).get_response(text)
     #threading.Timer(0, get_chatbot_by_id(chatid).get_response, args=[text]).start()
     try:
-      utils.save_lastsaid_tmpdir(chatid, text)
       tts_out = utils.get_tts(text, chatid=chatid, voice=voice)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -319,7 +294,6 @@ class AudioRepeatLearnUserClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, user: str, text: str, voice: str, chatid = "000000"):
     try:
-      utils.save_lastsaid_tmpdir(chatid, text)
       tts_out = utils.get_tts(text, chatid=chatid, voice=voice)
       if tts_out is not None:     
         def learnthis(user: str, text: str):
@@ -349,7 +323,6 @@ class AudioAskClass(Resource):
   def get (self, text: str, chatid = "000000"):
     try:
       chatbot_resp = get_chatbot_by_id(chatid).get_response(text).text
-      utils.save_lastsaid_tmpdir(chatid, chatbot_resp)
       tts_out = utils.get_tts(chatbot_resp, chatid=chatid)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -373,7 +346,6 @@ class AudioAskNoLearnClass(Resource):
   def get (self, text: str, chatid = "000000"):
     try:
       text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
-      utils.save_lastsaid_tmpdir(chatid, text_response)
       tts_out = utils.get_tts(text_response, chatid=chatid)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -397,7 +369,6 @@ class AudioAskNoLearnRandomClass(Resource):
   def get (self, text: str, chatid = "000000"):
     try:
       text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
-      utils.save_lastsaid_tmpdir(chatid, text_response)
       tts_out = utils.get_tts(text_response, voice="random", chatid=chatid)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -414,6 +385,23 @@ class AudioAskNoLearnRandomClass(Resource):
         return make_response(g.get('request_error'), 500)
 
 
+@nsaudio.route('/ask/nolearn/google/<string:text>/')
+@nsaudio.route('/ask/nolearn/google/<string:text>/<string:chatid>')
+class AudioAskNoLearnNoCacheGoogleClass(Resource):
+  @cache.cached(timeout=10, query_string=True)
+  def get (self, text: str, chatid = "000000"):
+    try:
+      text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
+      tts_out = utils.get_tts(text_response, voice="google", chatid=chatid)
+      if tts_out is not None:
+        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+      else:
+        return make_response('request_error', 500)
+    except Exception as e:
+      g.request_error = str(e)
+      return make_response(g.get('request_error'), 500)
+
+
 @nsaudio.route('/ask/nolearn/nocache/google/<string:text>/')
 @nsaudio.route('/ask/nolearn/nocache/google/<string:text>/<string:chatid>')
 class AudioAskNoLearnNoCacheGoogleClass(Resource):
@@ -421,7 +409,6 @@ class AudioAskNoLearnNoCacheGoogleClass(Resource):
   def get (self, text: str, chatid = "000000"):
     try:
       text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
-      utils.save_lastsaid_tmpdir(chatid, text_response)
       tts_out = utils.get_tts(text_response, voice="google", chatid=chatid)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -441,7 +428,7 @@ class AudioAskUserClass(Resource):
     if user not in previousMessages:
       dolearn=True
     chatbot_response = get_chatbot_by_id(chatid).get_response(text, learn=dolearn).text
-    utils.save_lastsaid_tmpdir(chatid, chatbot_response)
+    
     if user in previousMessages:
       utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid))
     previousMessages[user] = chatbot_response
@@ -468,7 +455,7 @@ class AudioSearchClass(Resource):
   def get (self, text: str, chatid = "000000"):
     try:
       wikisaid = utils.wiki_summary(text)
-      utils.save_lastsaid_tmpdir(chatid, wikisaid)
+      
       tts_out = utils.get_tts(wikisaid, chatid=chatid, voice="null")
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -499,7 +486,6 @@ class AudioInsultClass(Resource):
     try:
       if text and text != '' and text != 'none':
         sentence = text + " " + sentence
-      utils.save_lastsaid_tmpdir(chatid, sentence)
       tts_out = utils.get_tts(sentence, chatid=chatid, voice="google")
       if tts_out is not None:    
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -554,7 +540,6 @@ class TextChuckClass(Resource):
   @cache.cached(timeout=2)
   def get(self):
     jokesaid = utils.get_joke("CHUCK_NORRIS")
-    lastsaid["000000"] = jokesaid
     return get_response_str(jokesaid)
 
 
@@ -562,7 +547,6 @@ class TextChuckClass(Resource):
 class TextRandomJokeClass(Resource):
   def get(self):
     jokesaid = utils.get_joke("")
-    lastsaid["000000"] = jokesaid
     return get_response_str(utils.get_joke(""))
 
 nsjokesaudio = api.namespace('jokes_audio', 'Accumulators Jokes Audio APIs')
@@ -573,7 +557,7 @@ class AudioChuckClass(Resource):
   def get(self):
     try:
       text = utils.get_joke("CHUCK_NORRIS")
-      lastsaid["000000"] = text
+      
       tts_out = utils.get_tts(text, chatid="000000", voice="google")
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -589,7 +573,7 @@ class AudioRandomJokeClass(Resource):
   def get(self):
     try:
       text = utils.get_joke("")
-      lastsaid["000000"] = text
+      
       tts_out = utils.get_tts(text, chatid="000000", voice="google")
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -598,15 +582,6 @@ class AudioRandomJokeClass(Resource):
         return resp
     except Exception as e:
       return make_response(str(e), 500)
-
-
-nswebtext = api.namespace('reddit', 'Accumulators Reddit APIs')
-
-
-@nswebtext.route('/search/<string:word>')
-class TextRedditSearchClass(Resource):
-  def get(self, word: str):
-    return jsonify(reddit.search(word).__dict__)
 
 
 
@@ -619,33 +594,6 @@ class AudioSearchClass(Resource):
     #threading.Timer(0, get_chatbot_by_id(chatid).get_response, args=[words]).start()
     bytes_img, attachment_filename, mimetype = image.search(words)
     return send_file(bytes_img, attachment_filename=attachment_filename, mimetype=mimetype)
-
-#nswebtext = api.namespace('twitter', 'Accumulators Twitter APIs')
-
-#@nswebtext.route('/search/random/byhashtag/<string:word>')
-#class TextTwitterLocalSearchClass(Resource):
-#  @cache.cached(timeout=1, query_string=True)
-#  def get(self, word: str):
-#    return jsonify(twitter.search_random(word, sched, 0).__dict__)
-
-#@nswebtext.route('/search/random')
-#class TextTwitterRandomSearchClass(Resource):
-#  @cache.cached(timeout=1, query_string=True)
-#  def get(self):
-#    return jsonify(twitter.search_all_random())
-
-#for tw_search in twitter.get_all_searches():
-#  sched.add_job(twitter.scrape, 'interval', args=[tw_search,50], hours=2, id=tw_search)
-
-
-#nswebhook = api.namespace('webhooks', 'Accumulators Webhooks APIs')
-
-#@nswebhook.route('/test', methods=['POST'])
-#class WebhookTest(Resource):
-#  def webhook():
-#    if request.method == 'POST':
-#      print(str(datetime.now()) + " -","Data received from Webhook is: ", request.json)
-#    return "Webhook received!"
 
 
 
@@ -862,10 +810,6 @@ def populate_audiodb():
 @scheduler.task('interval', id='backupdb', hours=24, misfire_grace_time=900)
 def backupdb():
   utils.backupdb("000000")
-  
-@scheduler.task('interval', id='clean_lastsaid', hours=1, misfire_grace_time=900)
-def clean_lastsaid():
-  utils.clean_lastsaid()
 
 
 #@scheduler.task('cron', id='populate_sentences', hour=4, minute=10, second=0, misfire_grace_time=900)
@@ -881,12 +825,10 @@ chatbots_dict = {}
 audiodb.create_empty_tables()
 #chatbot = utils.get_chatterbot(os.environ['TRAIN'] == "True")
 #twitter.create_empty_tables()
-tournament.create_empty_tables()
 cache.init_app(app)
 limiter.init_app(app)
 scheduler.init_app(app)
 scheduler.start()
-utils.clean_lastsaid()
 utils.login_fakeyou()
 threading.Timer(30, utils.backupdb, args=["000000"]).start()
 
