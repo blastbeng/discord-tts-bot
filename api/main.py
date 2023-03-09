@@ -243,10 +243,11 @@ class AudioDownloadClass(Resource):
 @nsaudio.route('/random/<string:voice>/<string:chatid>')
 class AudioRandomClass(Resource):
   @cache.cached(timeout=2, query_string=True)
-  def get (self, voice = "google", chatid = "000000"):
+  def get (self, voice = "random", chatid = "000000"):
     try:
-      chatbot_resp = utils.get_random_from_bot(chatid)
-      tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice=voice, israndom=True)
+      #chatbot_resp = utils.get_random_from_bot(chatid)
+      #tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice=voice, israndom=True)
+      tts_out = audiodb.select_by_chatid_random(chatid)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:

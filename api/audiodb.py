@@ -138,6 +138,32 @@ def select_by_name_chatid_voice(name: str, chatid: str, voice: str):
         sqliteConnection.close()
     return audio
 
+def select_by_chatid_random(chatid: str):
+  if chatid == "X":
+    return None
+  else:
+    audio = None
+    try:
+      sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+      cursor = sqliteConnection.cursor()
+
+      sqlite_select_query = """SELECT data from Audio WHERE chatid = ? ORDER BY RANDOM() LIMIT 1; """
+      cursor.execute(sqlite_select_query, (chatid,))
+      records = cursor.fetchall()
+
+      for row in records:
+        data   =  row[0]
+        cursor.close()
+        audio = BytesIO(data)
+        audio.seek(0)
+
+    except sqlite3.Error as error:
+      logging.error("Failed to read data from sqlite table", exc_info=1)
+    finally:
+      if sqliteConnection:
+        sqliteConnection.close()
+    return audio
+
 def select_audio_by_id(id: int):
   audio = None
   try:
