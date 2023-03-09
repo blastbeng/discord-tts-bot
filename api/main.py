@@ -24,6 +24,7 @@ from markovipy import MarkoviPy
 from pathlib import Path
 from os.path import join, dirname
 from dotenv import load_dotenv
+from threading import Thread
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -105,7 +106,10 @@ class TextRepeatLearnClass(Resource):
     #get_chatbot_by_id(chatid).get_response(text)
     #threading.Timer(0, , args=[text]).start()
     response = get_response_str(text)
-    response.call_on_close(get_chatbot_by_id(chatid).get_response(text)) 
+    #response.call_on_close(get_chatbot_by_id(chatid).get_response(text)) 
+    chatbot = get_chatbot_by_id(chatid)
+    daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
+    daemon.start()
     return response
 
 
@@ -185,7 +189,10 @@ class TextInsultClass(Resource):
     if text and text != '' and text != 'none':
       sentence = text + " " + sentence
     response = Response(sentence)
-    response.call_on_close(get_chatbot_by_id(chatid).get_response(sentence)) 
+    #response.call_on_close(get_chatbot_by_id(chatid).get_response(text)) 
+    chatbot = get_chatbot_by_id(chatid)
+    daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
+    daemon.start()
     return response
 
 
@@ -274,7 +281,10 @@ class AudioRepeatLearnClass(Resource):
       tts_out = utils.get_tts(text, chatid=chatid, voice=voice)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.call_on_close(get_chatbot_by_id(chatid).get_response(text)) 
+        #response.call_on_close(get_chatbot_by_id(chatid).get_response(text)) 
+        chatbot = get_chatbot_by_id(chatid)
+        daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
+        daemon.start()
         return response
       else:
         @after_this_request
@@ -282,6 +292,9 @@ class AudioRepeatLearnClass(Resource):
           cache.delete_memoized(AudioRepeatLearnClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
     except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       g.request_error = str(e)
       @after_this_request
       def clear_cache(response):
@@ -302,7 +315,9 @@ class AudioRepeatLearnUserClass(Resource):
             utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid))
           previousMessages[user] = text  
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.call_on_close(learnthis(user,text)) 
+        #response.call_on_close(learnthis(user,text)) 
+        daemon = Thread(target=learnthis, args=(user,text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
+        daemon.start()
         return response
       else:
         @after_this_request
@@ -310,6 +325,9 @@ class AudioRepeatLearnUserClass(Resource):
           cache.delete_memoized(AudioRepeatLearnUserClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
     except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       g.request_error = str(e)
       @after_this_request
       def clear_cache(response):
@@ -490,12 +508,18 @@ class AudioInsultClass(Resource):
       tts_out = utils.get_tts(sentence, chatid=chatid, voice="google")
       if tts_out is not None:    
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.call_on_close(get_chatbot_by_id(chatid).get_response(sentence)) 
+        #response.call_on_close(get_chatbot_by_id(chatid).get_response(sentence)) 
+        chatbot = get_chatbot_by_id(chatid)
+        daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
+        daemon.start()
         return response
       else:
         resp = make_response("TTS Generation Error!", 500)
         return resp
     except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return make_response(str(e), 500)
 
 nsmusic = api.namespace('chatbot_music', 'Accumulators Chatbot Music APIs')
@@ -831,6 +855,7 @@ limiter.init_app(app)
 scheduler.init_app(app)
 scheduler.start()
 utils.login_fakeyou()
+get_chatbot_by_id("000000")
 threading.Timer(30, utils.backupdb, args=["000000"]).start()
 
 if __name__ == '__main__':
