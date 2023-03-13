@@ -22,6 +22,8 @@ WORKDIR /app
 
 #COPY .env .
 COPY main.py .
+COPY utils.py .
+COPY database.py .
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 #RUN chown -R uwsgi:uwsgi /app

@@ -132,12 +132,12 @@ def generate(filename: str):
           yield data
           data = fmp3.read(1024)
 
-def get_tts_google(text: str, chatid="000000"):
+def get_tts_google(text: str, chatid="000000", language="it"):
   data = audiodb.select_by_name_chatid_voice(text, chatid, "google")
   if data is not None:
     return data
   else:
-    tts = gTTS(text=text, lang="it", slow=False)
+    tts = gTTS(text=text, lang=language, slow=False)
     fp = BytesIO()
     tts.write_to_fp(fp)
     fp.seek(0)
@@ -145,8 +145,11 @@ def get_tts_google(text: str, chatid="000000"):
     memoryBuff = BytesIO()
     sound.export(memoryBuff, format='mp3', bitrate="256")
     memoryBuff.seek(0)
-    audiodb.insert(text, chatid, memoryBuff, "google")
-    return audiodb.select_by_name_chatid_voice(text, chatid, "google")
+    if chatid == "000000":
+      audiodb.insert(text, chatid, memoryBuff, "google")
+      return audiodb.select_by_name_chatid_voice(text, chatid, "google")
+    else:
+      return memoryBuff
     #return memoryBuff
     #return fp
 
@@ -176,16 +179,18 @@ def clean_input(testo: str):
   else:
     return True
 
-def get_chatterbot(chatid: str, train: bool):
+def get_chatterbot(chatid: str, train: False, lang = "it"):
 
   dbfile=chatid+"-db.sqlite3"
+
+  spacymodel = lang+"_core_news_sm"
 
   fle = Path('./config/'+dbfile)
   fle.touch(exist_ok=True)
   f = open(fle)
   f.close()
 
-  nlp = spacy.load("it_core_news_lg")
+  nlp = spacy.load(spacymodel)
   chatbot = ChatBot(
       'PezzenteCapo',
       storage_adapter='chatterbot.storage.SQLStorageAdapter',
@@ -624,13 +629,15 @@ def delete_from_audiodb_by_text(chatid: str, text: str):
     if sqliteConnection:
         sqliteConnection.close()
 
-def get_tts(text: str, chatid="000000", voice=None, israndom=False):
+def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it"):
   try:
     if voice is None or voice == "null" or voice == "random":
       voice_to_use = get_random_voice()
     else:
       voice_to_use = voice
-    if voice_to_use != "google": 
+    if chatid != "000000" or language != "it":
+      return get_tts_google(text.strip(), chatid=chatid, language=language)
+    elif voice_to_use != "google": 
       datafy = audiodb.select_by_name_chatid_voice(text.strip(), chatid, voice_to_use)
       if datafy is not None:
         return datafy
@@ -650,11 +657,11 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False):
           audiodb.insert(text.strip(), chatid, out, voice_to_use)
           return audiodb.select_by_name_chatid_voice(text.strip(), chatid, voice_to_use)
         elif voice == "random" or voice == "google":
-          return get_tts_google(text.strip(), chatid=chatid)
+          return get_tts_google(text.strip(), chatid=chatid, language="it")
         else:
           return None
     else:
-      return get_tts_google(text.strip(), chatid=chatid)
+      return get_tts_google(text.strip(), chatid=chatid, language=language)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]

@@ -254,7 +254,7 @@ class AudioRandomClass(Resource):
     try:
       #chatbot_resp = utils.get_random_from_bot(chatid)
       #tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice=voice, israndom=True)
-      tts_out = audiodb.select_by_chatid_random(chatid)
+      tts_out = audiodb.select_by_chatid_voice_random(chatid,voice)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -272,19 +272,21 @@ class AudioRandomClass(Resource):
 
 @nsaudio.route('/repeat/learn/<string:text>/<string:voice>/')
 @nsaudio.route('/repeat/learn/<string:text>/<string:voice>/<string:chatid>')
+@nsaudio.route('/repeat/learn/<string:text>/<string:voice>/<string:chatid>/<string:language>')
 class AudioRepeatLearnClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, voice: str, chatid = "000000"):
+  def get (self, text: str, voice: str, chatid = "000000", language = "it"):
     #get_chatbot_by_id(chatid).get_response(text)
     #threading.Timer(0, get_chatbot_by_id(chatid).get_response, args=[text]).start()
     try:
-      tts_out = utils.get_tts(text, chatid=chatid, voice=voice)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=language)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        #response.call_on_close(get_chatbot_by_id(chatid).get_response(text)) 
-        chatbot = get_chatbot_by_id(chatid)
-        daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
-        daemon.start()
+        #response.call_on_close(get_chatbot_by_id(chatid).get_response(text))
+        if chatid == "000000" and language == "it":
+          chatbot = get_chatbot_by_id(chatid)
+          daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
+          daemon.start()
         return response
       else:
         @after_this_request
@@ -336,13 +338,15 @@ class AudioRepeatLearnUserClass(Resource):
 
 
 @nsaudio.route('/ask/<string:text>/')
-@nsaudio.route('/ask/<string:text>/<string:chatid>')
+@nsaudio.route('/ask/<string:text>/<string:voice>/')
+@nsaudio.route('/ask/<string:text>/<string:voice>/<string:chatid>')
+@nsaudio.route('/ask/<string:text>/<string:voice>/<string:chatid>/<string:language>')
 class AudioAskClass(Resource):
   @cache.cached(timeout=10, query_string=True)
-  def get (self, text: str, chatid = "000000"):
+  def get (self, text: str, voice = "random", chatid = "000000", language = "it"):
     try:
       chatbot_resp = get_chatbot_by_id(chatid).get_response(text).text
-      tts_out = utils.get_tts(chatbot_resp, chatid=chatid)
+      tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice=voice, language=language)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
@@ -500,18 +504,22 @@ class AudioInsultClass(Resource):
     chatid = request.args.get("chatid")
     if chatid is None:
       chatid = "000000"
+    language = request.args.get("language")
+    if language is None:
+      chatid = "it"
     #threading.Timer(0, get_chatbot_by_id(chatid).get_response, args=[sentence]).start()
     text = request.args.get("text")
     try:
       if text and text != '' and text != 'none':
         sentence = text + " " + sentence
-      tts_out = utils.get_tts(sentence, chatid=chatid, voice="google")
+      tts_out = utils.get_tts(sentence, chatid=chatid, voice="google", language=language)
       if tts_out is not None:    
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        #response.call_on_close(get_chatbot_by_id(chatid).get_response(sentence)) 
-        chatbot = get_chatbot_by_id(chatid)
-        daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
-        daemon.start()
+        #response.call_on_close(get_chatbot_by_id(chatid).get_response(sentence))
+        if chatid == "000000" and language == "it":
+          chatbot = get_chatbot_by_id(chatid)
+          daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
+          daemon.start()
         return response
       else:
         resp = make_response("TTS Generation Error!", 500)
@@ -649,6 +657,21 @@ class UtilsDownloadClass(Resource):
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return get_response_str("Error downloading from server.")
+
+@nsutils.route('/init/<string:chatid>')
+class InitChatterbotClass(Resource):
+  def get(self, chatid = "000000"):
+    try:
+      if chatid == "000000":
+        threading.Timer(0, get_chatbot_by_id, args=[chatid]).start()
+        return make_response("Initializing chatterbot. Watch the logs for errors.", 200)
+      else:
+        return make_response("Initializing chatterbot on this chatid is not permitted!", 500)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
 
 @limiter.limit("1/second")
 @nsutils.route('/healthcheck')
@@ -797,8 +820,8 @@ def admin():
     return render_template('unhautorized.html')
 
 
-
-
+def change_chatbot_language(chatid, language):
+  chatbots_dict[chatid] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True", language)
 
 
 def get_chatbot_by_id(chatid = "000000"):
@@ -855,7 +878,6 @@ limiter.init_app(app)
 scheduler.init_app(app)
 scheduler.start()
 utils.login_fakeyou()
-get_chatbot_by_id("000000")
 threading.Timer(30, utils.backupdb, args=["000000"]).start()
 
 if __name__ == '__main__':

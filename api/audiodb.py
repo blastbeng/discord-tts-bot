@@ -138,7 +138,7 @@ def select_by_name_chatid_voice(name: str, chatid: str, voice: str):
         sqliteConnection.close()
     return audio
 
-def select_by_chatid_random(chatid: str):
+def select_by_chatid_voice_random(chatid: str, voice:str):
   if chatid == "X":
     return None
   else:
@@ -147,8 +147,8 @@ def select_by_chatid_random(chatid: str):
       sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
       cursor = sqliteConnection.cursor()
 
-      sqlite_select_query = """SELECT data from Audio WHERE chatid = ? ORDER BY RANDOM() LIMIT 1; """
-      cursor.execute(sqlite_select_query, (chatid,))
+      sqlite_select_query = """SELECT data from Audio WHERE chatid = ? and voice = ? ORDER BY RANDOM() LIMIT 1; """
+      cursor.execute(sqlite_select_query, (chatid,voice,))
       records = cursor.fetchall()
 
       for row in records:
