@@ -224,16 +224,15 @@ async def leave(interaction: discord.Interaction):
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error!"), ephemeral = True)
+        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error")+"!", ephemeral = True)
 
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="The sentence to repeat")
-#@app_commands.rename(voice='voice')
-#@app_commands.describe(voice='La voce da usare')
-#@app_commands.choices(voice=optionsvoices)
-#async def speak(interaction: discord.Interaction, text: str, voice: Optional[app_commands.Choice[str]] = "google"):
-async def speak(interaction: discord.Interaction, text: str):
+@app_commands.rename(language='language')
+@app_commands.describe(language="The language to convert to")
+@app_commands.choices(language=optionslanguages)
+async def speak(interaction: discord.Interaction, text: str, language: app_commands.Choice[str] = "Italian"):
     """Repeat a sentence"""
     try:
         if interaction.user.voice and interaction.user.voice.channel:
@@ -244,25 +243,18 @@ async def speak(interaction: discord.Interaction, text: str):
             elif not voice_client:
                 await interaction.user.voice.channel.connect()
 
-            #voicename = None
-
-            #if hasattr(voice, 'name'):
-            #    voicename = voice.name
-            #else:
-            #    voicename = voice
-
             message = utils.translate(get_current_guild_id(interaction.guild.id),"I'm repeating") +' "' + text + '"'
 
-            #try:
-            #    voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(str(get_voice_code(voicename)))+"/"), after=lambda e: logging.info(message))
-            #except Exception as e:
-            #    exc_type, exc_obj, exc_tb = sys.exc_info()
-            #    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            #    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-            #    voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(text))+"/google/"), after=lambda e: logging.info(message))
-            
             currentguildid = get_current_guild_id(interaction.guild.id)
-            voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))), after=lambda e: logging.info(message))
+
+            lang_to_use = ""
+            if hasattr(language, 'name'):
+                lang_to_use = language.value
+            else:
+                lang_to_use = utils.get_guild_language(currentguildid)
+
+
+            voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use)), after=lambda e: logging.info(message))
             await interaction.response.send_message(message, ephemeral = True)
             
         else:
@@ -276,10 +268,6 @@ async def speak(interaction: discord.Interaction, text: str):
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="the sentence to ask")
-#@app_commands.rename(voice='voice')
-#@app_commands.describe(voice='La voce da usare')
-#@app_commands.choices(voice=optionsvoices)
-#async def ask(interaction: discord.Interaction, text: str, voice: Optional[app_commands.Choice[str]] = "google"):
 async def ask(interaction: discord.Interaction, text: str):
     """Ask something."""
     try:
@@ -292,23 +280,10 @@ async def ask(interaction: discord.Interaction, text: str):
                 elif not voice_client:
                     await interaction.user.voice.channel.connect()
 
-                #voicename = None
-
-                #if hasattr(voice, 'name'):
-                #    voicename = voice.name
-                #else:
-                #    voicename = voice
-
+                
                 currentguildid = get_current_guild_id(interaction.guild.id)
                 message = utils.translate(get_current_guild_id(interaction.guild.id),"I'm saying an answer to") + ' "' + text + '"'
 
-                #try:
-                #    voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(str(get_voice_code(voicename)))+"/"), after=lambda e: logging.info(message))
-                #except Exception as e:
-                #    exc_type, exc_obj, exc_tb = sys.exc_info()
-                #    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                #    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-                #    voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/google/"), after=lambda e: logging.info(message))
                 
                 voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))), after=lambda e: logging.info(message))
                 await interaction.response.send_message(message, ephemeral = True)
@@ -340,14 +315,14 @@ async def insult(interaction: discord.Interaction, member: Optional[discord.Memb
             insultresponse=""
             currentguildid = get_current_guild_id(interaction.guild.id)
             if member:
-                insulturl=insulturl +"?text="+urllib.parse.quote(str(text)) + "&chatid="+urllib.parse.quote(get_current_guild_id(interaction.guild.id)) + "&language="+urllib.parse.quote(currentguildid)
-                insultresponse=utils.translate(get_current_guild_id(interaction.guild.id),"I'm insulting") + ' "' + member.name +'"'
+                insulturl=insulturl +"?text="+urllib.parse.quote(str(member.name)) + "&chatid="+urllib.parse.quote(get_current_guild_id(interaction.guild.id)) + "&language=" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+                insultresponse=utils.translate(get_current_guild_id(interaction.guild.id),"I'm insulting") + ' "' + str(member.name) +'"'
             else:
-                insulturl=insulturl +"?chatid="+urllib.parse.quote(get_current_guild_id(interaction.guild.id)) + "&language=" + +urllib.parse.quote(utils.get_guild_language(currentguildid))
+                insulturl=insulturl +"?chatid="+urllib.parse.quote(get_current_guild_id(interaction.guild.id)) + "&language=" + urllib.parse.quote(utils.get_guild_language(currentguildid))
                 insultresponse=utils.translate(get_current_guild_id(interaction.guild.id),"I'm saying an insult")
 
             
-            voice_client.play(discord.FFmpegPCMAudio(insulturl), after=lambda e: logging.info('Ho insultato: ' + text))
+            voice_client.play(discord.FFmpegPCMAudio(insulturl), after=lambda e: logging.info('Ho insultato: ' + str(member.name)))
 
             await interaction.response.send_message(insultresponse, ephemeral = True)
         else:
@@ -369,7 +344,7 @@ async def insult_tree(interaction: discord.Interaction, member: discord.Member):
             elif not voice_client:
                 await interaction.user.voice.channel.connect()
             currentguildid = get_current_guild_id(interaction.guild.id)
-            voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"insult?text="+urllib.parse.quote(str(member.name))+ "&chatid="+urllib.parse.quote(currentguildid) + "&language=" + +urllib.parse.quote(utils.get_guild_language(currentguildid))), after=lambda e: logging.info('Insulto ' + member.name))
+            voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"insult?text="+urllib.parse.quote(str(member.name))+ "&chatid="+urllib.parse.quote(currentguildid) + "&language=" + urllib.parse.quote(utils.get_guild_language(currentguildid))), after=lambda e: logging.info('Insulto ' + member.name))
 
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"I have insulted") + " " + member.name, ephemeral = True)
         else:
@@ -384,7 +359,7 @@ async def insult_tree(interaction: discord.Interaction, member: discord.Member):
 @app_commands.rename(voice='voice')
 @app_commands.describe(voice="The voice to use")
 @app_commands.choices(voice=optionsvoices)
-async def random(interaction: discord.Interaction, voice: Optional[app_commands.Choice[str]] = "google"):
+async def random(interaction: discord.Interaction, voice: Optional[app_commands.Choice[str]] = "random"):
     """Say a random sentence."""
     try:
         if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
@@ -399,12 +374,12 @@ async def random(interaction: discord.Interaction, voice: Optional[app_commands.
                 voicename = None
 
                 if hasattr(voice, 'name'):
-                    voicename = voice.name
+                    voicename = str(get_voice_code(voice.name))
                 else:
                     voicename = voice
                 currentguildid = get_current_guild_id(interaction.guild.id)
                 message = utils.translate(get_current_guild_id(interaction.guild.id),"I'm saying a random sentence.")
-                voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/"+urllib.parse.quote(str(get_voice_code(voicename)))+"/"+urllib.parse.quote(currentguildid) + "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))), after=lambda e: logging.info(message))
+                voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/"+urllib.parse.quote(voicename)+"/"+urllib.parse.quote(currentguildid)), after=lambda e: logging.info(message))
                 await interaction.response.send_message(message, ephemeral = True)
             else:
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
@@ -432,7 +407,7 @@ async def restart(interaction: discord.Interaction):
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error!"), ephemeral = True)
+        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error")+"!", ephemeral = True)
 
 @client.tree.command()
 async def stop(interaction: discord.Interaction):
@@ -455,37 +430,44 @@ async def stop(interaction: discord.Interaction):
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error!"), ephemeral = True)
+        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error")+"!", ephemeral = True)
 
 @client.tree.command()
 @app_commands.rename(name='name')
-@app_commands.describe(name="New bot nickname")
+@app_commands.describe(name="New bot nickname (25 chars limit)")
 async def rename(interaction: discord.Interaction, name: str):
     """Rename bot."""
     try:
-        for guild in client.guilds:
-            await guild.me.edit(nick=name)
-        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Bot renamed to") + ' "'+name+'"', ephemeral = True)
+        if len(name) < 25:
+            for guild in client.guilds:
+                await guild.me.edit(nick=name)
+            await interaction.response.send_message(interaction.user.name + " " + utils.translate(get_current_guild_id(interaction.guild.id)," renamed me to") + ' "'+name+'"')
+        else:
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"My name can't be that longer (25 chars limit)"), ephemeral = True)
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error!"), ephemeral = True)
+        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error")+"!", ephemeral = True)
 
 @client.tree.command()
 @app_commands.rename(language='language')
-@app_commands.describe(language="New bot nickname")
+@app_commands.describe(language="New bot language")
 @app_commands.choices(language=optionslanguages)
 async def changelanguage(interaction: discord.Interaction, language: app_commands.Choice[str]):
     """Change bot language."""
     try:
-        utils.update_guild(get_current_guild_id(interaction.guild.id), language.value)
-        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Bot language changed to ") + ' "'+language.name+'"', ephemeral = True)
+        if interaction.user.guild_permissions.administrator:
+            utils.update_guild(get_current_guild_id(interaction.guild.id), language.value)
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Bot language changed to ") + ' "'+language.name+'"', ephemeral = True)
+        else:
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
+        
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error!"), ephemeral = True)
+        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error")+"!", ephemeral = True)
 
 @client.tree.command()
 @app_commands.rename(text='text')

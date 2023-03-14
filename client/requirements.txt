@@ -6,3 +6,4 @@ psutil
 translate
 sqlalchemy
 translate
+SpeechRecognition

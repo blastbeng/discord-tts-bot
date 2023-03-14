@@ -40,6 +40,7 @@ def create_empty_tables():
             data BLOB NOT NULL,
             voice VARCHAR(50) NOT NULL,
             is_correct INTEGER DEFAULT 0 NOT NULL,
+            language VARCHAR(2) NOT NULL,
             UNIQUE(name,chatid,voice)
         ); """
 
@@ -51,21 +52,22 @@ def create_empty_tables():
     if sqliteConnection:
         sqliteConnection.close()
 
-def insert(name: str, chatid: str, data: BytesIO, voice: str):
+def insert(name: str, chatid: str, data: BytesIO, voice: str, language: str):
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
     cursor = sqliteConnection.cursor()
 
     sqlite_insert_audio_query = """INSERT INTO Audio
-                          (name, chatid, data, voice, is_correct) 
+                          (name, chatid, data, voice, is_correct, language) 
                            VALUES 
-                          (?, ?, ?, ?, ?)"""
+                          (?, ?, ?, ?, ?, ?)"""
 
     data_audio_tuple = (name, 
                         chatid, 
                         data.read(),
                         voice,
-                        0)
+                        0,
+                        language)
 
     cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
 
@@ -112,7 +114,7 @@ def select_by_chatid(chatid=GUILD_ID):
       sqliteConnection.close()
   return records
 
-def select_by_name_chatid_voice(name: str, chatid: str, voice: str):
+def select_by_name_chatid_voice_language(name: str, chatid: str, voice: str, language: str):
   if chatid == "X":
     return None
   else:
@@ -121,8 +123,8 @@ def select_by_name_chatid_voice(name: str, chatid: str, voice: str):
       sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
       cursor = sqliteConnection.cursor()
 
-      sqlite_select_query = """SELECT data from Audio WHERE name = ? AND chatid = ? AND voice = ? """
-      cursor.execute(sqlite_select_query, (name, chatid, voice,))
+      sqlite_select_query = """SELECT data from Audio WHERE name = ? AND chatid = ? AND voice = ? AND language = ?"""
+      cursor.execute(sqlite_select_query, (name, chatid, voice, language,))
       records = cursor.fetchall()
 
       for row in records:
@@ -147,8 +149,17 @@ def select_by_chatid_voice_random(chatid: str, voice:str):
       sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
       cursor = sqliteConnection.cursor()
 
-      sqlite_select_query = """SELECT data from Audio WHERE chatid = ? and voice = ? ORDER BY RANDOM() LIMIT 1; """
-      cursor.execute(sqlite_select_query, (chatid,voice,))
+      sqlite_select_query=""
+      params=None
+
+      if voice == "random":
+        sqlite_select_query = """SELECT data from Audio WHERE chatid = ? ORDER BY RANDOM() LIMIT 1; """
+        params=(chatid,)
+      else:
+        sqlite_select_query = """SELECT data from Audio WHERE chatid = ? and voice = ? ORDER BY RANDOM() LIMIT 1; """
+        params=(chatid,voice,)
+
+      cursor.execute(sqlite_select_query, params)
       records = cursor.fetchall()
 
       for row in records:
