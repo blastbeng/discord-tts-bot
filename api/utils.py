@@ -11,6 +11,7 @@ import requests
 import sys
 import os
 import io
+import yt_dlp
 from datetime import datetime
 import string
 import fakeyou
@@ -32,8 +33,6 @@ from chatterbot.response_selection import get_random_response
 #from chatterbot.response_selection import get_most_frequent_response
 from gtts import gTTS
 from io import BytesIO
-from pytube import YouTube
-from pytube import Search
 from pathlib import Path
 from faker import Faker
 from markovipy import MarkoviPy
@@ -65,9 +64,6 @@ fy=fakeyou.FakeYou()
 
 fake = Faker()
 
-EXCEPTION_WIKIPEDIA = 'Non ho trovato risultati per: '
-EXCEPTION_YOUTUBE_AUDIO = 'Errore nella riproduzione da Youtube.'
-
 wikipedia.set_lang("it")
 
 class TqdmToLogger(io.StringIO):
@@ -86,11 +82,6 @@ class TqdmToLogger(io.StringIO):
         self.buf = buf.strip('\r\n\t ')
     def flush(self):
         self.logger.log(self.level, self.buf)
-
-class YoutubeVideo():
-    def __init__(self):
-        self.title = None
-        self.link = None
 
 class TrainJson():
   def __init__(self, info, language, sentences):
@@ -304,58 +295,37 @@ def populate_new_sentences(chatbot: ChatBot, count: int, word: str, fromapi: boo
     except OSError:
       pass
 
-def get_youtube_audio(link: str):
+def get_youtube_audio(link: str, chatid: str):
   try:
-    yt = YouTube(link)
-    video = yt.streams.filter(only_audio=True).first()
-    fp = BytesIO()
-    video.stream_to_buffer(fp)
+    youtubefile = os.environ.get("TMP_DIR")+'/song_guild_'+str(chatid)
+    ydl_opts = {
+        'outtmpl': youtubefile,
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+    }
+
+    url = "https://www.youtube.com/watch?v=" + link
+
+    logging.info("Trying to download YouTube link: "+url)
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+      ydl.download([url])
+
+    with open(youtubefile+".mp3", "rb") as fh:
+      fp = BytesIO(fh.read())
     fp.seek(0)
+    os.remove(youtubefile+".mp3")
     return fp    
-  except:
-    return get_tts(EXCEPTION_YOUTUBE_AUDIO)
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    return None
 
-def search_youtube_audio(text: str, onevideo: bool):
-  try:
-    s = Search(text)
-    if not s.results or len(s.results) == 0:
-      videos = []
-      return videos
-    else:
-      if onevideo:
-        videos = []
-        size = len(s.results)-1
-        n = random.randint(0,size)
-        video = s.results[n]
-        youtubeVideo = YoutubeVideo()
-        youtubeVideo.title=video.title
-        youtubeVideo.link=video.watch_url
-        videos.append(youtubeVideo.__dict__)
-        return videos
-      else:
-        videos = []
-        for video in s.results:
-          youtubeVideo = YoutubeVideo()
-          youtubeVideo.title=video.title
-          youtubeVideo.link=video.watch_url
-          videos.append(youtubeVideo.__dict__)
-        return videos
-  except:
-    videos = []
-    return videos  
-
-def get_youtube_info(link: str):
-  try:
-    videos = []
-    video = YouTube(link)
-    youtubeVideo = YoutubeVideo()
-    youtubeVideo.title=video.title
-    youtubeVideo.link=video.watch_url
-    videos.append(youtubeVideo.__dict__)
-    return videos    
-  except:
-    videos = []
-    return videos
 
 def html_decode(s):
     """

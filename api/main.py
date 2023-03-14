@@ -37,7 +37,6 @@ log = logging.getLogger('werkzeug')
 log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 TMP_DIR = os.environ.get("TMP_DIR")
-TMP_DIR_DISCORD = os.environ.get("TMP_DIR_DISCORD")
 ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
 API_USER = os.environ.get("API_USER")
@@ -530,40 +529,25 @@ class AudioInsultClass(Resource):
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return make_response(str(e), 500)
 
-nsmusic = api.namespace('chatbot_music', 'Accumulators Chatbot Music APIs')
-
-parserurl = reqparse.RequestParser()
-parserurl.add_argument("url", type=str)
+nsmusic = api.namespace('music', 'Accumulators Chatbot Music APIs')
 
 
-@nsmusic.route('/youtube/get')
+@nsmusic.route('/youtube/get/<string:url>/')
+@nsmusic.route('/youtube/get/<string:url>/<string:chatid>')
 class YoutubeGetClass(Resource):
-  @api.expect(parserurl)
-  def get(self):
-    url = request.args.get("url")
-    audio = utils.get_youtube_audio(url)
-    return send_file(audio, attachment_filename='audio.mp3', mimetype='audio/mp3')
-
-
-@nsmusic.route('/youtube/info')
-class YoutubeInfoClass(Resource):
-  @api.expect(parserurl)
-  def get(self):
-    url = request.args.get("url")
-    return utils.get_youtube_info(url)
-
-parsersearch = reqparse.RequestParser()
-parsersearch.add_argument("text", type=str)
-parsersearch.add_argument("onevideo", type=str)
-
-
-@nsmusic.route('/youtube/search')
-class YoutubeSearchClass(Resource):
-  @api.expect(parsersearch)
-  def get(self):
-    text = request.args.get("text")
-    onevideo = request.args.get("onevideo")
-    return utils.search_youtube_audio(text, bool(onevideo))
+  @cache.cached(timeout=10, query_string=True)
+  def get (self, url: str, chatid = "000000"):
+    try:
+      audio = utils.get_youtube_audio(url,chatid)
+      if audio is None:
+        return make_response("YouTube Error", 500)
+      else:
+        return send_file(audio, attachment_filename='song.mp3', mimetype='audio/mp3')
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
 
 nsjokestext = api.namespace('jokes_text', 'Accumulators Jokes APIs')
 
@@ -644,19 +628,6 @@ class FakeYouGetVoicesByCatClass(Resource):
 class FakeYouListVoices(Resource):
   def get(self, lang = "it"):
     return jsonify(utils.list_fakeyou_voices(lang))
-
-
-@nsutils.route('/download/<string:filename>')
-class UtilsDownloadClass(Resource):
-  def get(self, filename: str):
-    try:
-      filepath = TMP_DIR_DISCORD + '/' + filename
-      return send_file(filepath, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-      return get_response_str("Error downloading from server.")
 
 @nsutils.route('/init/<string:chatid>')
 class InitChatterbotClass(Resource):

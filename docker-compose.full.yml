@@ -79,6 +79,7 @@ services:
     volumes:
       - ".env:/app/.env"
       - "./config:/app/config"
+      - "/tmp/discord-voicebot-discord:/tmp/discord-voicebot-discord"
     image: "blastbeng/discord-voicebot-client:1.0.0"
     restart: "no"
   discord-voicebot-tor:
