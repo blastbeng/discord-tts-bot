@@ -1,4 +1,4 @@
-# discord-voicebot
+# jerky-tts-bot
 
 A fully functional discord and telegram bot with various functions
 
@@ -34,7 +34,7 @@ handle the bot restarts automatically.
 - cp .env.sample to .env and edit it with your paarams
 - cp one of the docker-compose(one of your choiche) file in the main dir to docker-compose.yml
 - run "./install.sh" or docker-compose up
-- if using the install.sh script you can use systemd to control the bot (systemctl start/stop/restart docker-compose@discord-voicebot)
+- if using the install.sh script you can use systemd to control the bot (systemctl start/stop/restart docker-compose@jerky-tts-bot)
 
 ### Bot Functions
 

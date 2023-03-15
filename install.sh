@@ -5,14 +5,14 @@ then
     cd /opt/docker/compose/
 fi
 
-git clone https://github.com/blastbeng/discord-voicebot
-cd discord-voicebot
+git clone https://github.com/blastbeng/jerky-tts-bot
+cd jerky-tts-bot
 
 docker-compose build
 
 mdkdir config
-cp api/uwsgi.ini config/uwsgi.ini
+#cp api/uwsgi.ini config/uwsgi.ini
 
 sudo cp ./docker-compose@.service /lib/systemd/system/docker-compose@.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now docker-compose@discord-voicebot.service
+sudo systemctl enable --now docker-compose@jerky-tts-bot.service
