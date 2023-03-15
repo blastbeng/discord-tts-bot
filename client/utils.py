@@ -30,4 +30,4 @@ def get_guild_language(guildid: str):
 def check_exists_guild(guildid: str):
     value = database.select_guildconfig(dbms, guildid, value = None)
     if value is None:
-      database.insert_guildconfig(dbms, guildid, "it")
+      database.insert_guildconfig(dbms, guildid, "en")

@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 import utils
@@ -53,31 +54,6 @@ logging.basicConfig(
         level=int(os.environ.get("LOG_LEVEL")),
         datefmt='%Y-%m-%d %H:%M:%S')
 
-def function_timeout(seconds: int):
-    """Wrapper of Decorator to pass arguments"""
-
-    def decorator(func):
-        @contextmanager
-        def time_limit(seconds_):
-            def signal_handler(signum, frame):  # noqa
-                raise TimeoutException(f"Timed out in {seconds_} seconds!")
-
-            signal.signal(signal.SIGALRM, signal_handler)
-            signal.alarm(seconds_)
-            try:
-                yield
-            finally:
-                signal.alarm(0)
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            with time_limit(seconds):
-                return func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
 def listvoices():
     try:
         voices = []
@@ -121,10 +97,6 @@ def check_image_with_pil(path):
 def get_voices_menu():
 
     voices = listvoices()
-    #options = [
-    #    app_commands.Choice(name="ASIX", value="ASIX"),
-    #    app_commands.Choice(name="DAM", value="DAM")
-    #    ]
     options = []
     for voice in voices:
         options.append(app_commands.Choice(name=voice, value=voice))
@@ -136,12 +108,8 @@ optionsvoices = get_voices_menu()
 def get_languages_menu():
 
     voices = listvoices()
-    #options = [
-    #    app_commands.Choice(name="ASIX", value="ASIX"),
-    #    app_commands.Choice(name="DAM", value="DAM")
-    #    ]
     options = []    
-    options.append(app_commands.Choice(name="Albanian", value="al"))
+    options.append(app_commands.Choice(name="Afrikaans (South Africa)", value="za"))
     options.append(app_commands.Choice(name="Arabic", value="ar"))
     options.append(app_commands.Choice(name="Croatian", value="hr"))
     options.append(app_commands.Choice(name="Chinese", value="zh"))
@@ -152,12 +120,11 @@ def get_languages_menu():
     options.append(app_commands.Choice(name="French", value="fr"))
     options.append(app_commands.Choice(name="German", value="de"))
     options.append(app_commands.Choice(name="Greek", value="el"))
-    options.append(app_commands.Choice(name="Jewish", value="he"))
     options.append(app_commands.Choice(name="Hindi", value="hi"))
     options.append(app_commands.Choice(name="Italian", value="it"))
     options.append(app_commands.Choice(name="Japanese", value="ja"))
     options.append(app_commands.Choice(name="Korean", value="ko"))
-    options.append(app_commands.Choice(name="Norwegian Bokmål", value="nb"))
+    options.append(app_commands.Choice(name="Norwegian (Bokmål)", value="no"))
     options.append(app_commands.Choice(name="Polish", value="pl"))
     options.append(app_commands.Choice(name="Portuguese", value="pt"))
     options.append(app_commands.Choice(name="Romanian", value="ro"))
@@ -166,14 +133,13 @@ def get_languages_menu():
     options.append(app_commands.Choice(name="Swedish", value="sv"))
     options.append(app_commands.Choice(name="Turkish", value="tr"))
     options.append(app_commands.Choice(name="Ukrainian", value="uk"))
+    options.append(app_commands.Choice(name="Vietnamese", value="vn"))
 
     return options
 
 optionslanguages = get_languages_menu()
 
 
-#@function_timeout(seconds=5)
-#def play_fakeyou_tts(text: str, voice: str, message: str, voice_client):
     
 
 def get_voice_client_by_guildid(voice_clients, guildid):
@@ -198,8 +164,6 @@ def get_current_guild_id(guildid):
 @client.event
 async def on_ready():
     try:
-        utils.check_exists_guild(str("000000"))
-        lang = utils.get_guild_language("000000")
         url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/init/000000"
         response = requests.get(url)
         if (response.text == "Internal Server Error"):
@@ -208,10 +172,24 @@ async def on_ready():
         logging.info(f'Logged in as {client.user} (ID: {client.user.id})')
 
         for guild in client.guilds:
-            utils.insert_new_guild(str(guild.id), "en")
+            utils.check_exists_guild('000000' if str(guild.id) == str(os.environ.get("GUILD_ID")) else str(guild.id))
             client.tree.copy_global_to(guild=guild)
             await client.tree.sync(guild=guild)
             logging.info(f'Syncing commands to Guild (ID: {guild.id})')
+            if guild.me.nick is None:
+                nick = client.user.name + " [" + utils.get_guild_language('000000' if str(guild.id) == str(os.environ.get("GUILD_ID")) else str(guild.id)) + "]"
+                await guild.me.edit(nick=nick)
+                logging.info(f'Renaming bot to {nick} to Guild (ID: {guild.id})')
+            else:
+                x = re.search(r'\[[a-z][a-z]\]', guild.me.nick)
+                if x is not None:
+                    nick = guild.me.nick[:len(guild.me.nick) - 5] + " [" + utils.get_guild_language('000000' if str(guild.id) == str(os.environ.get("GUILD_ID")) else str(guild.id)) + "]"
+                    await guild.me.edit(nick=nick)
+                    logging.info(f'Renaming bot to {nick} to Guild (ID: {guild.id})')
+                else:
+                    nick = client.user.name + " [" + utils.get_guild_language('000000' if str(guild.id) == str(os.environ.get("GUILD_ID")) else str(guild.id)) + "]"
+                    await guild.me.edit(nick=nick)
+                    logging.info(f'Renaming bot to {nick} to Guild (ID: {guild.id})')
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -222,7 +200,7 @@ async def on_ready():
 @client.event
 async def on_guild_join(guild):
     logging.info(f'Guild joined (ID: {guild.id})')
-    utils.insert_new_guild(str(guild.id), "en")
+    utils.check_exists_guild('000000' if str(guild.id) == str(os.environ.get("GUILD_ID")) else str(guild.id))
     client.tree.copy_global_to(guild=guild)
     await client.tree.sync(guild=guild)
     logging.info(f'Syncing commands to Guild (ID: {guild.id})')
@@ -551,7 +529,18 @@ async def language(interaction: discord.Interaction, language: app_commands.Choi
         if interaction.user.guild_permissions.administrator:
 
             utils.update_guild(currentguildid, language.value)
-            name = interaction.guild.me.nick[:len(interaction.guild.me.nick) - 5] + " [" + utils.get_guild_language(currentguildid) + "]"
+
+            nick = interaction.guild.me.nick
+            if nick is None:
+                nick = client.user.name
+            else:
+                x = re.search(r'\[[a-z][a-z]\]', nick)
+                if x is not None:
+                    nick = interaction.guild.me.nick[:len(interaction.guild.me.nick) - 5]
+                else:
+                    nick = client.user.name
+
+            name = nick + " [" + utils.get_guild_language(currentguildid) + "]"
             await interaction.guild.me.edit(nick=name)
             await interaction.response.send_message(utils.translate(currentguildid,"Bot language changed to ") + ' "'+language.name+'"', ephemeral = True)
         else:
@@ -594,9 +583,7 @@ async def translate(interaction: discord.Interaction, text: str, language_to: ap
 
                 translated_text = Translator(from_lang=lang_to_use_from, to_lang=language_to.value).translate(text)
 
-                logging.info('I have translated "' + text + '" ' + '(' + language_to.value + ') to "' + translated_text + '" (' + lang_to_use_from + ')')
-
-                message = utils.translate(get_current_guild_id(interaction.guild.id),"I'm repeating") +' "' + text + '" (' + language_to.name + ')'
+                message = utils.translate(get_current_guild_id(interaction.guild.id),"I have translated") + ' "' + text + '" ' + '(' + lang_to_use_from + ') => "' + translated_text + '" (' + language_to.value + ')'
 
                 
                 voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(translated_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(language_to.value)), after=lambda e: logging.info(message))
