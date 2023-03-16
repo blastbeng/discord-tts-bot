@@ -20,7 +20,6 @@ from flask_restx import Api, Resource, reqparse
 from flask_apscheduler import APScheduler
 from chatterbot.conversation import Statement
 from flask_caching import Cache
-from markovipy import MarkoviPy
 from pathlib import Path
 from os.path import join, dirname
 from dotenv import load_dotenv
@@ -102,10 +101,7 @@ class TextRandomClass(Resource):
 class TextRepeatLearnClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, chatid = "000000"):
-    #get_chatbot_by_id(chatid).get_response(text)
-    #threading.Timer(0, , args=[text]).start()
     response = get_response_str(text)
-    #response.call_on_close(get_chatbot_by_id(chatid).get_response(text)) 
     chatbot = get_chatbot_by_id(chatid)
     daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
     daemon.start()
@@ -179,16 +175,13 @@ class TextInsultClass(Resource):
   @api.expect(parserinsult)
   def get (self):
     sentence = insults.get_insults()
-    #get_chatbot_by_id(chatid).get_response(sentence)
     chatid = request.args.get("chatid")
     if chatid is None:
       chatid = "000000"
-    #threading.Timer(0, get_chatbot_by_id(chatid).get_response, args=[sentence]).start()
     text = request.args.get("text")
     if text and text != '' and text != 'none':
       sentence = text + " " + sentence
     response = Response(sentence)
-    #response.call_on_close(get_chatbot_by_id(chatid).get_response(text)) 
     chatbot = get_chatbot_by_id(chatid)
     daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
     daemon.start()
@@ -251,8 +244,6 @@ class AudioRandomClass(Resource):
   @cache.cached(timeout=2, query_string=True)
   def get (self, voice = "random", chatid = "000000"):
     try:
-      #chatbot_resp = utils.get_random_from_bot(chatid)
-      #tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice=voice, israndom=True)
       tts_out = audiodb.select_by_chatid_voice_random(chatid,voice)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -275,13 +266,10 @@ class AudioRandomClass(Resource):
 class AudioRepeatLearnClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, voice: str, chatid = "000000", language = "it"):
-    #get_chatbot_by_id(chatid).get_response(text)
-    #threading.Timer(0, get_chatbot_by_id(chatid).get_response, args=[text]).start()
     try:
       tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=language)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        #response.call_on_close(get_chatbot_by_id(chatid).get_response(text))
         if chatid == "000000" and language == "it":
           chatbot = get_chatbot_by_id(chatid)
           daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
@@ -316,7 +304,6 @@ class AudioRepeatLearnUserClass(Resource):
             utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid))
           previousMessages[user] = text  
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        #response.call_on_close(learnthis(user,text)) 
         daemon = Thread(target=learnthis, args=(user,text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
         daemon.start()
         return response
@@ -499,14 +486,12 @@ class AudioInsultClass(Resource):
   @api.expect(parserinsult)
   def get (self):
     sentence = insults.get_insults()
-    #get_chatbot_by_id(chatid).get_response(sentence)
     chatid = request.args.get("chatid")
     if chatid is None:
       chatid = "000000"
     language = request.args.get("language")
     if language is None:
       chatid = "it"
-    #threading.Timer(0, get_chatbot_by_id(chatid).get_response, args=[sentence]).start()
     text = request.args.get("text")
     try:
       if text and text != '' and text != 'none':
@@ -514,7 +499,6 @@ class AudioInsultClass(Resource):
       tts_out = utils.get_tts(sentence, chatid=chatid, voice="google", language=language)
       if tts_out is not None:    
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        #response.call_on_close(get_chatbot_by_id(chatid).get_response(sentence))
         if chatid == "000000" and language == "it":
           chatbot = get_chatbot_by_id(chatid)
           daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
@@ -608,7 +592,6 @@ nsimages = api.namespace('images', 'Accumulators Images APIs')
 @nsimages.route('/search/<string:words>')
 class AudioSearchClass(Resource):
   def get (self, words: str):
-    #threading.Timer(0, get_chatbot_by_id(chatid).get_response, args=[words]).start()
     bytes_img, attachment_filename, mimetype = image.search(words)
     return send_file(bytes_img, attachment_filename=attachment_filename, mimetype=mimetype)
 
@@ -650,45 +633,34 @@ class Healthcheck(Resource):
   def get (self):
     return "Ok!"
 
+    
+@nsutils.route('/sentences/generate/')
+@nsutils.route('/sentences/generate/<string:chatid>/')
+@nsutils.route('/sentences/generate/<string:chatid>/<int:learn>')
+class SentencesGenerateClass(Resource):
+  def get(self, chatid = "000000", learn = 0):
+    try:
+      text = utils.generate_sentence(chatid)
+      if learn == 1:
+        chatbot = get_chatbot_by_id(chatid)
+        daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="sentences-generate"+utils.get_random_string(24))
+        daemon.start()
+      return make_response(text, 200)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
+
 
 
 nsdatabase = api.namespace('database', 'Accumulators Database APIs')
-
-@nsdatabase.route('/sentence/populate/<int:count>/')
-@nsdatabase.route('/sentence/populate/<int:count>/<string:chatid>')
-class UtilsPopulateSentences(Resource):
-  def get (self, count: int, chatid = "000000"):
-    threading.Timer(0, utils.populate_new_sentences, args=[get_chatbot_by_id(chatid), count, None, False, chatid]).start()
-    return "Starting thread populate_new_sentences with parameters: " + str(count) + ", None. Watch the logs."
-
-
-@nsdatabase.route('/sentence/populate/parsed/<int:count>/<string:word>/')
-@nsdatabase.route('/sentence/populate/parsed/<int:count>/<string:word>/<string:chatid>')
-class UtilsPopulateSentencesParsed(Resource):
-  def get (self, count: int, word: str, chatid = "000000"):
-    threading.Timer(0, utils.populate_new_sentences, args=[get_chatbot_by_id(chatid), count, word, False, chatid]).start()
-    return "Starting thread populate_new_sentences with parameters: " + str(count) + ", " + word + ". Watch the logs."
-
-
-@nsdatabase.route('/sentence/populate/parsed/api/<string:word>/')
-@nsdatabase.route('/sentence/populate/parsed/api/<string:word>/<string:chatid>')
-class UtilsPopulateSentencesParsedApi(Resource):
-  def get (self, word: str, chatid = "000000"):
-    return get_response_str(utils.populate_new_sentences(get_chatbot_by_id(chatid), 5, word, True, chatid))
-
-
-@nsdatabase.route('/sentence/populate/api/')
-@nsdatabase.route('/sentence/populate/api/<string:chatid>')
-class UtilsPopulateSentencesApi(Resource):
-  def get (self, chatid = "000000"):
-    return get_response_str(utils.populate_new_sentences(get_chatbot_by_id(chatid), 5, None, True, chatid))
 
 
 @nsdatabase.route('/delete/bytext/<string:text>/')
 @nsdatabase.route('/delete/bytext/<string:text>/<string:chatid>')
 class UtilsDeleteByText(Resource):
   def get (self, text: str, chatid = "000000"):
-    #return get_response_str(utils.delete_by_text(chatid, text))
     return get_response_str('Frasi con parola chiave "' + text + '" cancellate dal db chatbot!')
 
 
@@ -798,23 +770,11 @@ def change_chatbot_language(chatid, language):
 def get_chatbot_by_id(chatid = "000000"):
   if chatid not in chatbots_dict:
     chatbots_dict[chatid] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True")
-#    scheduler.add_job(
-#        func=utils.populate_new_sentences,
-#        trigger="cron",
-#        args=[chatbots_dict[chatid], 100, None, False, chatid],
-#        hour=4,
-#        minute=10,
-#        second=0,
-#        id="populate_sentences_chatid_"+chatid,
-#        name="populate_sentences_chatid_"+chatid,
-#        misfire_grace_time=900,
-#        replace_existing=True
-#    )
   return chatbots_dict[chatid]
   
   
   
-@scheduler.task('interval', id='scrape_jokes', hours=12, misfire_grace_time=900)
+@scheduler.task('interval', id='scrape_jokes', hours=72, misfire_grace_time=900)
 def scrape_jokes():
   utils.scrape_jokes()
   
@@ -829,11 +789,10 @@ def populate_audiodb():
 @scheduler.task('interval', id='backupdb', hours=24, misfire_grace_time=900)
 def backupdb():
   utils.backupdb("000000")
-
-
-#@scheduler.task('cron', id='populate_sentences', hour=4, minute=10, second=0, misfire_grace_time=900)
-#def populate_sentences():
-#  print(str(datetime.now()) + " -",utils.populate_new_sentences(chatbot, 1000, None, False))
+  
+@scheduler.task('interval', id='init_generator_models', hours=12, misfire_grace_time=900)
+def init_generator_models():
+  utils.init_generator_models("000000")
 
 
 
@@ -842,15 +801,14 @@ def backupdb():
 previousMessages = {}
 chatbots_dict = {}
 audiodb.create_empty_tables()
-#chatbot = utils.get_chatterbot(os.environ['TRAIN'] == "True")
-#twitter.create_empty_tables()
 cache.init_app(app)
 limiter.init_app(app)
 scheduler.init_app(app)
 scheduler.start()
 utils.login_fakeyou()
-threading.Timer(0, get_chatbot_by_id, args=[chatid]).start()
-threading.Timer(30, utils.backupdb, args=["000000"]).start()
+threading.Timer(0, get_chatbot_by_id, args=["000000"]).start()
+threading.Timer(5, utils.backupdb, args=["000000"]).start()
+threading.Timer(10, utils.init_generator_models, args=["000000"]).start()
 
 if __name__ == '__main__':
   app.run()

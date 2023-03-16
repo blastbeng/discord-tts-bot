@@ -48,16 +48,14 @@ services:
     image: "blastbeng/jerky-tts-bot-api-balancer:1.0.0"
     ports:
       - "5080:5080"
-    depends_on:
-      - jerky-tts-bot-api
     volumes:
       - "/tmp/jerky-tts-bot-api:/tmp/jerky-tts-bot-api"
     restart: "no"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:5080/utils/healthcheck"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
+      interval: 20s
+      timeout: 5s
+      retries: 12
   redis:
     image: redis
     container_name: jerky-tts-bot-redis
@@ -67,26 +65,50 @@ services:
   jerky-tts-bot-client:
     build:
       context: ./client
-      dockerfile: Dockerfile.client
+      dockerfile: Dockerfile
     container_name: jerky-tts-bot-client
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Rome
-    image: "blastbeng/jerky-tts-bot-client:1.0.0"
-    restart: "no"
     depends_on:
       jerky-tts-bot-api-balancer:
         condition: service_healthy
     volumes:
-      - "./config.json:/usr/src/app/config.json"
+      - ".env:/app/.env"
+      - "./config:/app/config"
+      - "/tmp/jerky-tts-bot-api:/tmp/jerky-tts-bot-api"
       - "/tmp/jerky-tts-bot-discord:/tmp/jerky-tts-bot-discord"
+    image: "blastbeng/jerky-tts-bot-client:1.0.0"
+    restart: "no"
   jerky-tts-bot-tor:
     container_name: jerky-tts-bot-tor
     ports:
       - '192.168.1.160:9058:9051'
     image: dockage/tor-privoxy
-     restart: "no"
+    restart: "no"
+  jerky-tts-bot-telegram:
+    build:
+      context: ./telegram
+      dockerfile: Dockerfile
+    container_name: jerky-tts-bot-telegram
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Rome
+    depends_on:
+      jerky-tts-bot-api-balancer:
+        condition: service_healthy
+    volumes:
+      - ".env:/app/.env"
+    image: "blastbeng/jerky-tts-bot-telegram:1.0.0"
+    restart: "no"
+  jerky-tts-bot-tor:
+    container_name: jerky-tts-bot-tor
+    ports:
+      - '192.168.1.160:9058:9051'
+    image: dockage/tor-privoxy
+    restart: "no"
 networks:
   caching:
     driver: bridge

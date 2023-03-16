@@ -35,7 +35,6 @@ from gtts import gTTS
 from io import BytesIO
 from pathlib import Path
 from faker import Faker
-from markovipy import MarkoviPy
 from pathlib import Path
 from os.path import join, dirname
 from dotenv import load_dotenv
@@ -43,6 +42,7 @@ from fakeyou.objects import *
 from fakeyou.exception import *
 from sqlitedict import SqliteDict
 from pydub import AudioSegment
+from essential_generators import DocumentGenerator, MarkovTextGenerator, MarkovWordGenerator
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -219,82 +219,6 @@ def recreate_file(filename: str):
     fle = Path(filename)
     fle.touch(exist_ok=True)  
 
-
-def populate_new_sentences(chatbot: ChatBot, count: int, word: str, fromapi: bool, chatid: str):
-  filename = ""
-  try:
-    out = ""
-    #filename = ''
-    #if word:
-    #  filename = TMP_DIR + '/sentences_parsed.txt'
-    #else:
-    #filename = TMP_DIR + '/sentences.txt'
-
-    filename = TMP_DIR + '/' + get_random_string(24) + ".txt"
-
-
-    extract_sentences_from_chatbot(filename, word, False, chatbot, chatid)
-
-    last = None
-    
-    if fromapi:
-      out = out + "Processing...\n\n"
-
-    if word is not None:
-      with open(filename, 'a') as sentence_file:
-        towrite = ""
-        sanitized = word.strip()
-        if sanitized[-1] in string.punctuation:
-          if fromapi:
-            out = out + " - " + sanitized +"\n"
-          towrite = towrite + sanitized +"\n"
-        else:
-          if fromapi:
-            out = out + " - " + sanitized +".\n"
-          towrite = towrite + sanitized + ".\n"
-        sentence_file.write(towrite)
-
-    i=0
-    while(i < count): 
-      markov = MarkoviPy(filename, random.randint(3, 4)).generate_sentence()
-
-      if last is None:
-        with open(filename) as f:
-          for line in (line for line in f if line.rstrip('\n')):
-            last = line
-      
-      with open(filename, 'a') as sentence_file:
-        towrite = ""
-        sanitized = markov.strip()
-        if sanitized[-1] in string.punctuation:
-          if fromapi:
-            out = out + " - " + sanitized +"\n"
-          towrite = towrite + sanitized
-        else:
-          if fromapi:
-            out = out + " - " + sanitized +".\n"
-          towrite = towrite + sanitized + "."
-        sentence_file.write(towrite)
-
-      learn(last, markov, chatbot)
-      last = markov
-      i=i+1
-    if fromapi:
-      return out
-  except Exception as e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-    if fromapi:
-      return "Errore!"
-    #else:
-    #  logging.error("Error populating sentences!", exc_info=1)
-  finally:
-    try:
-      os.remove(filename)
-    except OSError:
-      pass
-
 def get_youtube_audio(link: str, chatid: str):
   try:
     youtubefile = os.environ.get("TMP_DIR")+'/song_guild_'+str(chatid)
@@ -393,9 +317,12 @@ def get_random_date():
   date = fake.date_time_between(start_date=offset, end_date='now').strftime("%Y-%m-%d")
   return date
 
-def extract_sentences_from_chatbot(filename: str, word: str, distinct: bool, chatbot: ChatBot, chatid: str):
-  #globalsanit = ""
+def extract_sentences_from_chatbot(filename, chatid="000000", distinct=True, randomize=True):
   try:
+
+    if os.path.exists(filename):
+      os.remove(filename)
+      
     dbfile=chatid+"-db.sqlite3"
     sqliteConnection = sqlite3.connect('./config/'+dbfile)
     cursor = sqliteConnection.cursor()
@@ -413,49 +340,34 @@ def extract_sentences_from_chatbot(filename: str, word: str, distinct: bool, cha
 
     
     records_len = len(records)-1
-
-
-    try:
-      os.remove(filename)
-    except OSError:
-      pass
       
     globalsanit = ""
 
-    count = 0
+    #if not os.path.isfile(filename):
 
     with open(filename, 'a') as sentence_file:
       for row in records:
         sentence = row[0]
-        #if (word is not None and word.lower() in sentence.lower()) or word is None:
         sanitized = sentence.strip()
         if sanitized[-1] not in string.punctuation:
-          sanitized = sanitized + "."
+          if randomize:
+            if bool(random.getrandbits(1)):
+              sanitized = sanitized + "."
+            else:
+              sanitized = sanitized + " "
+          else:
+            sanitized = sanitized + "."
         if records.index(row) != records_len:
-          sanitized = sanitized + "\n"
+          if randomize:
+            if bool(random.getrandbits(1)):
+              sanitized = sanitized + "\n"
+            else:
+              sanitized = sanitized + " "
+          else:
+            sanitized = sanitized + "\n"
         sentence_file.write(sanitized)
-        count = count + 1
 
     cursor.close()
-    #if not distinct:
-    #  lines = open(filename).readlines()
-    #  random.shuffle(lines)
-    #  open(filename, 'w').writelines(lines)
-    
-    #if count < 5 and word is not None and chatbot is not None:
-    #  extract_sentences_from_chatbot(TMP_DIR + '/sentences.txt', None, False, chatbot)
-    #  lines = open(TMP_DIR + '/sentences.txt').read().splitlines()
-    #  z=0
-    #  word_internal = word;
-    #  while(z<100):
-    #    myline = random.choice(lines)
-    #    sanitized = word_internal.strip()
-    #    if sanitized[-1] not in string.punctuation:
-    #      word_internal = word_internal + "."
-    #    learn(word_internal, myline, chatbot)  
-    #    learn(myline, word_internal, chatbot)
-    #    z = z + 1
-    #  extract_sentences_from_chatbot(filename, word, distinct, None)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -464,8 +376,6 @@ def extract_sentences_from_chatbot(filename: str, word: str, distinct: bool, cha
   finally:
     if sqliteConnection:
         sqliteConnection.close()
-  #if distinct:
-  #  return globalsanit
 
 def get_random_string(length):
     # choose from all lowercase letter
@@ -897,3 +807,55 @@ def get_audios_list_for_ft():
     internal.append(key)
     audios.append(internal)
   return audios
+
+def init_generator_models(chatid: str):
+
+  logging.info("START -- essential_generators -- Models Generator")
+
+  filename=os.environ.get("TMP_DIR")+'/sentences.txt'
+  
+  extract_sentences_from_chatbot(filename, chatid=chatid)
+
+  text_model_path = os.environ.get("TMP_DIR") + '/markov_textgen.json'
+  word_model_path = os.environ.get("TMP_DIR") + '/markov_wordgen.json'
+
+  init_text_generator(corpus=filename, output=text_model_path)
+  init_word_generator(corpus=filename, output=word_model_path)
+
+  logging.info("END -- essential_generators -- Models Generator")
+
+def init_text_generator(corpus=os.environ.get("TMP_DIR") + '/sentences.txt', output=os.environ.get("TMP_DIR") + '/markov_textgen.json'):
+
+    if os.path.exists(output):
+      os.remove(output)
+
+    with open(corpus, 'r', encoding='utf-8') as fp:
+      set4 = fp.read()
+
+    gen = MarkovTextGenerator(load_model=False)
+    gen.train(set4)
+    gen.save_model(output)
+
+def init_word_generator(corpus=os.environ.get("TMP_DIR") + '/sentences.txt', output=os.environ.get("TMP_DIR") + '/markov_wordgen.json'):
+    
+    if os.path.exists(output):
+      os.remove(output)
+
+    with open(corpus, 'r', encoding='utf-8') as fp:
+      set4 = fp.read()
+
+    gen = MarkovWordGenerator(load_model=False)
+    gen.train(set4)
+    gen.save_model(output)
+
+def generate_sentence(chatid: str):
+
+  text_model_path = os.environ.get("TMP_DIR") + '/markov_textgen.json'
+  word_model_path = os.environ.get("TMP_DIR") + '/markov_wordgen.json'
+
+  text_generator=MarkovTextGenerator(model=text_model_path, load_model=True)
+  word_generator=MarkovWordGenerator(model=word_model_path, load_model=True)
+
+  generator = DocumentGenerator(word_generator=word_generator, text_generator=text_generator)
+
+  return generator.sentence()

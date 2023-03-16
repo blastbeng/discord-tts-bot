@@ -322,6 +322,50 @@ async def ask(interaction: discord.Interaction, text: str):
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
         await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error")+"!", ephemeral = True)
 
+
+
+@client.tree.command()
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
+async def generate(interaction: discord.Interaction):
+    """Ask something."""
+    try:
+        if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
+            if interaction.user.voice and interaction.user.voice.channel:
+                voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+                await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel)
+
+                
+                if not hasattr(voice_client, 'play'):
+                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
+                elif not voice_client.is_playing():
+                    currentguildid = get_current_guild_id(interaction.guild.id)
+
+                    url = API_URL + API_PATH_UTILS + "/sentences/generate/" + urllib.parse.quote(strid) + "/0"
+                    response = requests.get(url)
+                    if (response.text != "Internal Server Error"):
+                        message = utils.translate(get_current_guild_id(interaction.guild.id),"I have generated ") + ' "' + response.text + '"'
+                        voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(response.text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use)), after=lambda e: logging.info(message))
+                        await interaction.response.send_message(message, ephemeral = True)
+                    else:
+                        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error")+"!", ephemeral = True)     
+                    
+
+
+                    
+                else:
+                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use /stop command"), ephemeral = True)
+
+                
+            else:
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+        else:
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"This is a private command and can only be used by members with specific permissions on the main Bot Server"), ephemeral = True)
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error")+"!", ephemeral = True)
+
 @client.tree.command()
 @app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 @app_commands.describe(member="The user to insult")

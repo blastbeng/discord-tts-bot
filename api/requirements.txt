@@ -25,10 +25,10 @@ Tweepy==4.12.1
 faker==17.6.0
 praw==7.7.0
 pyenchant==3.2.2
-markovipy==0.3.0
 fakeyou
 sqlitedict==2.1.0
 Flask-Limiter==3.3.0
 uwsgi-tools==1.1.1
 pydub==0.25.1
 tqdm==4.65.0
+essential_generators==1.0

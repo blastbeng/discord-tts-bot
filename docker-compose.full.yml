@@ -48,16 +48,14 @@ services:
     image: "blastbeng/jerky-tts-bot-api-balancer:1.0.0"
     ports:
       - "5080:5080"
-    depends_on:
-      - jerky-tts-bot-api
     volumes:
       - "/tmp/jerky-tts-bot-api:/tmp/jerky-tts-bot-api"
     restart: "no"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:5080/utils/healthcheck"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
+      interval: 20s
+      timeout: 5s
+      retries: 12
   redis:
     image: redis
     container_name: jerky-tts-bot-redis
@@ -120,6 +118,8 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Rome
+    ports:
+      - '192.168.1.160:7391:80'
     image: "blastbeng/jerky-tts-bot-website:1.0.0"
     restart: "no"
     networks:

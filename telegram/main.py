@@ -101,23 +101,13 @@ def generate(update: Update, context: CallbackContext):
         #else:
         #    strid = chatid
         if strid:
-            message = update.message.text[9:].strip();
-            url = ""
-            if(message != "" and len(message) <= 500 and not message.endswith('bot')):
-                url = API_URL + API_PATH_UTILS + "/sentence/populate/parsed/api/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid)
-            elif(message == ""):
-                url = API_URL + API_PATH_UTILS + "/sentence/populate/api" + "/" + urllib.parse.quote(strid)
-                
-
-            if url != "":
-                response = requests.get(url)
-                if (response.text != "Internal Server Error"):
-                    context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                else:
-                    context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)       
+            url = API_URL + API_PATH_UTILS + "/sentences/generate/" + urllib.parse.quote(strid) + "/1"
+            response = requests.get(url)
+            if (response.text != "Internal Server Error"):
+                context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
             else:
-                context.bot.send_message(chat_id=update.effective_chat.id, text="se vuoi che genero conversazioni casuali devi scrivere qualcosa dopo /generate (massimo 500 caratteri) oppure lasciare vuoto", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-               
+                context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)       
+                          
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
