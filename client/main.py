@@ -164,10 +164,10 @@ def get_current_guild_id(guildid):
 @client.event
 async def on_ready():
     try:
-        url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/init/000000"
-        response = requests.get(url)
-        if (response.text == "Internal Server Error"):
-            raise Exception("Initializing chatterbot on chatid 000000 failed")
+        #url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/init/000000"
+        #response = requests.get(url)
+        #if (response.text == "Internal Server Error"):
+        #    raise Exception("Initializing chatterbot on chatid 000000 failed")
 
         logging.info(f'Logged in as {client.user} (ID: {client.user.id})')
 

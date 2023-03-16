@@ -849,6 +849,7 @@ limiter.init_app(app)
 scheduler.init_app(app)
 scheduler.start()
 utils.login_fakeyou()
+threading.Timer(0, get_chatbot_by_id, args=[chatid]).start()
 threading.Timer(30, utils.backupdb, args=["000000"]).start()
 
 if __name__ == '__main__':
