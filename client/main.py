@@ -176,20 +176,17 @@ async def on_ready():
             client.tree.copy_global_to(guild=guild)
             await client.tree.sync(guild=guild)
             logging.info(f'Syncing commands to Guild (ID: {guild.id})')
+            nick = None
             if guild.me.nick is None:
                 nick = client.user.name + " [" + utils.get_guild_language('000000' if str(guild.id) == str(os.environ.get("GUILD_ID")) else str(guild.id)) + "]"
+            elif re.search(r'\[[a-z][a-z]\]', guild.me.nick) is None:
+                if len(guild.me.nick) > 20:
+                    nick = client.user.name + " [" + utils.get_guild_language('000000' if str(guild.id) == str(os.environ.get("GUILD_ID")) else str(guild.id)) + "]"
+                else:
+                    nick = guild.me.nick[:len(guild.me.nick) - 5] + " [" + utils.get_guild_language('000000' if str(guild.id) == str(os.environ.get("GUILD_ID")) else str(guild.id)) + "]"
+            if nick is not None:
                 await guild.me.edit(nick=nick)
                 logging.info(f'Renaming bot to {nick} to Guild (ID: {guild.id})')
-            else:
-                x = re.search(r'\[[a-z][a-z]\]', guild.me.nick)
-                if x is not None:
-                    nick = guild.me.nick[:len(guild.me.nick) - 5] + " [" + utils.get_guild_language('000000' if str(guild.id) == str(os.environ.get("GUILD_ID")) else str(guild.id)) + "]"
-                    await guild.me.edit(nick=nick)
-                    logging.info(f'Renaming bot to {nick} to Guild (ID: {guild.id})')
-                else:
-                    nick = client.user.name + " [" + utils.get_guild_language('000000' if str(guild.id) == str(os.environ.get("GUILD_ID")) else str(guild.id)) + "]"
-                    await guild.me.edit(nick=nick)
-                    logging.info(f'Renaming bot to {nick} to Guild (ID: {guild.id})')
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -537,8 +534,10 @@ async def language(interaction: discord.Interaction, language: app_commands.Choi
                 x = re.search(r'\[[a-z][a-z]\]', nick)
                 if x is not None:
                     nick = interaction.guild.me.nick[:len(interaction.guild.me.nick) - 5]
-                else:
+                elif len(nick) > 20:
                     nick = client.user.name
+                else:
+                    nick = interaction.guild.me.nick[:len(interaction.guild.me.nick) - 5]
 
             name = nick + " [" + utils.get_guild_language(currentguildid) + "]"
             await interaction.guild.me.edit(nick=name)
