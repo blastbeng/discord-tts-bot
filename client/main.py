@@ -5,6 +5,7 @@ import time
 import utils
 import time
 import signal
+import random
 import urllib
 import typing
 import asyncio
@@ -40,10 +41,6 @@ class MyClient(discord.Client):
     def __init__(self, *, intents: discord.Intents):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
-
-    #async def setup_hook(self):
-    #    self.tree.copy_global_to(guild=GUILD_ID)
-    #    await self.tree.sync(guild=GUILD_ID)
 
 
 intents = discord.Intents.default()
@@ -156,7 +153,7 @@ def get_voice_client_by_guildid(voice_clients, guildid):
     return None
 
 async def connect_bot_by_voice_client(voice_client, channel, guild):    
-    if voice_client and voice_client.channel.id != channel.id:
+    if voice_client and not voice_client.is_playing() and voice_client.channel.id != channel.id:
         await voice_client.disconnect()
         await channel.connect()
         if guild is not None:
@@ -178,22 +175,23 @@ async def play_audio():
         for guild in client.guilds:
             if str(guild.id) == str(os.environ.get("GUILD_ID")) and os.environ.get("AUTONOMOUS") == '1':
                 channelfound = guild.voice_channels[0]
+                channelusers = []
                 for channel in guild.voice_channels:
                     for member in channel.members:
                         if not member.bot:
-                            channelfound = channel
+                            channelusers.append(channel)
                             break
+                if len(channelusers) > 0:
+                    channelfound = channelusers[random.randint(0,len(channelusers)-1)]
                 voice_client = get_voice_client_by_guildid(client.voice_clients, guild.id)
                 await connect_bot_by_voice_client(voice_client, channelfound, None)
-                if hasattr(voice_client, 'play'):
+                if hasattr(voice_client, 'play') and not voice_client.is_playing():
                     voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/000000"))
                 break
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        await asyncio.sleep(10)
-
 
 @client.event
 async def on_ready():
@@ -261,10 +259,7 @@ async def join(interaction: discord.Interaction):
         else:
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
     except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        await interaction.response.send_message("Errore!", ephemeral = True)
+        await send_error(e, interaction)
 
 @client.tree.command()
 @app_commands.checks.cooldown(1, 3.0, key=lambda i: (i.user.id))
@@ -316,7 +311,7 @@ async def speak(interaction: discord.Interaction, text: str, language: app_comma
                 await interaction.response.send_message(message, ephemeral = True)
 
             else:
-                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use /stop command"), ephemeral = True)
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
 
 
             
@@ -350,7 +345,7 @@ async def ask(interaction: discord.Interaction, text: str):
                     voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))), after=lambda e: logging.info(message))
                     await interaction.response.send_message(message, ephemeral = True)
                 else:
-                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use /stop command"), ephemeral = True)
+                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
 
                 
             else:
@@ -388,7 +383,7 @@ async def generate(interaction: discord.Interaction):
                     else:
                         await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error")+"!", ephemeral = True)     
                 else:
-                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use /stop command"), ephemeral = True)
+                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
             else:
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
         else:
@@ -424,7 +419,7 @@ async def story(interaction: discord.Interaction):
                     else:
                         await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error")+"!", ephemeral = True)     
                 else:
-                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use /stop command"), ephemeral = True)
+                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
             else:
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
         else:
@@ -461,7 +456,7 @@ async def insult(interaction: discord.Interaction, member: Optional[discord.Memb
 
                 await interaction.response.send_message(insultresponse, ephemeral = True)
             else:
-                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use /stop command"), ephemeral = True)
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
 
         else:
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
@@ -485,7 +480,7 @@ async def insult_tree(interaction: discord.Interaction, member: discord.Member):
 
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"I have insulted") + " " + member.name, ephemeral = True)
             else:
-                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use /stop command"), ephemeral = True)
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
 
         else:
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
@@ -520,7 +515,7 @@ async def random(interaction: discord.Interaction, voice: Optional[app_commands.
                     voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/"+urllib.parse.quote(voicename)+"/"+urllib.parse.quote(currentguildid)), after=lambda e: logging.info(message))
                     await interaction.response.send_message(message, ephemeral = True)
                 else:
-                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use /stop command"), ephemeral = True)
+                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
 
             else:
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
@@ -683,7 +678,7 @@ async def translate(interaction: discord.Interaction, text: str, language_to: ap
                 voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(translated_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(language_to.value)), after=lambda e: logging.info(message))
                 await interaction.response.send_message(message, ephemeral = True)
             else:
-                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use /stop command"), ephemeral = True)
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
 
             
         else:
@@ -712,7 +707,7 @@ async def youtube(interaction: discord.Interaction, url: str):
                     voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_MUSIC")+"youtube/get/"+(url.split("watch?v=",1)[1])+"/"+urllib.parse.quote(currentguildid)), after=lambda e: logging.info(message))
                     await interaction.response.send_message(message, ephemeral = True)
                 else:
-                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use /stop command"), ephemeral = True)
+                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
             else:
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"URL must match something like https://www.youtube.com/watch?v=1abcd2efghi"), ephemeral = True)
 
