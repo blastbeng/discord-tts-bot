@@ -5,7 +5,6 @@ import time
 import utils
 import time
 import signal
-import random
 import urllib
 import typing
 import asyncio
@@ -175,14 +174,11 @@ async def play_audio():
         for guild in client.guilds:
             if str(guild.id) == str(os.environ.get("GUILD_ID")) and os.environ.get("AUTONOMOUS") == '1':
                 channelfound = guild.voice_channels[0]
-                channelusers = []
                 for channel in guild.voice_channels:
                     for member in channel.members:
                         if not member.bot:
-                            channelusers.append(channel)
+                            channelfound = channel
                             break
-                if len(channelusers) > 0:
-                    channelfound = channelusers[random.randint(0,len(channelusers)-1)]
                 voice_client = get_voice_client_by_guildid(client.voice_clients, guild.id)
                 await connect_bot_by_voice_client(voice_client, channelfound, None)
                 if hasattr(voice_client, 'play') and not voice_client.is_playing():
@@ -753,7 +749,7 @@ async def timer(interaction: discord.Interaction, seconds: int):
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Seconds must be greater than 30 and lower than 300"), ephemeral = True)
         else:
             play_audio.change_interval(seconds=seconds)
-            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"I'm setting " + str(seconds) + " for the auto talking feature"), ephemeral = True)
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"I'm setting a " + str(seconds) + " seconds timer for the auto talking feature"), ephemeral = True)
     except Exception as e:
         await send_error(e, interaction)
 
