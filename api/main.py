@@ -652,6 +652,19 @@ class SentencesGenerateClass(Resource):
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return make_response(str(e), 500)
 
+    
+@nsutils.route('/paragraph/generate/')
+@nsutils.route('/paragraph/generate/<string:chatid>')
+class ParagraphGenerateClass(Resource):
+  def get(self, chatid = "000000"):
+    try:
+      return make_response(utils.generate_paragraph(chatid), 200)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
+
 
 
 nsdatabase = api.namespace('database', 'Accumulators Database APIs')
@@ -806,7 +819,7 @@ limiter.init_app(app)
 scheduler.init_app(app)
 scheduler.start()
 utils.login_fakeyou()
-threading.Timer(0, get_chatbot_by_id, args=["000000"]).start()
+#threading.Timer(0, get_chatbot_by_id, args=["000000"]).start()
 threading.Timer(5, utils.backupdb, args=["000000"]).start()
 threading.Timer(10, utils.init_generator_models, args=["000000"]).start()
 

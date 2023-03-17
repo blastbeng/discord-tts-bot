@@ -114,8 +114,31 @@ def generate(update: Update, context: CallbackContext):
       print(exc_type, fname, exc_tb.tb_lineno)
       context.bot.send_message(chat_id=update.effective_chat.id, text="Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
-          
 dispatcher.add_handler(CommandHandler('generate', generate))
+
+def story(update: Update, context: CallbackContext):
+    try:
+        chatid = str(update.effective_chat.id)
+        if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
+            strid = "000000"
+        #else:
+        #    strid = chatid
+        if strid:
+            url = API_URL + API_PATH_UTILS + "/paragraph/generate/" + urllib.parse.quote(strid)
+            response = requests.get(url)
+            if (response.text != "Internal Server Error"):
+                context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+            else:
+                context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)       
+                          
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      print(exc_type, fname, exc_tb.tb_lineno)
+      context.bot.send_message(chat_id=update.effective_chat.id, text="Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+
+          
+dispatcher.add_handler(CommandHandler('story', story))
 
 def echo(update: Update, context: CallbackContext):
     try:
@@ -695,6 +718,7 @@ def help(update: Update, context: CallbackContext):
     text = text + "setalarm - allarme singolo\n"
     text = text + "setalarmdaily - allarme giornaliero\n"
     text = text + "speak - ripete il messaggio via audio\n"
+    text = text + "story - genera storie casuali\n"
     text = text + "unsetalarm - rimuove un allarme\n";
 
     context.bot.send_message(chat_id=update.effective_chat.id, text=text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)

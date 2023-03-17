@@ -859,3 +859,15 @@ def generate_sentence(chatid: str):
   generator = DocumentGenerator(word_generator=word_generator, text_generator=text_generator)
 
   return generator.sentence()
+
+def generate_paragraph(chatid: str):
+
+  text_model_path = os.environ.get("TMP_DIR") + '/markov_textgen.json'
+  word_model_path = os.environ.get("TMP_DIR") + '/markov_wordgen.json'
+
+  text_generator=MarkovTextGenerator(model=text_model_path, load_model=True)
+  word_generator=MarkovWordGenerator(model=word_model_path, load_model=True)
+
+  generator = DocumentGenerator(word_generator=word_generator, text_generator=text_generator)
+
+  return generator.paragraph()
