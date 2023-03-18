@@ -12,6 +12,7 @@ import sys
 import os
 import io
 import yt_dlp
+import openai
 from datetime import datetime
 import string
 import fakeyou
@@ -871,3 +872,12 @@ def generate_paragraph(chatid: str):
   generator = DocumentGenerator(word_generator=word_generator, text_generator=text_generator)
 
   return generator.paragraph()
+
+def ask_chat_gpy(message: str): 
+  openai.api_key = os.environ.get("CHAT_GPT_KEY")
+  response = openai.ChatCompletion.create(
+    model = os.environ.get("CHAT_GPT_MODEL"),
+    messages=message,
+    temperature = 1.0 # 0.0 - 2.0
+  )
+  return response.choices[0].message

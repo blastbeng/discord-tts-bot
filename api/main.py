@@ -187,6 +187,20 @@ class TextInsultClass(Resource):
     daemon.start()
     return response
 
+@nstext.route('/ask/chat-gpt/<string:text>/')
+@nstext.route('/ask/chat-gpt/<string:text>/<string:chatid>')
+class TextAskChatGptClass(Resource):
+  @cache.cached(timeout=10, query_string=True)
+  def get (self, text: str, chatid = "000000"):
+    try:
+      return utils.ask_chat_gpy(text)
+    except Exception as e:
+      g.request_error = str(e)
+      @after_this_request
+      def clear_cache(response):
+        cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+        return make_response(g.get('request_error'), 500)
+
 
 
 

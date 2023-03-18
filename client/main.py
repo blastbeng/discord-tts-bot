@@ -50,6 +50,13 @@ logging.basicConfig(
         level=int(os.environ.get("LOG_LEVEL")),
         datefmt='%Y-%m-%d %H:%M:%S')
 
+logger = logging.getLogger('discord')
+logger.setLevel(int(os.environ.get("LOG_LEVEL")))
+
+discord.utils.setup_logging(level=int(os.environ.get("LOG_LEVEL")), root=False)
+
+
+
 def listvoices():
     try:
         voices = []
@@ -152,12 +159,12 @@ def get_voice_client_by_guildid(voice_clients, guildid):
     return None
 
 async def connect_bot_by_voice_client(voice_client, channel, guild):    
-    if voice_client and not voice_client.is_playing() and voice_client.channel.id != channel.id:
+    if voice_client and not voice_client.is_playing() and voice_client.channel and voice_client.channel.id != channel.id:
         await voice_client.disconnect()
         await channel.connect()
         if guild is not None:
             await guild.change_voice_state(channel=channel, self_deaf=True)
-    elif not voice_client:
+    elif not voice_client or not voice_client.channel:
         await channel.connect()
         if guild is not None:
             await guild.change_voice_state(channel=channel, self_deaf=True)
@@ -173,16 +180,21 @@ async def play_audio():
     try:
         for guild in client.guilds:
             if str(guild.id) == str(os.environ.get("GUILD_ID")) and os.environ.get("AUTONOMOUS") == '1':
-                channelfound = guild.voice_channels[0]
-                for channel in guild.voice_channels:
-                    for member in channel.members:
-                        if not member.bot:
-                            channelfound = channel
-                            break
+                channelfound = None
                 voice_client = get_voice_client_by_guildid(client.voice_clients, guild.id)
-                await connect_bot_by_voice_client(voice_client, channelfound, None)
-                if hasattr(voice_client, 'play') and not voice_client.is_playing():
-                    voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/000000"))
+                if voice_client is None or voice_client.channel is None:
+                    for channel in guild.voice_channels:
+                        for member in channel.members:
+                            if not member.bot:
+                                channelfound = channel
+                                break
+                else:
+                    channelfound = voice_client.channel
+                if channelfound is not None:
+                    voice_client.channel
+                    await connect_bot_by_voice_client(voice_client, channelfound, None)
+                    if hasattr(voice_client, 'play') and not voice_client.is_playing():
+                        voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/000000"))
                 break
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()

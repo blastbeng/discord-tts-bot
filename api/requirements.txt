@@ -32,3 +32,4 @@ uwsgi-tools==1.1.1
 pydub==0.25.1
 tqdm==4.65.0
 essential_generators==1.0
+openai
