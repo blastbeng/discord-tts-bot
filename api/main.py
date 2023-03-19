@@ -209,11 +209,12 @@ nsaudio = api.namespace('chatbot_audio', 'Accumulators Chatbot TTS audio APIs')
 
 @nsaudio.route('/repeat/<string:text>/<string:voice>/')
 @nsaudio.route('/repeat/<string:text>/<string:voice>/<string:chatid>')
+@nsaudio.route('/repeat/<string:text>/<string:voice>/<string:chatid>/<string:language>')
 class AudioRepeatClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, voice: str, chatid = "000000"):
+  def get (self, text: str, voice: str, chatid = "000000", language = "it"):
     try:
-      tts_out = utils.get_tts(text, chatid=chatid, voice=voice)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=language, save=False)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:

@@ -175,23 +175,24 @@ def get_current_guild_id(guildid):
     else:
         return str(guildid)
 
-@tasks.loop(seconds=120)
+@tasks.loop(seconds=180)
 async def play_audio():
     try:
         for guild in client.guilds:
             if str(guild.id) == str(os.environ.get("GUILD_ID")) and os.environ.get("AUTONOMOUS") == '1':
                 channelfound = None
-                voice_client = get_voice_client_by_guildid(client.voice_clients, guild.id)
+                channeluserfound = None
+                voice_client = get_voice_client_by_guildid(client.voice_clients, guild.id)                
+                for channel in guild.voice_channels:
+                    for member in channel.members:
+                        if not member.bot:
+                            channeluserfound = channel
+                            break
                 if voice_client is None or voice_client.channel is None:
-                    for channel in guild.voice_channels:
-                        for member in channel.members:
-                            if not member.bot:
-                                channelfound = channel
-                                break
+                    channelfound = channeluserfound
                 else:
                     channelfound = voice_client.channel
-                if channelfound is not None:
-                    voice_client.channel
+                if channelfound is not None and channeluserfound is not None:
                     await connect_bot_by_voice_client(voice_client, channelfound, None)
                     if hasattr(voice_client, 'play') and not voice_client.is_playing():
                         voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/000000"))
@@ -399,6 +400,42 @@ async def generate(interaction: discord.Interaction):
     except Exception as e:
         await send_error(e, interaction)
 
+
+
+@client.tree.command()
+@app_commands.rename(text='text')
+@app_commands.describe(text="the sentence to ask")
+@app_commands.checks.cooldown(1, 3.0, key=lambda i: (i.user.id))
+async def askchatgpt(interaction: discord.Interaction, text: str):
+    """Ask something to ChatGPT."""
+    try:
+        if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
+            if interaction.user.voice and interaction.user.voice.channel:
+                voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+                await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
+
+                
+                if not hasattr(voice_client, 'play'):
+                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
+                elif not voice_client.is_playing():
+                    currentguildid = get_current_guild_id(interaction.guild.id)
+
+                    url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "ask/chat-gpt/" + urllib.parse.quote(text) + "/" + currentguildid
+                    response = requests.get(url)
+                    if (response.text != "Internal Server Error" and response.status_code == 200):
+                        message = utils.translate(get_current_guild_id(interaction.guild.id),"ChatGPT answered") + ' "' + response.text + '"'
+                        voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(response.text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))), after=lambda e: logging.info(message))
+                        await interaction.response.send_message(response.text, ephemeral = True)
+                    else:
+                        await interaction.response.send_message("ChatGPT Error: " + response.text, ephemeral = True)     
+                else:
+                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
+            else:
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+        else:
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"This is a private command and can only be used by members with specific permissions on the main Bot Server"), ephemeral = True)
+    except Exception as e:
+        await send_error(e, interaction)
 
 
 @client.tree.command()

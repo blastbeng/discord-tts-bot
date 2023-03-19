@@ -124,8 +124,10 @@ def generate(filename: str):
           yield data
           data = fmp3.read(1024)
 
-def get_tts_google(text: str, chatid="000000", language="it"):
-  data = audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
+def get_tts_google(text: str, chatid="000000", language="it", save=True):
+  data = None
+  if save:
+    data = audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
   if data is not None:
     return data
   else:
@@ -137,7 +139,7 @@ def get_tts_google(text: str, chatid="000000", language="it"):
     memoryBuff = BytesIO()
     sound.export(memoryBuff, format='mp3', bitrate="256")
     memoryBuff.seek(0)
-    if chatid == "000000":
+    if chatid == "000000" and save:
       audiodb.insert(text, chatid, memoryBuff, "google", language)
       return audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
     else:
@@ -145,8 +147,8 @@ def get_tts_google(text: str, chatid="000000", language="it"):
     #return memoryBuff
     #return fp
 
-def populate_tts_google(text: str, chatid="000000"):
-  data = audiodb.select_by_name_chatid_voice(text, chatid, "google")
+def populate_tts_google(text: str, chatid="000000", language="it"):
+  data = audiodb.select_by_name_chatid_voice_language(text, chatid, "google")
   if data is not None:
     return False
   else:
@@ -510,16 +512,18 @@ def delete_from_audiodb_by_text(chatid: str, text: str):
     if sqliteConnection:
         sqliteConnection.close()
 
-def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it"):
+def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it", save=True):
   try:
     if voice is None or voice == "null" or voice == "random":
       voice_to_use = get_random_voice()
     else:
       voice_to_use = voice
     if chatid != "000000" or language != "it":
-      return get_tts_google(text.strip(), chatid=chatid, language=language)
-    elif voice_to_use != "google": 
-      datafy = audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
+      return get_tts_google(text.strip(), chatid=chatid, language=language, save=save)
+    elif voice_to_use != "google":
+      datafy = None
+      if save:
+        datafy = audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
       if datafy is not None:
         return datafy
       else:
@@ -535,20 +539,23 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
           out = BytesIO()
           sound.export(out, format='mp3', bitrate="256")
           out.seek(0)
-          audiodb.insert(text.strip(), chatid, out, voice_to_use, language)
-          return audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
+          if save:
+            audiodb.insert(text.strip(), chatid, out, voice_to_use, language)
+            return audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
+          else:
+            return out
         elif voice == "random" or voice == "google":
           return get_tts_google(text.strip(), chatid=chatid, language="it")
         else:
           return None
     else:
-      return get_tts_google(text.strip(), chatid=chatid, language=language)
+      return get_tts_google(text.strip(), chatid=chatid, language=language, save=save)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     if voice == "random" or israndom:
-      return get_tts_google(text.strip(), chatid=chatid)
+      return get_tts_google(text.strip(), chatid=chatid, language=language, save=save)
     else:
       raise Exception(e)
 
@@ -589,7 +596,7 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
           return True
         raise Exception("FakeYou Generation KO")
     else:
-      return populate_tts_google(text.strip(), chatid=chatid)
+      return populate_tts_google(text.strip(), chatid=chatid, language=language)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
