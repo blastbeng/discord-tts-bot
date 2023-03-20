@@ -250,7 +250,7 @@ async def on_ready():
                     nick = guild.me.nick[:len(guild.me.nick) - 5] + " [" + utils.get_guild_language('000000' if str(guild.id) == str(os.environ.get("GUILD_ID")) else str(guild.id)) + "]"
             if nick is not None:
                 await guild.me.edit(nick=nick)
-                logging.info(f'Renaming bot to {nick} to Guild (ID: {guild.id})')
+                logging.info(f'Renaming bot to {nick} for Guild (ID: {guild.id})')
 
         await play_audio_loop.start()
 
