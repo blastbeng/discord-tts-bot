@@ -246,7 +246,7 @@ def get_youtube_audio(link: str, chatid: str):
       fp = BytesIO(fh.read())
     fp.seek(0)
     os.remove(youtubefile+".mp3")
-    return fp    
+    return fp, url  
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
