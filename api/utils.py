@@ -331,10 +331,14 @@ def extract_sentences_from_chatbot(filename, chatid="000000", distinct=True, ran
     cursor = sqliteConnection.cursor()
 
     sqlite_select_sentences_query = ""
-    if distinct:
-      sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY text"""
-    else:
-      sqlite_select_sentences_query = """SELECT text FROM statement"""
+    if distinct and randomize:
+      sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY RANDOM()"""
+    elif not distinct and not randomize:
+      sqlite_select_sentences_query = """SELECT text FROM statement ORDER BY TEXT"""
+    elif distinct and not randomize:
+      sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY TEXT"""
+    elif not distinct and randomize:
+      sqlite_select_sentences_query = """SELECT text FROM statement ORDER BY RANDOM()"""
 
     data = ()
 

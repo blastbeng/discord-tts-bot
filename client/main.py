@@ -51,8 +51,7 @@ logging.basicConfig(
         level=int(os.environ.get("LOG_LEVEL")),
         datefmt='%Y-%m-%d %H:%M:%S')
 
-logger = logging.getLogger('discord')
-logger.setLevel(int(os.environ.get("LOG_LEVEL")))
+logging.getLogger('discord').setLevel(int(os.environ.get("LOG_LEVEL")))
 
 discord.utils.setup_logging(level=int(os.environ.get("LOG_LEVEL")), root=False)
 
@@ -180,7 +179,7 @@ async def do_play(voice_client, url: str, interaction: discord.Interaction, curr
     await interaction.response.defer(thinking=True, ephemeral=True)
     response = requests.get(url)
     if (response.status_code == 200 and response.content):
-        message = response.headers["X-Generated-Text"]
+        message = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
         voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info("do_play - " + message))
         await interaction.followup.send(message, ephemeral = True)
     else:
@@ -207,18 +206,18 @@ async def play_audio_loop():
                     await connect_bot_by_voice_client(voice_client, channelfound, None)
                     if hasattr(voice_client, 'play') and not voice_client.is_playing():
                         #voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/000000"))
-                        if utils.random_boolean():
-                            response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/000000")
-                            if (response.status_code == 200 and response.content):
-                                message = 'play_audio_loop - random - ' + response.headers["X-Generated-Text"]
-                                voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info(message))
-                        else:
-                            response_gen = requests.get(os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/sentences/generate/000000/0")
-                            if (response_gen.text != "Internal Server Error" and response_gen.status_code == 200):
-                                response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(response_gen.text))+"/google/000000/it")
-                                if (response.status_code == 200 and response.content):
-                                    message = 'play_audio_loop - generate - ' + response.headers["X-Generated-Text"]
-                                    voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info(message))
+                        #if utils.random_boolean():
+                        response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/000000")
+                        if (response.status_code == 200 and response.content):
+                            message = 'play_audio_loop - random - ' + response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
+                            voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info(message))
+                        #else:
+                        #    response_gen = requests.get(os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/sentences/generate/000000/0")
+                        #    if (response_gen.text != "Internal Server Error" and response_gen.status_code == 200):
+                        #        response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(response_gen.text))+"/google/000000/it")
+                        #        if (response.status_code == 200 and response.content):
+                        #            message = 'play_audio_loop - generate - ' + response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
+                        #            voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info(message))
                 break
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -414,7 +413,7 @@ async def generate(interaction: discord.Interaction):
                         #message =utils.translate(get_current_guild_id(interaction.guild.id),"I have generated the sentence ") + ' "' + response.text + '"'
                         #voice_client.play(discord.FFmpegPCMAudio(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(response.text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))), after=lambda e: logging.info(message))
                         #await interaction.response.send_message(message, ephemeral = True)
-                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(response.text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(response.text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
                         await do_play(voice_client, url, interaction, currentguildid)
                     else:
                         await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Error")+"!", ephemeral = True)     

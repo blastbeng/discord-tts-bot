@@ -217,7 +217,7 @@ class AudioRepeatClass(Resource):
       tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=language, save=False)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.headers['X-Generated-Text'] = text
+        response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
         return response
       else:
         @after_this_request
@@ -264,7 +264,7 @@ class AudioRandomClass(Resource):
       tts_out, text_out = audiodb.select_by_chatid_voice_random(chatid,voice)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.headers['X-Generated-Text'] = text_out
+        response.headers['X-Generated-Text'] = text_out.encode('utf-8').decode('latin-1')
         return response
       else:
         @after_this_request
@@ -293,7 +293,7 @@ class AudioRepeatLearnClass(Resource):
           chatbot = get_chatbot_by_id(chatid)
           daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
           daemon.start()
-        response.headers['X-Generated-Text'] = text
+        response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
         return response
       else:
         @after_this_request
@@ -326,7 +326,7 @@ class AudioRepeatLearnUserClass(Resource):
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         daemon = Thread(target=learnthis, args=(user,text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
         daemon.start()
-        response.headers['X-Generated-Text'] = text
+        response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
         return response
       else:
         @after_this_request
@@ -381,7 +381,7 @@ class AudioAskNoLearnClass(Resource):
       tts_out = utils.get_tts(text_response, chatid=chatid)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.headers['X-Generated-Text'] = text_response
+        response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
         return response
       else:
         @after_this_request
@@ -406,7 +406,7 @@ class AudioAskNoLearnRandomClass(Resource):
       tts_out = utils.get_tts(text_response, voice="random", chatid=chatid)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.headers['X-Generated-Text'] = text_response
+        response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
         return response
       else:
         @after_this_request
@@ -431,7 +431,7 @@ class AudioAskNoLearnNoCacheGoogleClass(Resource):
       tts_out = utils.get_tts(text_response, voice="google", chatid=chatid)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.headers['X-Generated-Text'] = text_response
+        response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
         return response
       else:
         return make_response('request_error', 500)
@@ -450,7 +450,7 @@ class AudioAskNoLearnNoCacheGoogleClass(Resource):
       tts_out = utils.get_tts(text_response, voice="google", chatid=chatid)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.headers['X-Generated-Text'] = text_response
+        response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
         return response
       else:
         return make_response('request_error', 500)
