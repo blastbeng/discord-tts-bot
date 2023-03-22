@@ -3,7 +3,6 @@ python-dotenv
 requests
 pytz
 psutil
-translate
 sqlalchemy
 translate
 Pillow

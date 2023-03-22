@@ -24,6 +24,8 @@ from pathlib import Path
 from os.path import join, dirname
 from dotenv import load_dotenv
 from threading import Thread
+from bestemmie import Bestemmie
+from libretranslator import LibreTranslator
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -85,6 +87,14 @@ class TextRepeatClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, chatid = "000000"):
     return get_response_str(text)
+
+
+@nstext.route('/curse/')
+@nstext.route('/curse/<string:chatid>')
+class TextCurseClass(Resource):
+  @cache.cached(timeout=3, query_string=True)
+  def get (self, text: str, chatid = "000000"):
+    return get_response_str(Bestemmie().random().lower())
 
 
 
@@ -170,6 +180,30 @@ class TextLearnClass(Resource):
     return "Ho imparato: " + text + " => " + response
 
 
+@nstext.route('/translate/<string:from_lang>/<string:to_lang>/<string:text>/')
+@nstext.route('/translate/<string:from_lang>/<string:to_lang>/<string:text>/<string:chatid>')
+class TextTranslateClass(Resource):
+  @cache.cached(timeout=7200, query_string=True)
+  def get (self, from_lang: str, to_lang: str, text: str, chatid = "000000"):
+    try:
+      text_out = LibreTranslator(from_lang=from_lang, to_lang=to_lang, base_url=os.environ.get("TRANSLATOR_BASEURL")).translate(text)
+      if text_out is not None:
+        response = get_response_str(text_out)
+        response.headers['X-Generated-Text'] = text_out.encode('utf-8').decode('latin-1')
+        return response
+      else:
+        @after_this_request
+        def clear_cache(response):
+          cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+          return make_response("Translate Error!", 500)
+    except Exception as e:
+      g.request_error = str(e)
+      @after_this_request
+      def clear_cache(response):
+        cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+        return make_response(g.get('request_error'), 500)
+
+
 @nstext.route('/insult')
 class TextInsultClass(Resource):
   @api.expect(parserinsult)
@@ -187,22 +221,6 @@ class TextInsultClass(Resource):
     daemon.start()
     return response
 
-@nstext.route('/ask/chat-gpt/<string:text>/')
-@nstext.route('/ask/chat-gpt/<string:text>/<string:chatid>')
-class TextAskChatGptClass(Resource):
-  @cache.cached(timeout=10, query_string=True)
-  def get (self, text: str, chatid = "000000"):
-    try:
-      return utils.ask_chat_gpy(text)
-    except Exception as e:
-      g.request_error = str(e)
-      @after_this_request
-      def clear_cache(response):
-        cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
-        return make_response(g.get('request_error'), 500)
-
-
-
 
 nsaudio = api.namespace('chatbot_audio', 'Accumulators Chatbot TTS audio APIs')
 
@@ -215,6 +233,31 @@ class AudioRepeatClass(Resource):
   def get (self, text: str, voice: str, chatid = "000000", language = "it"):
     try:
       tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=language, save=False)
+      if tts_out is not None:
+        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+        return response
+      else:
+        @after_this_request
+        def clear_cache(response):
+          cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+          return make_response("TTS Generation Error!", 500)
+    except Exception as e:
+      g.request_error = str(e)
+      @after_this_request
+      def clear_cache(response):
+        cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+        return make_response(g.get('request_error'), 500)
+
+
+@nsaudio.route('/curse/<string:voice>/')
+@nsaudio.route('/curse/<string:voice>/<string:chatid>')
+class AudioCurseClass(Resource):
+  @cache.cached(timeout=3, query_string=True)
+  def get (self, voice: str, chatid = "000000"):
+    try:
+      text = Bestemmie().random().lower()
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language="it", save=True, call_fy=False)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')

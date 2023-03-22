@@ -13,13 +13,13 @@ itsdangerous==2.1.2
 Jinja2==3.1.2
 MarkupSafe==2.1.2
 uWSGI==2.0.21
-wikipedia==1.4.0
+wikipedia
 gtts
 git+https://github.com/yt-dlp/yt-dlp
 pysqlite3==0.5.0
 redis==4.3.4
 Flask-Caching==2.0.1
-translate==3.6.1
+libretranslatepy
 Flask-APScheduler==1.12.4
 Tweepy==4.12.1
 faker==17.6.0
@@ -31,5 +31,5 @@ Flask-Limiter==3.3.0
 uwsgi-tools==1.1.1
 pydub==0.25.1
 tqdm==4.65.0
-essential_generators==1.0
-openai
+essential_generators
+bestemmie

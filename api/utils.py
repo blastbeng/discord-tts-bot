@@ -12,7 +12,6 @@ import sys
 import os
 import io
 import yt_dlp
-import openai
 from datetime import datetime
 import string
 import fakeyou
@@ -44,6 +43,7 @@ from fakeyou.exception import *
 from sqlitedict import SqliteDict
 from pydub import AudioSegment
 from essential_generators import DocumentGenerator, MarkovTextGenerator, MarkovWordGenerator
+from libretranslator import LibreTranslator
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -206,7 +206,7 @@ def get_chatterbot(chatid: str, train: False, lang = "it"):
     if result == 0 :
       learn('ciao', 'ciao', chatbot)
       if train:
-        trainer = CustomTrainer(chatbot, translator_provider=TRANSLATOR_PROVIDER, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
+        trainer = CustomTrainer(chatbot, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
         trainer.train()      
   return chatbot
 
@@ -351,11 +351,12 @@ def extract_sentences_from_chatbot(filename, chatid="000000", distinct=True, ran
     globalsanit = ""
 
     #if not os.path.isfile(filename):
+    translator = LibreTranslator(from_lang="it", to_lang="en", base_url=os.environ.get("TRANSLATOR_BASEURL"))
 
     with open(filename, 'a') as sentence_file:
       for row in records:
-        sentence = row[0]
-        sanitized = sentence.strip()
+        sentence = row[0].strip()
+        sanitized = translator.translate(sentence) 
         if sanitized[-1] not in string.punctuation:
           if randomize:
             if bool(random.getrandbits(1)):
@@ -396,7 +397,7 @@ def train_json(json_req, chatbot: ChatBot):
       logging.info(empty_template_trainfile_json())
     else:
       content = json_req
-      trainer = TranslatedListTrainer(chatbot, lang=content['language'], translator_provider=TRANSLATOR_PROVIDER, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
+      trainer = TranslatedListTrainer(chatbot, lang=content['language'], translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
       i = 0
       while(i < len(content['sentences'])):
         trainarray=[]
@@ -446,7 +447,7 @@ def allowed_file(filename):
 def train_txt(trainfile, chatbot: ChatBot, lang: str):
   try:
       logging.info("Loading: %s", trainfile)
-      trainer = TranslatedListTrainer(chatbot, lang=lang, translator_provider=TRANSLATOR_PROVIDER, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
+      trainer = TranslatedListTrainer(chatbot, lang=lang, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
       trainfile_array = []
       with open(trainfile) as file:
           for line in file:
@@ -516,7 +517,7 @@ def delete_from_audiodb_by_text(chatid: str, text: str):
     if sqliteConnection:
         sqliteConnection.close()
 
-def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it", save=True):
+def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it", save=True, call_fy=True):
   try:
     if voice is None or voice == "null" or voice == "random":
       voice_to_use = get_random_voice()
@@ -530,7 +531,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
         datafy = audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
       if datafy is not None:
         return datafy
-      else:
+      elif call_fy:
         if bool(random.getrandbits(1)):
           proxies = {'http': 'http://192.168.1.160:9058'}
           fy.session.proxies.update(proxies)
@@ -552,6 +553,12 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
           return get_tts_google(text.strip(), chatid=chatid, language="it")
         else:
           return None
+      else:
+        fyfromdb = audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
+        if fyfromdb is not None:
+          return fyfromdb
+        else:
+          return get_tts_google(text.strip(), chatid=chatid, language="it")
     else:
       return get_tts_google(text.strip(), chatid=chatid, language=language, save=save)
   except Exception as e:
@@ -870,7 +877,7 @@ def generate_sentence(chatid: str):
 
   generator = DocumentGenerator(word_generator=word_generator, text_generator=text_generator)
 
-  return generator.sentence()
+  return LibreTranslator(from_lang="en", to_lang="it", base_url=os.environ.get("TRANSLATOR_BASEURL")).translate(generator.sentence()) 
 
 def generate_paragraph(chatid: str):
 
@@ -882,13 +889,4 @@ def generate_paragraph(chatid: str):
 
   generator = DocumentGenerator(word_generator=word_generator, text_generator=text_generator)
 
-  return generator.paragraph()
-
-def ask_chat_gpy(message: str): 
-  openai.api_key = os.environ.get("CHAT_GPT_KEY")
-  response = openai.ChatCompletion.create(
-    model = os.environ.get("CHAT_GPT_MODEL"),
-    messages=message,
-    temperature = 1.0 # 0.0 - 2.0
-  )
-  return response.choices[0].message
+  return LibreTranslator(from_lang="en", to_lang="it", base_url=os.environ.get("TRANSLATOR_BASEURL")).translate(generator.paragraph()) 

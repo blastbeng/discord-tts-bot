@@ -93,6 +93,37 @@ dispatcher.add_handler(CommandHandler('ask', ask))
 
 
 
+def curse(update: Update, context: CallbackContext):
+    try:
+        chatid = str(update.effective_chat.id)
+        if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
+            strid = "000000"
+#        else:
+#            strid = chatid
+        if strid:
+            message = update.message.text[5:].strip();
+            if(message != "" and len(message) <= 500  and not message.endswith('bot')):
+                url = API_URL + API_PATH_TEXT + "curse/" + urllib.parse.quote(strid)
+
+                response = requests.get(url)
+                if (response.text != "Internal Server Error"):
+                    context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                else:
+                    context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                
+            else:
+                context.bot.send_message(chat_id=update.effective_chat.id, text="se vuoi dirmi o chiedermi qualcosa devi scrivere una frase dopo /ask (massimo 500 caratteri)", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+               
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      print(exc_type, fname, exc_tb.tb_lineno)
+      context.bot.send_message(chat_id=update.effective_chat.id, text="Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+
+          
+dispatcher.add_handler(CommandHandler('curse', curse))
+
+
 def generate(update: Update, context: CallbackContext):
     try:
         chatid = str(update.effective_chat.id)
@@ -261,6 +292,67 @@ def speak(update: Update, context: CallbackContext):
 
           
 dispatcher.add_handler(CommandHandler('speak', speak))
+
+
+
+def curseaudio(update: Update, context: CallbackContext):
+    try:
+        chatid = str(update.effective_chat.id)
+        if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
+            strid = "000000"
+        #else:
+        #    strid = chatid
+        if strid:
+            userinput = update.message.text[12:].strip();
+            splitted = userinput.split("-")
+            message = splitted[0].strip()
+            if(message != "" and len(message) <= 500  and not message.endswith('bot')):
+
+                url = API_URL + API_PATH_UTILS + "/fakeyou/get_voices_by_cat/Italiano"
+
+                voices = None
+                voice = "google"
+
+                response = requests.get(url)
+                if (response.text != "Internal Server Error"):
+                    voices = response.json()
+                
+                if len(splitted) == 2 and voices is not None:
+                    sel_voice = splitted[1].lower().strip()
+                    #if sel_voice in voices:
+                    #    voice = voices[sel_voice]
+                    #else:
+                    for voice_rest in voices:   
+                        if sel_voice.lower() in voice_rest.lower():
+                            voice = voices[voice_rest]
+                            break
+
+                url = API_URL + API_PATH_AUDIO + "repeat/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(strid) 
+
+                response = requests.get(url)
+                if (response.text != "Internal Server Error" and response.content and response.status_code == 200):
+                    audio = BytesIO(response.content)
+                    context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, title="Messaggio vocale", performer="ScemoPezzente",  filename=get_random_string(12)+ "audio.wav")
+                else:
+                    context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                
+            else:
+
+                text = "se vuoi che ripeto qualcosa devi scrivere una frase dopo /speak (massimo 500 caratteri).\n\n\n"
+                text = text + "PS: se vuoi customizzare la voce aggiungi:\n"
+                text = text + "'- modello vocale' al fondo della frase.\n\n"
+                text = text + "Esempio: '/speak ciao - gerry scotti'.\n\n"
+                text = text + "Usa /listvoices per una lista dei modelli disponibili."
+                context.bot.send_message(chat_id=update.effective_chat.id, text=text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+               
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      print(exc_type, fname, exc_tb.tb_lineno)
+      context.bot.send_message(chat_id=update.effective_chat.id, text="Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+
+          
+dispatcher.add_handler(CommandHandler('curseaudio', curseaudio))
 
 def listvoices(update: Update, context: CallbackContext):
 
@@ -704,6 +796,8 @@ def help(update: Update, context: CallbackContext):
     text = text + "askaudio - chiedi qualcosa (audio)\n"
     text = text + "chuck - Chuck Norris. (text)\n"
     text = text + "chuckaudio - Chuck Norris. (audio)\n"
+    text = text + "curse - Churse. (audio)\n"
+    text = text + "curseaudio - Churse. (audio)\n"
     text = text + "generate - genera frasi casuali\n"
     text = text + "image - ricerca immagini\n"
     text = text + "insult - genera insulti (text)\n"

@@ -52,6 +52,7 @@ WORKDIR /app
 COPY data data
 COPY templates templates
 COPY static static
+COPY libretranslator.py .
 COPY utils.py .
 COPY audiodb.py .
 COPY custom_trainer.py .

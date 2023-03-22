@@ -9,7 +9,7 @@ from chatterbot.trainers import Trainer
 #from googletrans import Translator
 from chatterbot import utils
 from chatterbot.exceptions import OptionalDependencyImportError
-from translate import Translator
+from libretranslator import LibreTranslator
 
 
 class CustomTrainer(Trainer):
@@ -33,7 +33,7 @@ class CustomTrainer(Trainer):
         else:
             self.translator_limit = 0
 
-        self.translator = Translator(from_lang='en', to_lang="it", provider=self.translator_provider, base_url=self.translator_baseurl, email=self.translator_email)
+        self.translator = LibreTranslator(from_lang='en', to_lang="it", base_url=self.translator_baseurl, email=self.translator_email)
 
 
     def train(self):
@@ -152,7 +152,7 @@ class TranslatedListTrainer(Trainer):
 
         self.lang = kwargs.get('lang')
 
-        self.translator = Translator(from_lang=self.lang, to_lang="it", provider=self.translator_provider, base_url=self.translator_baseurl, email=self.translator_email)
+        self.translator = LibreTranslator(from_lang=self.lang, to_lang="it", base_url=self.translator_baseurl, email=self.translator_email)
 
 
     def train(self, conversation):

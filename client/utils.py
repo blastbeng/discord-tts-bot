@@ -3,6 +3,7 @@ import database
 import subprocess
 import shlex
 import io
+import requests
 import random
 from discord.opus import Encoder
 from translate import Translator
@@ -57,9 +58,12 @@ def translate(guildid: str, text: str):
   if cached is not None:
     return cached
   else:
-    translation = Translator(from_lang=fromlang, to_lang=tolang).translate(text)
-    database.insert_translation(dbms, fromlang, tolang, text, translation)
-    return translation
+    translation = requests.get(os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "/" + from_lang + "/" + to_lang + "/" + text + "/" + guildid)
+    if (translation.text != "Internal Server Error" and translation.status_code == 200):
+      database.insert_translation(dbms, fromlang, tolang, text, translation)
+      return translation
+    else:
+      return text
 
 def insert_new_guild(guildid: str, language: str):
     database.insert_guildconfig(dbms, guildid, language)
