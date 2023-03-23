@@ -28,12 +28,10 @@ class LibreTranslator():
     def translate(self, text):
         if self.from_lang == self.to_lang:
             return text
-
         if self.from_lang == 'autodetect':
             from_lang = self.api.detect(text)[0]['language']
         else:
             from_lang = self.from_lang
-
         try:
             return self.api.translate(text, from_lang, self.to_lang)
         except Exception as e:

@@ -3,7 +3,6 @@ python-dotenv
 requests
 pytz
 psutil
-sqlalchemy
-translate
+sqlalchemy==2.0.7
 Pillow
 PyNaCl

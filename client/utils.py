@@ -2,11 +2,11 @@ import os
 import database
 import subprocess
 import shlex
+import urllib
 import io
 import requests
 import random
 from discord.opus import Encoder
-from translate import Translator
 import discord
 
 class FFmpegPCMAudioBytesIO(discord.AudioSource):
@@ -58,10 +58,11 @@ def translate(guildid: str, text: str):
   if cached is not None:
     return cached
   else:
-    translation = requests.get(os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "/" + from_lang + "/" + to_lang + "/" + text + "/" + guildid)
-    if (translation.text != "Internal Server Error" and translation.status_code == 200):
-      database.insert_translation(dbms, fromlang, tolang, text, translation)
-      return translation
+    url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "translate/" + urllib.parse.quote(fromlang) + "/" + urllib.parse.quote(tolang) + "/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(guildid)
+    translation = requests.get(url)
+    if (translation.text != "Internal Server Error" and translation.status_code == 200 and translation.text != text):
+      database.insert_translation(dbms, fromlang, tolang, text, translation.text)
+      return translation.text
     else:
       return text
 
@@ -81,3 +82,8 @@ def check_exists_guild(guildid: str):
 
 def random_boolean():
     return bool(random.getrandbits(1))
+
+def get_random_from_array(array):
+    size = len(array)
+    n = random.randint(0,size-1)
+    return array[n]

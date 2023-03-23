@@ -250,6 +250,32 @@ class AudioRepeatClass(Resource):
         return make_response(g.get('request_error'), 500)
 
 
+
+@nsaudio.route('/repeat/save/<string:text>/<string:voice>/')
+@nsaudio.route('/repeat/save/<string:text>/<string:voice>/<string:chatid>')
+@nsaudio.route('/repeat/save/<string:text>/<string:voice>/<string:chatid>/<string:language>')
+class AudioRepeatClass(Resource):
+  @cache.cached(timeout=7200, query_string=True)
+  def get (self, text: str, voice: str, chatid = "000000", language = "it"):
+    try:
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=language, save=True)
+      if tts_out is not None:
+        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+        return response
+      else:
+        @after_this_request
+        def clear_cache(response):
+          cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+          return make_response("TTS Generation Error!", 500)
+    except Exception as e:
+      g.request_error = str(e)
+      @after_this_request
+      def clear_cache(response):
+        cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+        return make_response(g.get('request_error'), 500)
+
+
 @nsaudio.route('/curse/<string:voice>/')
 @nsaudio.route('/curse/<string:voice>/<string:chatid>')
 class AudioCurseClass(Resource):
@@ -257,7 +283,7 @@ class AudioCurseClass(Resource):
   def get (self, voice: str, chatid = "000000"):
     try:
       text = Bestemmie().random().lower()
-      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language="it", save=True, call_fy=False)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language="it", save=False, call_fy=False)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
@@ -606,7 +632,7 @@ class YoutubeGetClass(Resource):
         return make_response("YouTube Error", 500)
       else:
         response = send_file(audio, attachment_filename='song.mp3', mimetype='audio/mp3')
-        response.headers['X-Generated-Text'] = senturlence
+        response.headers['X-Generated-Text'] = url
         return response
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -707,6 +733,23 @@ class InitChatterbotClass(Resource):
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return make_response(str(e), 500)
+
+@nsutils.route('/initgenerator/<string:chatid>')
+class InitGeneratorClass(Resource):
+  def get(self, chatid = "000000"):
+    try:
+      if chatid == "000000":
+        threading.Timer(10, utils.init_generator_models, args=["000000"]).start()
+        return make_response("Initializing Generator Models. Watch the logs for errors.", 200)
+      else:
+        return make_response("Initializing Generator Models on this chatid is not permitted!", 500)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
+
+
 
 @limiter.limit("1/second")
 @nsutils.route('/healthcheck')
@@ -868,7 +911,7 @@ def get_chatbot_by_id(chatid = "000000"):
   
   
   
-@scheduler.task('interval', id='scrape_jokes', hours=72, misfire_grace_time=900)
+@scheduler.task('interval', id='scrape_jokes', hours=168, misfire_grace_time=900)
 def scrape_jokes():
   utils.scrape_jokes()
   
@@ -884,7 +927,7 @@ def populate_audiodb():
 def backupdb():
   utils.backupdb("000000")
   
-@scheduler.task('interval', id='init_generator_models', hours=12, misfire_grace_time=900)
+@scheduler.task('interval', id='init_generator_models', hours=72, misfire_grace_time=900)
 def init_generator_models():
   utils.init_generator_models("000000")
 
@@ -900,8 +943,6 @@ limiter.init_app(app)
 scheduler.init_app(app)
 scheduler.start()
 utils.login_fakeyou()
-#threading.Timer(0, get_chatbot_by_id, args=["000000"]).start()
-threading.Timer(5, utils.backupdb, args=["000000"]).start()
 threading.Timer(10, utils.init_generator_models, args=["000000"]).start()
 
 if __name__ == '__main__':

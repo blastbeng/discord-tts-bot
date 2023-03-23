@@ -347,43 +347,46 @@ def extract_sentences_from_chatbot(filename, chatid="000000", distinct=True, ran
 
     
     records_len = len(records)-1
-      
-    globalsanit = ""
 
-    #if not os.path.isfile(filename):
-    translator = LibreTranslator(from_lang="it", to_lang="en", base_url=os.environ.get("TRANSLATOR_BASEURL"))
 
     with open(filename, 'a') as sentence_file:
       for row in records:
-        sentence = row[0].strip()
-        sanitized = translator.translate(sentence) 
-        if sanitized[-1] not in string.punctuation:
-          if randomize:
-            if bool(random.getrandbits(1)):
-              sanitized = sanitized + "."
-            else:
-              sanitized = sanitized + " "
-          else:
-            sanitized = sanitized + "."
-        if records.index(row) != records_len:
-          if randomize:
-            if bool(random.getrandbits(1)):
-              sanitized = sanitized + "\n"
-            else:
-              sanitized = sanitized + " "
-          else:
-            sanitized = sanitized + "\n"
-        sentence_file.write(sanitized)
+        try:
+          if row[0] and row[0] != "":
+            sanitized = row[0].strip()
+            logging.info('extract_sentences_from_chatbot -- "' + sanitized + '"')
+            if sanitized[-1] not in string.punctuation:
+              if randomize:
+                if bool(random.getrandbits(1)):
+                  sanitized = sanitized + "."
+                else:
+                  sanitized = sanitized + " "
+              else:
+                sanitized = sanitized + "."
+            if records.index(row) != records_len:
+              if randomize:
+                if bool(random.getrandbits(1)):
+                  sanitized = sanitized + "\n"
+                else:
+                  sanitized = sanitized + " "
+              else:
+                sanitized = sanitized + "\n"
+            sentence_file.write(sanitized)
+        except Exception as e:
+          exc_type, exc_obj, exc_tb = sys.exc_info()
+          fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+          logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
     cursor.close()
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-    return "Error extracting sentences!"
+    return False
   finally:
     if sqliteConnection:
         sqliteConnection.close()
+  return True
 
 def get_random_string(length):
     # choose from all lowercase letter
@@ -831,19 +834,19 @@ def init_generator_models(chatid: str):
 
   logging.info("START -- essential_generators -- Models Generator")
 
-  filename=os.environ.get("TMP_DIR")+'/sentences.txt'
+  filename='./config/sentences_000000.txt'
   
-  extract_sentences_from_chatbot(filename, chatid=chatid)
+  if extract_sentences_from_chatbot(filename, chatid=chatid):
 
-  text_model_path = os.environ.get("TMP_DIR") + '/markov_textgen.json'
-  word_model_path = os.environ.get("TMP_DIR") + '/markov_wordgen.json'
+    text_model_path = './config/markov_textgen_000000.json'
+    word_model_path = './config/markov_wordgen_000000.json'
 
-  init_text_generator(corpus=filename, output=text_model_path)
-  init_word_generator(corpus=filename, output=word_model_path)
+    init_text_generator(corpus=filename, output=text_model_path)
+    init_word_generator(corpus=filename, output=word_model_path)
 
-  logging.info("END -- essential_generators -- Models Generator")
+    logging.info("END -- essential_generators -- Models Generator")
 
-def init_text_generator(corpus=os.environ.get("TMP_DIR") + '/sentences.txt', output=os.environ.get("TMP_DIR") + '/markov_textgen.json'):
+def init_text_generator(corpus='./config/sentences_000000.txt', output='./config/markov_textgen_000000.json'):
 
     if os.path.exists(output):
       os.remove(output)
@@ -855,7 +858,7 @@ def init_text_generator(corpus=os.environ.get("TMP_DIR") + '/sentences.txt', out
     gen.train(set4)
     gen.save_model(output)
 
-def init_word_generator(corpus=os.environ.get("TMP_DIR") + '/sentences.txt', output=os.environ.get("TMP_DIR") + '/markov_wordgen.json'):
+def init_word_generator(corpus='./config/sentences_000000.txt', output='./config/markov_wordgen_000000.json'):
     
     if os.path.exists(output):
       os.remove(output)
@@ -869,24 +872,24 @@ def init_word_generator(corpus=os.environ.get("TMP_DIR") + '/sentences.txt', out
 
 def generate_sentence(chatid: str):
 
-  text_model_path = os.environ.get("TMP_DIR") + '/markov_textgen.json'
-  word_model_path = os.environ.get("TMP_DIR") + '/markov_wordgen.json'
+  text_model_path = './config/markov_textgen_000000.json'
+  word_model_path = './config/markov_wordgen_000000.json'
 
   text_generator=MarkovTextGenerator(model=text_model_path, load_model=True)
   word_generator=MarkovWordGenerator(model=word_model_path, load_model=True)
 
   generator = DocumentGenerator(word_generator=word_generator, text_generator=text_generator)
 
-  return LibreTranslator(from_lang="en", to_lang="it", base_url=os.environ.get("TRANSLATOR_BASEURL")).translate(generator.sentence()) 
+  return generator.sentence()
 
 def generate_paragraph(chatid: str):
 
-  text_model_path = os.environ.get("TMP_DIR") + '/markov_textgen.json'
-  word_model_path = os.environ.get("TMP_DIR") + '/markov_wordgen.json'
+  text_model_path = './config/markov_textgen_000000.json'
+  word_model_path = './config/markov_wordgen_000000.json'
 
   text_generator=MarkovTextGenerator(model=text_model_path, load_model=True)
   word_generator=MarkovWordGenerator(model=word_model_path, load_model=True)
 
   generator = DocumentGenerator(word_generator=word_generator, text_generator=text_generator)
 
-  return LibreTranslator(from_lang="en", to_lang="it", base_url=os.environ.get("TRANSLATOR_BASEURL")).translate(generator.paragraph()) 
+  return generator.paragraph()
