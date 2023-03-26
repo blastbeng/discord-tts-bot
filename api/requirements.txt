@@ -33,3 +33,4 @@ pydub==0.25.1
 tqdm==4.65.0
 essential_generators
 bestemmie
+bs4

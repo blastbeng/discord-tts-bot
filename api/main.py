@@ -194,13 +194,13 @@ class TextTranslateClass(Resource):
       else:
         @after_this_request
         def clear_cache(response):
-          cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+          cache.delete_memoized(TextTranslateClass.get, self, str, str, str)
           return make_response("Translate Error!", 500)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
       def clear_cache(response):
-        cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+        cache.delete_memoized(TextTranslateClass.get, self, str, str, str)
         return make_response(g.get('request_error'), 500)
 
 
@@ -254,7 +254,7 @@ class AudioRepeatClass(Resource):
 @nsaudio.route('/repeat/save/<string:text>/<string:voice>/')
 @nsaudio.route('/repeat/save/<string:text>/<string:voice>/<string:chatid>')
 @nsaudio.route('/repeat/save/<string:text>/<string:voice>/<string:chatid>/<string:language>')
-class AudioRepeatClass(Resource):
+class AudioSaveRepeatClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, voice: str, chatid = "000000", language = "it"):
     try:
@@ -266,13 +266,13 @@ class AudioRepeatClass(Resource):
       else:
         @after_this_request
         def clear_cache(response):
-          cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+          cache.delete_memoized(AudioSaveRepeatClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
       def clear_cache(response):
-        cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+        cache.delete_memoized(AudioSaveRepeatClass.get, self, str, str, str)
         return make_response(g.get('request_error'), 500)
 
 
@@ -291,13 +291,13 @@ class AudioCurseClass(Resource):
       else:
         @after_this_request
         def clear_cache(response):
-          cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+          cache.delete_memoized(AudioCurseClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
       def clear_cache(response):
-        cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+        cache.delete_memoized(AudioCurseClass.get, self, str, str, str)
         return make_response(g.get('request_error'), 500)
 
 
@@ -312,15 +312,14 @@ class AudioDownloadClass(Resource):
       else:
         @after_this_request
         def clear_cache(response):
-          cache.delete_memoized(AudioDwonloadClass.get, self, int)
+          cache.delete_memoized(AudioDownloadClass.get, self, int)
           return make_response("TTS Generation Error!", 500)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
       def clear_cache(response):
-        cache.delete_memoized(AudioDwonloadClass.get, self, int)
+        cache.delete_memoized(AudioDownloadClass.get, self, int)
         return make_response(g.get('request_error'), 500)
-      
 
 
 @nsaudio.route('/random/')
@@ -338,13 +337,13 @@ class AudioRandomClass(Resource):
       else:
         @after_this_request
         def clear_cache(response):
-          cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+          cache.delete_memoized(AudioRandomClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
       def clear_cache(response):
-        cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
+        cache.delete_memoized(AudioRandomClass.get, self, str, str, str)
         return make_response(g.get('request_error'), 500)
       
 
@@ -639,6 +638,50 @@ class YoutubeGetClass(Resource):
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return make_response(str(e), 500)
+
+nssoundboard = api.namespace('soundboard', 'Accumulators Soundboard APIs')
+
+@nssoundboard.route('/random/<string:text>/')
+@nssoundboard.route('/random/<string:text>/<string:chatid>')
+class SoundboardRandomClass(Resource):
+  @cache.cached(timeout=5, query_string=True)
+  def get (self, text: str, chatid = "000000"):
+    try:
+      result = utils.random_myinstants_sound(text)
+      if result is not None:
+        return jsonify(result)
+      else:
+        @after_this_request
+        def clear_cache(response):
+          cache.delete_memoized(SoundboardRandomClass.get, self, str, str, str)
+          return make_response("SoundBoard search Error!", 500)
+    except Exception as e:
+      g.request_error = str(e)
+      @after_this_request
+      def clear_cache(response):
+        cache.delete_memoized(SoundboardRandomClass.get, self, str, str, str)
+        return make_response(g.get('request_error'), 500)
+
+@nssoundboard.route('/query/<string:text>/')
+@nssoundboard.route('/query/<string:text>/<string:chatid>')
+class SoundboardQueryClass(Resource):
+  @cache.cached(timeout=5, query_string=True)
+  def get (self, text: str, chatid = "000000"):
+    try:
+      results = utils.query_myinstants_sound(text)
+      if len(results) > 0:
+        return jsonify(results)
+      else:
+        @after_this_request
+        def clear_cache(response):
+          cache.delete_memoized(SoundboardQueryClass.get, self, str, str, str)
+          return make_response("SoundBoard query Error!", 500)
+    except Exception as e:
+      g.request_error = str(e)
+      @after_this_request
+      def clear_cache(response):
+        cache.delete_memoized(SoundboardQueryClass.get, self, str, str, str)
+        return make_response(g.get('request_error'), 500)
 
 nsjokestext = api.namespace('jokes_text', 'Accumulators Jokes APIs')
 

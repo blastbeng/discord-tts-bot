@@ -11,6 +11,7 @@ import requests
 import sys
 import os
 import io
+import urllib
 import yt_dlp
 from datetime import datetime
 import string
@@ -44,6 +45,7 @@ from sqlitedict import SqliteDict
 from pydub import AudioSegment
 from essential_generators import DocumentGenerator, MarkovTextGenerator, MarkovWordGenerator
 from libretranslator import LibreTranslator
+from bs4 import BeautifulSoup
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -893,3 +895,70 @@ def generate_paragraph(chatid: str):
   generator = DocumentGenerator(word_generator=word_generator, text_generator=text_generator)
 
   return generator.paragraph()
+
+def random_myinstants_sound(query: str):
+  try:
+    r = None
+    if query == "random":
+      r = requests.get('https://www.myinstants.com/it/index/it/')
+    else:
+      r = requests.get('http://www.myinstants.com/search/?name='+urllib.parse.quote(query))
+    soup = BeautifulSoup(r.text, 'html.parser')
+    founds = soup.find_all("div", class_="instant")
+          
+    url = None
+    name = None
+    if len(founds) > 0:
+      size = len(founds)
+      n = random.randint(0,size-1)
+      link = founds[n]
+
+      for content in link.contents:
+        if '"small-button"' in str(content):
+          url = "http://www.myinstants.com" + content.attrs['onclick'].split("'")[1]
+        if '"instant-link link-secondary"' in str(content):
+          name = content.contents[0]
+        if url is not None and name is not None:
+          result = {
+            "url": url,
+            "name": name
+          }
+          return result
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    return None
+
+def query_myinstants_sound(query: str):
+  try:
+    r = requests.get('http://www.myinstants.com/search/?name='+urllib.parse.quote(query))
+    soup = BeautifulSoup(r.text, 'html.parser')
+    founds = soup.find_all("div", class_="instant")
+    results = []
+    size = len(founds)
+    if size > 0:
+      if size > 25:
+        size = 25
+      for n in range(0,size):
+        url = None
+        name = None
+        for content in founds[n].contents:
+          if '"small-button"' in str(content):
+            url = "http://www.myinstants.com" + content.attrs['onclick'].split("'")[1]
+          if '"instant-link link-secondary"' in str(content):
+            name = content.contents[0]
+          if url is not None and name is not None:
+            result = {
+              "url": url,
+              "name": name
+            }
+            results.append(result)
+            break
+    return results
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    return []
+  
