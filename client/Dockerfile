@@ -5,6 +5,8 @@ RUN apt-get update && \
          locales \
          ffmpeg
 
+RUN pip3 install ffmpeg-normalize
+
 RUN sed -i '/it_IT.UTF-8/s/^# //g' /etc/locale.gen && \
     locale-gen
 ENV LANG it_IT.UTF-8  
@@ -24,6 +26,7 @@ WORKDIR /app
 COPY main.py .
 COPY utils.py .
 COPY database.py .
+COPY constants.py .
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 #RUN chown -R uwsgi:uwsgi /app

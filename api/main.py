@@ -93,7 +93,7 @@ class TextRepeatClass(Resource):
 @nstext.route('/curse/<string:chatid>')
 class TextCurseClass(Resource):
   @cache.cached(timeout=3, query_string=True)
-  def get (self, text: str, chatid = "000000"):
+  def get (self, chatid = "000000"):
     return get_response_str(Bestemmie().random().lower())
 
 

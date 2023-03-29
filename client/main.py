@@ -14,6 +14,7 @@ import pathlib
 import requests
 import database
 import functools
+import constants
 import urllib.request
 from PIL import Image
 from contextlib import contextmanager
@@ -26,6 +27,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 from discord.ext.commands import Greedy, Context
+from discord.errors import ClientException
 
 
 from io import BytesIO
@@ -41,6 +43,11 @@ class MyClient(discord.Client):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
 
+class CustomTextInput(discord.ui.TextInput):
+        
+    def __init__(self, style, name):
+        super().__init__(style=style, label=name, value="")
+
 class SoundBoardButton(discord.ui.Button["InteractionRoles"]):
 
     audiourl = ""
@@ -51,18 +58,77 @@ class SoundBoardButton(discord.ui.Button["InteractionRoles"]):
         self.audiourl = audiourl
     
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.voice and interaction.user.voice.channel:
-            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
-            await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
-            if not hasattr(voice_client, 'play'):
-                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-            elif not voice_client.is_playing():
-                currentguildid = get_current_guild_id(interaction.guild.id)
-                await do_play(voice_client, self.audiourl, interaction, currentguildid, name = self.name)
+        try:
+            if interaction.user.voice and interaction.user.voice.channel:
+                voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+                await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
+                if not hasattr(voice_client, 'play'):
+                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
+                elif not voice_client.is_playing():
+                    currentguildid = get_current_guild_id(interaction.guild.id)
+                    await do_play(voice_client, self.audiourl, interaction, currentguildid, name = self.name)
+                else:
+                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)            
             else:
-                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)            
-        else:
-            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+        except Exception as e:
+            await send_error(e, interaction, from_generic=False)
+
+class SlashCommandButton(discord.ui.Button["InteractionRoles"]):
+
+    def __init__(self, style, name):
+        super().__init__(style=style, label="/"+name)
+        self.name = name
+    
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            if self.name == constants.ASK:
+                await interaction.response.send_message("/ask <text> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot answers to your questions"), ephemeral = True)
+            elif self.name == constants.CURSE:
+                await curse_internal(interaction, "random")
+            elif self.name == constants.INSULT:
+                await insult_internal(interaction, None)
+            elif self.name == constants.RANDOM:
+                await random_internal(interaction, "random")
+            elif self.name == constants.TIMER:
+                await interaction.response.send_message("/timer <seconds> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"This is used to set the timer for the auto talking feature"), ephemeral = True)
+            elif self.name == constants.SPEAK:
+                await interaction.response.send_message("/speak <text> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot repeats something"), ephemeral = True)
+            elif self.name == constants.TRANSLATE:
+                await interaction.response.send_message("/translate <text> <language_to> <language_from[Optional]> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot translates a text"), ephemeral = True)
+            elif self.name == constants.GENERATE:
+                await generate_internal(interaction)
+            elif self.name == constants.STORY:
+                await story_internal(interaction)
+            elif self.name == constants.ENABLE:
+                await enable_internal(interaction)
+            elif self.name == constants.DISABLE:
+                await disable_internal(interaction)
+            elif self.name == constants.JOIN:
+                await join_internal(interaction)
+            elif self.name == constants.LEAVE:
+                await leave_internal(interaction)
+            elif self.name == constants.LANGUAGE:
+                await interaction.response.send_message("/language <language> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot change its main language"), ephemeral = True)
+            elif self.name == constants.RENAME:
+                await interaction.response.send_message("/rename <name> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot change its name"), ephemeral = True)
+            elif self.name == constants.AVATAR:
+                await interaction.response.send_message("/avatar <image> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot change its avatar"), ephemeral = True)
+            elif self.name == constants.SOUNDRANDOM:
+                await soundrandom_internal(interaction, "random")
+            elif self.name == constants.SOUNDSEARCH:
+                await interaction.response.send_message("/soundsearch <text> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot searches and displays audio results, allowing you to play them"), ephemeral = True)
+            elif self.name == constants.YOUTUBE:
+                await interaction.response.send_message("/youtube <url> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"Listen to a youtube song"), ephemeral = True)
+            elif self.name == constants.VOTEMUTE:
+                await interaction.response.send_message("/votemute <member> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"Start a poll to mute someone for 60 seconds"), ephemeral = True)
+            elif self.name == constants.STOP:
+                await stop_internal(interaction)
+            else:
+                await interaction.response.send_message("Work in progress", ephemeral = True)
+        except Exception as e:
+            await send_error(e, interaction, from_generic=False)
+
 
 class StopButton(discord.ui.Button["InteractionRoles"]):
 
@@ -80,6 +146,66 @@ class StopButton(discord.ui.Button["InteractionRoles"]):
             
         else:
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+
+class VoteButton(discord.ui.Button["InteractionRoles"]):
+
+    def __init__(self, style, function, name, member, start_member):
+        super().__init__(style=style, label=name)
+        self.name = name
+        self.style = style
+        self.function = function
+        self.member = member
+        self.votes = {}
+        self.votes[start_member] = 1
+        self.ended = False
+    
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            if self.function == constants.MUTE:
+                if self.ended:
+                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"This poll has ended"), ephemeral = True)
+                elif interaction.user.voice and interaction.user.voice.channel:
+                    if not self.member.voice or not self.member.voice.channel:
+                        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"This user is not connected to any voice channel"), ephemeral = True)
+                    elif self.member.voice and self.member.voice.channel and interaction.user.voice.channel != self.member.voice.channel:
+                        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"This user is not connected to your voice channel"), ephemeral = True)
+                    elif interaction.user.name in self.votes:
+                        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You have already voted"), ephemeral = True)
+                    else:         
+                        message = interaction.message
+                        if message.embeds is not None and len(message.embeds) > 0:
+                            embed = message.embeds[0]
+                            if(self.style == discord.ButtonStyle.green):
+                                self.votes[interaction.user.name] = 1
+                                cyes = 0
+                                for key in self.votes:
+                                    if self.votes[key] == 1:
+                                        cyes = cyes + 1
+                                embed.set_field_at(1, name=embed.fields[1].name, value=str(cyes), inline=embed.fields[1].inline)
+                            elif(self.style == discord.ButtonStyle.red):
+                                self.votes[interaction.user.name] = 0
+                                cno = 0
+                                for key in self.votes:
+                                    if self.votes[key] == 0:
+                                        cno = cno + 1
+                                embed.set_field_at(2, name=embed.fields[2].name, value=str(cno), inline=embed.fields[2].inline)
+                            if int(embed.fields[1].value) >= int(embed.fields[0].value):                            
+                                self.ended = True
+                                if len(embed.fields) == 4:
+                                    embed.set_field_at(3, name=utils.translate(get_current_guild_id(interaction.guild.id),"The poll has passed, I'm disabling " + self.member.name + "'s voice for 60 seconds"), value="", inline=False)
+                                else: 
+                                    embed.add_field(name=utils.translate(get_current_guild_id(interaction.guild.id),"The poll has passed, I'm disabling " + self.member.name + "'s voice for 60 seconds"), value="", inline=False)
+                            elif int(embed.fields[2].value) >= int(embed.fields[0].value):                   
+                                self.ended = True                 
+                                if len(embed.fields) == 4:
+                                    embed.set_field_at(3, name=utils.translate(get_current_guild_id(interaction.guild.id),"The poll hasn't passed"), value="", inline=False)
+                                else: 
+                                    embed.add_field(name=utils.translate(get_current_guild_id(interaction.guild.id),"The poll hasn't passed"), value="", inline=False)
+                            await interaction.response.edit_message(embed=embed)
+                else:
+                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+        except Exception as e:
+            await send_error(e, interaction, from_generic=False)
 
 intents = discord.Intents.default()
 client = MyClient(intents=intents)
@@ -100,7 +226,7 @@ def listvoices():
         voices = []
         url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/fakeyou/get_voices_by_cat/Italiano"
         response = requests.get(url)
-        if (response.text != "Internal Server Error") and response.status_code == 200:
+        if (response.status_code == 200 and response.text != "Internal Server Error"):
             data = response.json()
             for voice in data:   
                 voices.append(voice)
@@ -119,7 +245,7 @@ def get_voice_code(voice: str):
         voices = []
         url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/fakeyou/get_voices_by_cat/Italiano"
         response = requests.get(url)
-        if (response.text != "Internal Server Error") and response.status_code == 200:
+        if (response.status_code == 200 and response.text != "Internal Server Error"):
             data = response.json()
             return data[voice]
     except Exception as e:
@@ -216,12 +342,17 @@ def get_voice_client_by_guildid(voice_clients, guildid):
             return vc
     return None
 
-async def connect_bot_by_voice_client(voice_client, channel, guild):    
-    if voice_client and not voice_client.is_playing() and voice_client.channel and voice_client.channel.id != channel.id:
-        await voice_client.disconnect()
-        await channel.connect()
-    elif not voice_client or not voice_client.channel:
-        await channel.connect()
+async def connect_bot_by_voice_client(voice_client, channel, guild):
+    try: 
+        if voice_client and not voice_client.is_connected() and voice_client.channel and voice_client.channel.id != channel.id:
+            await voice_client.disconnect()
+            await channel.connect()
+        elif not voice_client or not voice_client.channel or not voice_client.is_connected():
+            await channel.connect()
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 def get_current_guild_id(guildid):
     if str(guildid) == str(os.environ.get("GUILD_ID")):
@@ -230,21 +361,32 @@ def get_current_guild_id(guildid):
         return str(guildid)
 
 async def do_play(voice_client, url: str, interaction: discord.Interaction, currentguildid: str, ephermeal = True, defer = True, name = None):
-    if defer:
-        await interaction.response.defer(thinking=True, ephemeral = ephermeal)
-    response = requests.get(url)
-    if (response.status_code == 200 and response.content):
-        message = url
-        if "X-Generated-Text" in response.headers:
-            message = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
-        elif name is not None:
-            message = name
-        voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info("do_play - " + message))
-        view = discord.ui.View()
-        view.add_item(StopButton())
-        await interaction.followup.send(message, view = view, ephemeral = ephermeal)
-    else:
-        logging.error("[GUILDID : %s] do_play - Received bad response fromm APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
+    try:
+        if defer:
+            await interaction.response.defer(thinking=True, ephemeral = ephermeal)
+        response = requests.get(url)
+        if (response.status_code == 200 and response.content and not voice_client.is_playing()):
+            message = url
+            if "X-Generated-Text" in response.headers:
+                message = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
+            elif name is not None:
+                message = name
+            voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info("do_play - " + message))
+            view = discord.ui.View()
+            view.add_item(StopButton())
+            await interaction.followup.send(message, view = view, ephemeral = ephermeal)
+        else:
+            logging.error("[GUILDID : %s] do_play - Received bad response fromm APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
+            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+" blastbong#9151", ephemeral = True)
+    except ClientException as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
+    except Exception as ee:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
         await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+" blastbong#9151", ephemeral = True)
 
 @tasks.loop(seconds=180)
@@ -271,18 +413,6 @@ async def play_audio_loop():
                         if (response.status_code == 200 and response.content):
                             message = 'play_audio_loop - random - ' + response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
                             voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info(message))
-                        #if utils.random_boolean():
-                        #    response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/000000")
-                        #    if (response.status_code == 200 and response.content):
-                        #        message = 'play_audio_loop - random - ' + response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
-                        #        voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info(message))
-                        #else:
-                        #    response_gen = requests.get(os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/sentences/generate/000000/0")
-                        #    if (response_gen.text != "Internal Server Error" and response_gen.status_code == 200):
-                        #        response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(response_gen.text))+"/google/000000/it")
-                        #        if (response.status_code == 200 and response.content):
-                        #            message = 'play_audio_loop - generate - ' + response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
-                        #            voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info(message))
                 elif voice_client is not None and voice_client.channel is not None:
                     await voice_client.disconnect()
                 break
@@ -290,6 +420,7 @@ async def play_audio_loop():
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
 
 @client.event
 async def on_ready():
@@ -326,12 +457,35 @@ async def on_ready():
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
         raise Exception(e)
 
+@client.event
+async def on_reaction_add(reaction, user):
+    message = reaction.message
+    if message.embeds is not None and len(message.embeds) > 0:
+        if message.embeds[0].title == constants.MUTE:
+            embed = discord.Embed.from_data(message.embeds[0])
+            reactok = get(message.reactions, emoji="✅")
+            reactko = get(message.reactions, emoji="❌")
+            if reactok and reactok.count > int(embed.fields[0].value):
+                targetuser = message.mentions[0]
+                await targetuser.edit(mute=True)
+                await message.delete()
+                await client.send_message(channel, "✅ " + constants.MUTE + " [" + message.mentions[0] + "]" + utils.translate(get_current_guild_id(message.guild.id), "Poll has passed"))
+                await unmute_user(targetuser, 60)
+            elif reactko and reactko.count > int(embed.fields[0].value):
+                await message.delete()
+                await client.send_message(channel, "❌ " + constants.MUTE + " [" + message.mentions[0] + "]" + utils.translate(get_current_guild_id(message.guild.id), "Poll has failed"))
+              
 
 @client.event
 async def on_voice_state_update(member, before, after):
-    if after.channel is not None:
-        voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
-        await connect_bot_by_voice_client(voice_client, after.channel, None)
+    try:
+        if after.channel is not None:
+            voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
+            await connect_bot_by_voice_client(voice_client, after.channel, None)
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 @client.event
 async def on_guild_join(guild):
@@ -348,6 +502,9 @@ async def on_guild_join(guild):
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def join(interaction: discord.Interaction):
     """Join channel."""
+    await join_internal(interaction)
+
+async def join_internal(interaction):
     try:
         if interaction.user.voice and interaction.user.voice.channel:
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
@@ -363,6 +520,9 @@ async def join(interaction: discord.Interaction):
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def leave(interaction: discord.Interaction):
     """Leave channel"""
+    await leave_internal(interaction)
+    
+async def leave_internal(interaction):
     try:
         if interaction.user.guild_permissions.administrator:
             if interaction.user.voice and interaction.user.voice.channel:
@@ -454,6 +614,9 @@ async def ask(interaction: discord.Interaction, text: str):
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def generate(interaction: discord.Interaction):
     """Generate a random sentence."""
+    await generate_internal(interaction)
+
+async def generate_internal(interaction):
     try:
         if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
             if interaction.user.voice and interaction.user.voice.channel:
@@ -470,7 +633,7 @@ async def generate(interaction: discord.Interaction):
                     try:
                         url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/sentences/generate/" + urllib.parse.quote(currentguildid) + "/0"
                         response = requests.get(url)
-                        if (response.text != "Internal Server Error" and response.status_code == 200):
+                        if (response.status_code == 200 and response.text != "Internal Server Error"):
                             url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(response.text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
                             await do_play(voice_client, url, interaction, currentguildid, defer=False)
                         else:
@@ -497,6 +660,9 @@ async def generate(interaction: discord.Interaction):
 @app_commands.checks.cooldown(1, 60, key=lambda i: (i.user.id))
 async def story(interaction: discord.Interaction):
     """Generate a random story."""
+    await story_internal(interaction)
+
+async def story_internal(interaction):
     try:
         if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
             if interaction.user.voice and interaction.user.voice.channel:
@@ -512,7 +678,7 @@ async def story(interaction: discord.Interaction):
                     try:
                         url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/paragraph/generate/" + urllib.parse.quote(currentguildid)
                         response = requests.get(url)
-                        if (response.text != "Internal Server Error" and response.status_code == 200):
+                        if (response.status_code == 200 and response.text != "Internal Server Error"):
                             url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(response.text))+"/google/"+urllib.parse.quote(currentguildid)
                             await do_play(voice_client, url, interaction, currentguildid, defer=False)
                         else:
@@ -536,10 +702,14 @@ async def story(interaction: discord.Interaction):
 
 @client.tree.command()
 @app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
+@app_commands.rename(member='member')
 @app_commands.describe(member="The user to insult")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def insult(interaction: discord.Interaction, member: Optional[discord.Member] = None):
     """Insult someone"""
+    await insult_internal(interaction, member)
+
+async def insult_internal(interaction, member):
     try:
         if interaction.user.voice and interaction.user.voice.channel:
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
@@ -597,7 +767,10 @@ async def insult_tree(interaction: discord.Interaction, member: discord.Member):
 @app_commands.choices(voice=optionsvoices)
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def random(interaction: discord.Interaction, voice: Optional[app_commands.Choice[str]] = "random"):
-    """Say a random sentence."""
+    """Say a random sentence"""
+    await random_internal(interaction, voice)
+
+async def random_internal(interaction, voice):
     try:
         if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
             if interaction.user.voice and interaction.user.voice.channel:
@@ -635,6 +808,9 @@ async def random(interaction: discord.Interaction, voice: Optional[app_commands.
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def curse(interaction: discord.Interaction, voice: Optional[app_commands.Choice[str]] = "random"):
     """Curse."""
+    await curse_internal(interaction, voice)
+
+async def curse_internal(interaction, voice):
     try:
         if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
             if interaction.user.voice and interaction.user.voice.channel:
@@ -686,6 +862,14 @@ async def restart(interaction: discord.Interaction):
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def stop(interaction: discord.Interaction):
     """Stop playback."""
+    await stop_internal(interaction)
+
+@client.tree.context_menu(name="Stop")
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+async def stop_tree(interaction: discord.Interaction, member: discord.Member):
+    await stop_internal(interaction)
+
+async def stop_internal(interaction: discord.Interaction):
     try:
         if interaction.user.voice and interaction.user.voice.channel:
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
@@ -700,6 +884,8 @@ async def stop(interaction: discord.Interaction):
     except Exception as e:
         await send_error(e, interaction, from_generic=False)
 
+    
+
 @client.tree.command()
 @app_commands.rename(name='name')
 @app_commands.describe(name="New bot nickname (20 chars limit)")
@@ -710,7 +896,7 @@ async def rename(interaction: discord.Interaction, name: str):
         if len(name) < 20:
             currentguildid = get_current_guild_id(interaction.guild.id)
             
-            message = interaction.user.name + " " + utils.translate(currentguildid," renamed me to") + ' "'+name+'"'
+            message = interaction.user.mention + " " + utils.translate(currentguildid," renamed me to") + ' "'+name+'"'
             name = name + " [" + utils.get_guild_language(currentguildid) + "]"
             await interaction.guild.me.edit(nick=name)
             await interaction.response.send_message(message)
@@ -873,10 +1059,13 @@ async def youtube(interaction: discord.Interaction, url: str):
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def enable(interaction: discord.Interaction):
     """Enable auto talking feature."""
+    await enable_internal(interaction)
+
+async def enable_internal(interaction):
     try:
         if not play_audio_loop.is_running():
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Enabling the auto mode"), ephemeral = True)
-            play_audio_loop.start()
+            await play_audio_loop.start()
             logging.info("enable - play_audio_loop.start()")
         else:
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Auto mode is already enabled"), ephemeral = True)
@@ -888,13 +1077,16 @@ async def enable(interaction: discord.Interaction):
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def disable(interaction: discord.Interaction):
     """Disable auto talking feature."""
+    await disable_internal(interaction)
+
+async def disable_internal(interaction: discord.Interaction):
 
     try:
         if play_audio_loop.is_running():
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Disabling the auto mode"), ephemeral = True)
-            play_audio_loop.stop()
+            await play_audio_loop.stop()
             logging.info("disable - play_audio_loop.stop()")
-            play_audio_loop.cancel()
+            await play_audio_loop.cancel()
             logging.info("disable - play_audio_loop.cancel()")
         else:
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Auto mode is already disabled"), ephemeral = True)
@@ -928,44 +1120,44 @@ async def timer(interaction: discord.Interaction, seconds: int):
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def soundrandom(interaction: discord.Interaction, text: Optional[str] = "random"):
     """Play a random sound from the soundboard."""
+    await soundrandom_internal(interaction, text)
+
+async def soundrandom_internal(interaction: discord.Interaction, text: Optional[str] = "random"):
+    """Play a random sound from the soundboard."""
     try:
-        if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
-            if interaction.user.voice and interaction.user.voice.channel:
-                voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
-                await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
+        if interaction.user.voice and interaction.user.voice.channel:
+            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+            await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
-                
-                if not hasattr(voice_client, 'play'):
-                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-                elif not voice_client.is_playing():
-                    currentguildid = get_current_guild_id(interaction.guild.id)
+            
+            if not hasattr(voice_client, 'play'):
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
+            elif not voice_client.is_playing():
+                currentguildid = get_current_guild_id(interaction.guild.id)
 
-                    await interaction.response.defer(thinking=True, ephemeral=True)
-                    try:
-                        url = os.environ.get("API_URL") + os.environ.get("API_PATH_SOUNDBOARD") + "/random/" + urllib.parse.quote(str(text)) + "/" + urllib.parse.quote(currentguildid)
-                        response = requests.get(url)
-                        if (response.json() and response.status_code == 200):
-                            name = response.json()['name']
-                            url = response.json()['url']
-                            await do_play(voice_client, url, interaction, currentguildid, defer=False, name=name)
+                await interaction.response.defer(thinking=True, ephemeral=True)
+                try:
+                    url = os.environ.get("API_URL") + os.environ.get("API_PATH_SOUNDBOARD") + "/random/" + urllib.parse.quote(str(text)) + "/" + urllib.parse.quote(currentguildid)
+                    response = requests.get(url)
+                    if (response.status_code == 200 and response.json()):
+                        name = response.json()['name']
+                        url = response.json()['url']
+                        await do_play(voice_client, url, interaction, currentguildid, defer=False, name=name)
+                    else:
+                        if text == "random":
+                            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results "), ephemeral = True)   
                         else:
-                            logging.error("[GUILDID : %s] soundboard - Received bad response fromm APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
-                            if text == "random":
-                                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results "), ephemeral = True)   
-                            else:
-                                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results ") + " [" + text + "]", ephemeral = True)     
-                    except Exception as e:
-                        exc_type, exc_obj, exc_tb = sys.exc_info()
-                        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                        logging.error("[GUILDID : %s] %s %s %s", currentguildid, exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-                        await interaction.followup.send(utils.translate(currentguildid,"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+" blastbong#9151", ephemeral = True)
+                            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results ") + " [" + text + "]", ephemeral = True)     
+                except Exception as e:
+                    exc_type, exc_obj, exc_tb = sys.exc_info()
+                    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                    logging.error("[GUILDID : %s] %s %s %s", currentguildid, exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+                    await interaction.followup.send(utils.translate(currentguildid,"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+" blastbong#9151", ephemeral = True)
     
-                else:
-                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
             else:
-                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
         else:
-            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"This is a private command and can only be used by members with specific permissions on the main Bot Server"), ephemeral = True)
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
     except Exception as e:
         await send_error(e, interaction, from_generic=False)
 
@@ -977,72 +1169,147 @@ async def soundrandom(interaction: discord.Interaction, text: Optional[str] = "r
 async def soundsearch(interaction: discord.Interaction, text: Optional[str] = "random"):
     """Search for sounds on the soundboard."""
     try:
-        if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
-            if interaction.user.voice and interaction.user.voice.channel:
-                voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
-                await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
+        if interaction.user.voice and interaction.user.voice.channel:
+            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+            await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
-                
-                if not hasattr(voice_client, 'play'):
-                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-                elif not voice_client.is_playing():
-                    currentguildid = get_current_guild_id(interaction.guild.id)
+            
+            #if not hasattr(voice_client, 'play'):
+            #    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
+            #elif not voice_client.is_playing():
+            currentguildid = get_current_guild_id(interaction.guild.id)
 
-                    await interaction.response.defer(thinking=True, ephemeral=True)
-                    try:                        
-                        url = os.environ.get("API_URL") + os.environ.get("API_PATH_SOUNDBOARD") + "/query/" + urllib.parse.quote(str(text)) + "/" + urllib.parse.quote(currentguildid)
-                        response = requests.get(url)
-                        if (response.text != "Internal Server Error" and response.status_code == 200):
-                            view = discord.ui.View()
-                            for element in response.json():
-                                button = SoundBoardButton(element['name'], element['url'])
-                                view.add_item(button)
-                            await interaction.followup.send(text, view=view, ephemeral = True)   
-                        else:
-                            logging.error("[GUILDID : %s] soundboard - Received bad response fromm APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
-                            if text == "random":
-                                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results "), ephemeral = True)   
-                            else:
-                                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results ") + " [" + text + "]", ephemeral = True)   
-                    except Exception as e:
-                        exc_type, exc_obj, exc_tb = sys.exc_info()
-                        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                        logging.error("[GUILDID : %s] %s %s %s", currentguildid, exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-                        await interaction.followup.send(utils.translate(currentguildid,"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+" blastbong#9151", ephemeral = True)
-    
+            await interaction.response.defer(thinking=True, ephemeral=True)
+            try:                        
+                url = os.environ.get("API_URL") + os.environ.get("API_PATH_SOUNDBOARD") + "/query/" + urllib.parse.quote(str(text)) + "/" + urllib.parse.quote(currentguildid)
+                response = requests.get(url)
+                if (response.status_code == 200 and response.text != "Internal Server Error"):
+                    view = discord.ui.View()
+                    for element in response.json():
+                        button = SoundBoardButton(element['name'], element['url'])
+                        view.add_item(button)
+                    await interaction.followup.send(text, view=view, ephemeral = False)   
                 else:
-                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
-            else:
-                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+                    logging.error("[GUILDID : %s] soundboard - Received bad response fromm APIs", currentguildid, exc_info=1)
+                    if text == "random":
+                        await interaction.followup.send(utils.translate(currentguildid,"I haven't found any results "), ephemeral = True)   
+                    else:
+                        await interaction.followup.send(utils.translate(currentguildid,"I haven't found any results ") + " [" + text + "]", ephemeral = True)   
+            except Exception as e:
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                logging.error("[GUILDID : %s] %s %s %s", currentguildid, exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+                await interaction.followup.send(utils.translate(currentguildid,"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+" blastbong#9151", ephemeral = True)
+
         else:
-            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"This is a private command and can only be used by members with specific permissions on the main Bot Server"), ephemeral = True)
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False)
+
+@client.tree.command()
+@app_commands.rename(member='member')
+@app_commands.describe(member="The user to mute")
+@app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
+async def votemute(interaction: discord.Interaction, member: discord.Member):
+    """Vote to mute someone for 60 seconds"""
+    try:
+        currentguildid = get_current_guild_id(interaction.guild.id)
+        if interaction.user.voice and interaction.user.voice.channel:
+            if not member.voice or not member.voice.channel:
+                await interaction.response.send_message(utils.translate(currentguildid,"This user is not connected to any voice channel"), ephemeral = True)
+            elif member.voice and member.voice.channel and interaction.user.voice.channel != member.voice.channel:
+                await interaction.response.send_message(utils.translate(currentguildid,"This user is not connected to your voice channel"), ephemeral = True)
+            else:
+                votes = 0
+                
+                for cmember in interaction.user.voice.channel.members:
+                    if not cmember.bot:
+                        votes = votes + 1
+
+                title=constants.MUTE
+                description=utils.translate(currentguildid,"Someone started a poll")
+                embed=discord.Embed(title=title, description=description, color=0xd10a07)
+                embed.add_field(name=utils.translate(currentguildid,"Votes required to close the poll"), value=str((int(1/2))+1), inline=False)
+                embed.add_field(name=utils.translate(currentguildid,"Positive votes:"), value="1", inline=True)
+                embed.add_field(name=utils.translate(currentguildid,"Negative votes:"), value="0", inline=True)
+                message = utils.translate(currentguildid,"disable " + member.mention + "'s voice for 60 seconds?")
+                view = discord.ui.View()
+                view.add_item(VoteButton(discord.ButtonStyle.green, constants.MUTE, utils.translate(currentguildid,"Yes"), member, interaction.user.name))
+                view.add_item(VoteButton(discord.ButtonStyle.red, constants.MUTE, utils.translate(currentguildid,"No"), member, interaction.user.name))
+                await interaction.response.send_message(message, embed=embed, view=view, ephemeral = True)
+        else:
+            await interaction.response.send_message(utils.translate(currentguildid,"You must be connected to a voice channel to use this command"), ephemeral = True)
     except Exception as e:
         await send_error(e, interaction, from_generic=False)
 
 
+@client.tree.command()
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+async def commands(interaction: discord.Interaction):
+    """Show bot commands."""
+    try:     
+        view = discord.ui.View()
+        if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
+            view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.CURSE))
+            view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.INSULT))
+            view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.GENERATE))
+            view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.STORY))
+            view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.RANDOM))
+
+        view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.SOUNDRANDOM))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.ENABLE))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.DISABLE))
+
+        view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.JOIN))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.LEAVE))
+        
+
+        if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")): 
+            view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.ASK))
+        
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.SPEAK))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRANSLATE))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.LANGUAGE))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.RENAME))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TIMER))  
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.VOTEMUTE))  
 
 
-@enable.error
-@disable.error
-@timer.error
-@join.error
-@leave.error
-@speak.error
-@avatar.error
-@language.error
+        if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")): 
+            view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.AVATAR))
+
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.SOUNDSEARCH))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.YOUTUBE))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.red, constants.STOP))
+
+        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"These are the bot's commands"), view = view, ephemeral = False)
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False)
+
+
 @ask.error
-@random.error
-@story.error
-@stop.error
-@translate.error
-@youtube.error
-@rename.error
+@avatar.error
+@commands.error
+@curse.error
+@disable.error
+@enable.error
+@generate.error
 @insult.error
 @insult_tree.error
-@generate.error
-@curse.error
+@join.error
+@language.error
+@leave.error
+@random.error
+@rename.error
 @soundrandom.error
 @soundsearch.error
+@speak.error
+@story.error
+@timer.error
+@translate.error
+@stop.error
+@votemute.error
+@youtube.error
 async def on_generic_error(interaction: discord.Interaction, e: app_commands.AppCommandError):
     await send_error(e, interaction, from_generic=True)
 

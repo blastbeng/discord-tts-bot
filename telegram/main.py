@@ -74,7 +74,7 @@ def ask(update: Update, context: CallbackContext):
                 url = API_URL + API_PATH_TEXT + "ask/user/" + urllib.parse.quote(str(update.message.chat.id)) + "/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid)
 
                 response = requests.get(url)
-                if (response.text != "Internal Server Error"):
+                if (response.status_code == 200):
                     context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
                 else:
                     context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
@@ -106,7 +106,7 @@ def curse(update: Update, context: CallbackContext):
                 url = API_URL + API_PATH_TEXT + "curse/" + urllib.parse.quote(strid)
 
                 response = requests.get(url)
-                if (response.text != "Internal Server Error"):
+                if (response.status_code == 200):
                     context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
                 else:
                     context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
@@ -134,7 +134,7 @@ def generate(update: Update, context: CallbackContext):
         if strid:
             url = API_URL + API_PATH_UTILS + "/sentences/generate/" + urllib.parse.quote(strid) + "/1"
             response = requests.get(url)
-            if (response.text != "Internal Server Error"):
+            if (response.status_code == 200):
                 context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
             else:
                 context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)       
@@ -157,7 +157,7 @@ def story(update: Update, context: CallbackContext):
         if strid:
             url = API_URL + API_PATH_UTILS + "/paragraph/generate/" + urllib.parse.quote(strid)
             response = requests.get(url)
-            if (response.text != "Internal Server Error"):
+            if (response.status_code == 200):
                 context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
             else:
                 context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)       
@@ -184,7 +184,7 @@ def echo(update: Update, context: CallbackContext):
                 url = API_URL + API_PATH_TEXT + "ask/user/" + urllib.parse.quote(str(update.message.chat.id)) + "/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid)
 
                 response = requests.get(url)
-                if (response.text != "Internal Server Error"):
+                if (response.status_code == 200):
                     context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
                 else:
                     context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
@@ -214,7 +214,7 @@ def askaudio(update: Update, context: CallbackContext):
                 url = API_URL + API_PATH_AUDIO + "ask/user/" + urllib.parse.quote(str(update.message.chat.id)) + "/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid)
 
                 response = requests.get(url)
-                if (response.text != "Internal Server Error"):
+                if (response.status_code == 200):
                     audio = BytesIO(response.content)
                     context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, title="Messaggio vocale", performer="ScemoPezzente", filename=get_random_string(12)+ "audio.wav")
                 else:
@@ -253,7 +253,7 @@ def speak(update: Update, context: CallbackContext):
                 voice = "google"
 
                 response = requests.get(url)
-                if (response.text != "Internal Server Error"):
+                if (response.status_code == 200):
                     voices = response.json()
                 
                 if len(splitted) == 2 and voices is not None:
@@ -269,7 +269,7 @@ def speak(update: Update, context: CallbackContext):
                 url = API_URL + API_PATH_AUDIO + "repeat/learn/user/" + urllib.parse.quote(str(update.message.chat.id)) + "/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(strid) 
 
                 response = requests.get(url)
-                if (response.text != "Internal Server Error" and response.content and response.status_code == 200):
+                if (response.status_code == 200):
                     audio = BytesIO(response.content)
                     context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, title="Messaggio vocale", performer="ScemoPezzente",  filename=get_random_string(12)+ "audio.wav")
                 else:
@@ -303,47 +303,15 @@ def curseaudio(update: Update, context: CallbackContext):
         #else:
         #    strid = chatid
         if strid:
-            userinput = update.message.text[12:].strip();
-            splitted = userinput.split("-")
-            message = splitted[0].strip()
-            if(message != "" and len(message) <= 500  and not message.endswith('bot')):
 
-                url = API_URL + API_PATH_UTILS + "/fakeyou/get_voices_by_cat/Italiano"
+            url = API_URL + API_PATH_AUDIO + "curse/google/" + urllib.parse.quote(strid) 
 
-                voices = None
-                voice = "google"
-
-                response = requests.get(url)
-                if (response.text != "Internal Server Error"):
-                    voices = response.json()
-                
-                if len(splitted) == 2 and voices is not None:
-                    sel_voice = splitted[1].lower().strip()
-                    #if sel_voice in voices:
-                    #    voice = voices[sel_voice]
-                    #else:
-                    for voice_rest in voices:   
-                        if sel_voice.lower() in voice_rest.lower():
-                            voice = voices[voice_rest]
-                            break
-
-                url = API_URL + API_PATH_AUDIO + "repeat/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(strid) 
-
-                response = requests.get(url)
-                if (response.text != "Internal Server Error" and response.content and response.status_code == 200):
-                    audio = BytesIO(response.content)
-                    context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, title="Messaggio vocale", performer="ScemoPezzente",  filename=get_random_string(12)+ "audio.wav")
-                else:
-                    context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                
+            response = requests.get(url)
+            if (response.status_code == 200):
+                audio = BytesIO(response.content)
+                context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, title="Messaggio vocale", performer="ScemoPezzente",  filename=get_random_string(12)+ "audio.wav")
             else:
-
-                text = "se vuoi che ripeto qualcosa devi scrivere una frase dopo /speak (massimo 500 caratteri).\n\n\n"
-                text = text + "PS: se vuoi customizzare la voce aggiungi:\n"
-                text = text + "'- modello vocale' al fondo della frase.\n\n"
-                text = text + "Esempio: '/speak ciao - gerry scotti'.\n\n"
-                text = text + "Usa /listvoices per una lista dei modelli disponibili."
-                context.bot.send_message(chat_id=update.effective_chat.id, text=text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
                
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -371,7 +339,7 @@ def listvoices(update: Update, context: CallbackContext):
             url = API_URL + API_PATH_UTILS + "/fakeyou/get_voices_by_cat/Italiano"
 
             response = requests.get(url)
-            if (response.text != "Internal Server Error"):
+            if (response.status_code == 200):
                 data = response.json()
                 for voice in data:   
                     text = text + "- "+voice+"\n"
@@ -402,7 +370,7 @@ def image(update: Update, context: CallbackContext):
                 img_url = API_URL + API_PATH_IMAGES + "search/" + urllib.parse.quote(message)
 
                 response = requests.get(img_url, stream=True)
-                if (response.text != "Internal Server Error" and response.content and response.status_code == 200):
+                if (response.status_code == 200):
                     context.bot.send_photo(chat_id=update.effective_chat.id, photo=response.content, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, filename=get_random_string(12)+ "image.jpeg")
                 else:
                     context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
@@ -431,7 +399,7 @@ def chuck(update: Update, context: CallbackContext):
             url = API_URL + API_PATH_JOKES_TEXT + "chuck"
 
             response = requests.get(url)
-            if (response.text != "Internal Server Error"):
+            if (response.status_code == 200):
                 context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
             else:
                 context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
@@ -458,7 +426,7 @@ def joke(update: Update, context: CallbackContext):
             url = API_URL + API_PATH_JOKES_TEXT + "random"
 
             response = requests.get(url)
-            if (response.text != "Internal Server Error"):
+            if (response.status_code == 200):
                 context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
             else:
                 context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
@@ -485,7 +453,7 @@ def jokeaudio(update: Update, context: CallbackContext):
             url = API_URL + API_PATH_JOKES_AUDIO + "random"
 
             response = requests.get(url)
-            if (response.text != "Internal Server Error"):
+            if (response.status_code == 200):
                 audio = BytesIO(response.content)
                 context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, title="Barzelletta", performer="ScemoPezzente", filename=get_random_string(12)+ "audio.wav")
             else:
@@ -512,7 +480,7 @@ def chuckaudio(update: Update, context: CallbackContext):
             url = API_URL + API_PATH_JOKES_AUDIO + "chuck"
 
             response = requests.get(url)
-            if (response.text != "Internal Server Error"):
+            if (response.status_code == 200):
                 audio = BytesIO(response.content)
                 context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, title="Barzelletta", performer="ScemoPezzente", filename=get_random_string(12)+ "audio.wav")
             else:
@@ -539,7 +507,7 @@ def search(update: Update, context: CallbackContext):
                 url = API_URL + API_PATH_TEXT + "search/" + urllib.parse.quote(message)
 
                 response = requests.get(url)
-                if (response.text != "Internal Server Error"):
+                if (response.status_code == 200):
                     context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
                 else:
                     context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
@@ -568,7 +536,7 @@ def searchaudio(update: Update, context: CallbackContext):
                 url = API_URL + API_PATH_AUDIO + "search/" + urllib.parse.quote(message)
 
                 response = requests.get(url)
-                if (response.text != "Internal Server Error"):
+                if (response.status_code == 200):
                     audio = BytesIO(response.content)
                     context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, title="Ricerca: " + message, performer="ScemoPezzente", filename=get_random_string(12)+ "audio.wav")
                 else:
@@ -602,7 +570,7 @@ def insult(update: Update, context: CallbackContext):
                 url = API_URL + API_PATH_TEXT + "insult?chatid=" + urllib.parse.quote(strid)
 
             response = requests.get(url)
-            if (response.text != "Internal Server Error"):
+            if (response.status_code == 200):
                 text = response.text.replace('"','')
                 context.bot.send_message(chat_id=update.effective_chat.id, text=text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
             else:
@@ -633,7 +601,7 @@ def insultaudio(update: Update, context: CallbackContext):
                 url = API_URL + API_PATH_TEXT + "insult?chatid=" + urllib.parse.quote(strid)
 
             response = requests.get(url)
-            if (response.text != "Internal Server Error"):
+            if (response.status_code == 200):
                 audio = BytesIO(response.content)
                 context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, title="Messaggio vocale", performer="ScemoPezzente", filename=get_random_string(12)+ "audio.wav")
             else:
