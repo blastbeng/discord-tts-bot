@@ -1,0 +1,115 @@
+---
+version: "3.3"
+services:
+  jerky-tts-bot-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.api
+    container_name: jerky-tts-bot-api
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Rome
+    image: "blastbeng/jerky-tts-bot-api:1.0.0"
+    restart: "no"
+    volumes:
+      - ".env:/app/.env"
+      - "./config:/app/config"
+      - "/tmp/jerky-tts-bot-api:/tmp/jerky-tts-bot-api"
+      - "/tmp/jerky-tts-bot-discord:/tmp/jerky-tts-bot-discord"
+      - "/dev/dri/card0:/dev/dri/card0"
+      - "/dev/dri/renderD128:/dev/dri/renderD128"
+    entrypoint: ./entrypoint.sh
+    #ports:
+    #  - "5080:5080"
+    networks:
+      - caching
+  jerky-tts-bot-battuteapi:
+    container_name: jerky-tts-bot-battuteapi
+    build:
+      context: ./battuteAPI
+      dockerfile: Dockerfile
+    container_name: jerky-tts-bot-battuteapi
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Rome
+    image: "blastbeng/jerky-tts-bot-battuteapi:1.0.0"
+    volumes:
+      - ./config/battuteapi_data:/usr/src/app/data
+    ports:
+      - 3050:3050
+    restart: "no"
+  jerky-tts-bot-api-balancer:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.balancer
+    container_name: jerky-tts-bot-api-balancer
+    image: "blastbeng/jerky-tts-bot-api-balancer:1.0.0"
+    ports:
+      - "5080:5080"
+    volumes:
+      - "/tmp/jerky-tts-bot-api:/tmp/jerky-tts-bot-api"
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5080/utils/healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 12
+  redis:
+    image: redis
+    container_name: jerky-tts-bot-redis
+    networks:
+      - caching
+    restart: "no"
+  jerky-tts-bot-client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: jerky-tts-bot-client
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Rome
+    depends_on:
+      jerky-tts-bot-api-balancer:
+        condition: service_healthy
+    volumes:
+      - ".env:/app/.env"
+      - "./config:/app/config"
+      - "/tmp/jerky-tts-bot-api:/tmp/jerky-tts-bot-api"
+      - "/tmp/jerky-tts-bot-discord:/tmp/jerky-tts-bot-discord"
+    image: "blastbeng/jerky-tts-bot-client:1.0.0"
+    restart: "no"
+  jerky-tts-bot-tor:
+    container_name: jerky-tts-bot-tor
+    ports:
+      - '192.168.1.160:9058:9051'
+    image: dockage/tor-privoxy
+    restart: "no"
+  jerky-tts-bot-tor:
+    container_name: jerky-tts-bot-tor
+    ports:
+      - '192.168.1.160:9058:9051'
+    image: dockage/tor-privoxy
+    restart: "no"
+  jerky-tts-bot-website:
+    build:
+      context: ./website
+      dockerfile: Dockerfile.website
+    container_name: jerky-tts-bot-website
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Rome
+    ports:
+      - '192.168.1.160:7391:80'
+    image: "blastbeng/jerky-tts-bot-website:1.0.0"
+    restart: "no"
+    networks:
+      - caching
+networks:
+  caching:
+    driver: bridge
+
+

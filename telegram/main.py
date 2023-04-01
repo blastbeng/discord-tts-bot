@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import base64
 import random
 import requests
 import string
@@ -9,6 +10,7 @@ import sys
 import telegram
 import time
 import urllib
+from PIL import Image
 
 from datetime import datetime
 from datetime import timedelta
@@ -408,7 +410,7 @@ def chuck(update: Update, context: CallbackContext):
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
       print(exc_type, fname, exc_tb.tb_lineno)
-      context.bot.send_amessage(chat_id=update.effective_chat.id, text="Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+      context.bot.send_message(chat_id=update.effective_chat.id, text="Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
 dispatcher.add_handler(CommandHandler('chuck', chuck))
 
@@ -585,6 +587,49 @@ def insult(update: Update, context: CallbackContext):
 dispatcher.add_handler(CommandHandler('insult', insult))
 
 
+def text2image(update: Update, context: CallbackContext):
+    try:
+        chatid = str(update.effective_chat.id)
+        if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
+            strid = "000000"
+        #else:
+        #    strid = chatid
+        if strid:
+            try:
+                r = requests.get(os.environ.get("STABLE_DIFFUSION_API_URL"))
+                r.raise_for_status()  # Raises a HTTPError if the status is 4xx, 5xxx
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+                context.bot.send_message(chat_id=update.effective_chat.id, text="Le API remote sono offline", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+            else:
+                text = update.message.text[12:].strip();
+                payload = {
+                    "prompt": text,
+                    "steps": 50,
+                    "width": 512,
+                    "height": 512,
+                    "batch_size": 1,
+                    "sampler_index": "Euler",
+                }
+                url = os.environ.get("STABLE_DIFFUSION_API_URL") + os.environ.get("STABLE_DIFFUSION_API_TEXT_2_IMG")
+                response = requests.post(url, json=payload)
+                if (response.status_code == 200 and response.text != "Internal Server Error"):
+                    r = response.json()
+                    for i in r['images']:
+                        image = Image.open(BytesIO(base64.b64decode(i.split(",",1)[0])))
+                    with BytesIO() as image_binary:
+                        image.save(image_binary, 'PNG')
+                        image_binary.seek(0)
+                        context.bot.send_photo(chat_id=update.effective_chat.id, photo=image_binary, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                else:
+                    context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)   
+                        
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      print(exc_type, fname, exc_tb.tb_lineno)
+      context.bot.send_message(chat_id=update.effective_chat.id, text="Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+
+dispatcher.add_handler(CommandHandler('text2image', text2image))
 
 def insultaudio(update: Update, context: CallbackContext):
     try:
@@ -781,6 +826,7 @@ def help(update: Update, context: CallbackContext):
     text = text + "setalarmdaily - allarme giornaliero\n"
     text = text + "speak - ripete il messaggio via audio\n"
     text = text + "story - genera storie casuali\n"
+    text = text + "text2image - genera immagini da un testo\n"
     text = text + "unsetalarm - rimuove un allarme\n";
 
     context.bot.send_message(chat_id=update.effective_chat.id, text=text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)

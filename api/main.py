@@ -837,9 +837,26 @@ class ParagraphGenerateClass(Resource):
 nsdatabase = api.namespace('database', 'Accumulators Database APIs')
 
 
+@nsdatabase.route('/create/zipfile/')
+@nsdatabase.route('/create/zipfile/<string:chatid>')
+class  DatabaseCreateZipFile(Resource):
+  def get (self, chatid = "000000"):
+    try:
+      if chatid == "000000":
+        threading.Timer(0, utils.download_audio_zip, args=[chatid]).start()
+        return make_response("Creating zipfile under ./config dir. Watch the logs for errors.", 200)
+      else:
+        return make_response("Creating zipfile not permitted for this chatid!", 500)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
+
+
 @nsdatabase.route('/delete/bytext/<string:text>/')
 @nsdatabase.route('/delete/bytext/<string:text>/<string:chatid>')
-class UtilsDeleteByText(Resource):
+class DatabaseDeleteByText(Resource):
   def get (self, text: str, chatid = "000000"):
     return get_response_str('Frasi con parola chiave "' + text + '" cancellate dal db chatbot!')
 
@@ -848,7 +865,7 @@ class UtilsDeleteByText(Resource):
 @nsdatabase.route('/audiodb/populate/')
 @nsdatabase.route('/audiodb/populate/<int:count>/')
 @nsdatabase.route('/audiodb/populate/<int:count>/<string:chatid>')
-class UtilsAudiodbPopulate(Resource):
+class DatabaseAudiodbPopulate(Resource):
   def get (self, count = 100, chatid = "000000"):
     threading.Timer(0, utils.populate_audiodb, args=[chatid, count]).start()
     return "Starting thread populate_audiodb. Watch the logs."
@@ -856,7 +873,7 @@ class UtilsAudiodbPopulate(Resource):
 	
 
 @nsdatabase.route('/upload/trainfile/json')
-class UtilsTrainFile(Resource):
+class DatabaseTrainFile(Resource):
   def post (self):    
     try:
       chatid = request.form.get("chatid")
@@ -872,7 +889,7 @@ class UtilsTrainFile(Resource):
 	
 
 @nsdatabase.route('/upload/trainfile/txt')
-class UtilsTrainFile(Resource):
+class DatabaseTrainFile(Resource):
   def post (self):
     try:
       chatid = request.form.get("chatid")
@@ -973,7 +990,10 @@ def backupdb():
 @scheduler.task('interval', id='init_generator_models', hours=72, misfire_grace_time=900)
 def init_generator_models():
   utils.init_generator_models("000000")
-
+  
+@scheduler.task('interval', id='clean_audio_zip', hours=28, misfire_grace_time=900)
+def init_generator_models():
+  utils.clean_audio_zip()
 
 
 

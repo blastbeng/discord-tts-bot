@@ -2,6 +2,7 @@ import re
 import shutil
 import chatterbot
 import spacy
+import zipfile
 import random
 import wikipedia
 import sqlite3
@@ -46,6 +47,8 @@ from pydub import AudioSegment
 from essential_generators import DocumentGenerator, MarkovTextGenerator, MarkovWordGenerator
 from libretranslator import LibreTranslator
 from bs4 import BeautifulSoup
+from glob import glob
+from zipfile import ZipFile
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -743,7 +746,10 @@ def populate_audiodb(chatid: str, count: int):
           logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
         except Exception as e:
           inserted="Failed"
-          logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted, exc_info=1)
+          logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted, exc_info=1)  
+          if str(e).startswith("check token and text,"):
+            if utils.select_count_by_text_chatid_voice(sentence,chatid,voice) == 0:
+              audiodb.insert(sentence, chatid, memoryBuff, voice, "it", is_correct=0)
         finally:
           if voice != "google" and (inserted == "Done" or inserted == "Failed"):
               time.sleep(60)
@@ -961,4 +967,45 @@ def query_myinstants_sound(query: str):
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return []
-  
+
+def clean_audio_zip():
+  dirname = "./config/download_audio_zip"
+  if os.path.exists(dirname):
+    rmdir(dirname)
+
+def download_audio_zip(chatid: str):
+  try:
+    dirname = "./config/download_audio_zip"
+    if not os.path.exists(dirname):
+      os.mkdir(dirname)
+      voices = get_fakeyou_voices()
+      datas = audiodb.select_data_name_voice_by_chatid(chatid)
+      audios = []
+      for data in datas:
+        audio = BytesIO(data[0])
+        name  = data[1].replace(" ", "_")
+        voice = ([k for k, v in voices.items() if v == data[2]][0]).replace(" ", "_")
+
+        if(len(name) > 40):
+          name = name[0:40]
+
+        filename_tmp1 = name + "_" + voice
+        filename_tmp2 = ''.join(e for e in filename_tmp1 if e.isalnum() or e == "_")
+        filename = dirname + "/" + filename_tmp2 +".mp3"
+        with open(filename, "wb") as outfile:
+            outfile.write(audio.getbuffer())
+    shutil.make_archive(dirname, 'zip', dirname)
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    return False
+
+def rmdir(directory):
+  directory = Path(directory)
+  for item in directory.iterdir():
+      if item.is_dir():
+          rmdir(item)
+      else:
+          item.unlink()
+  directory.rmdir()

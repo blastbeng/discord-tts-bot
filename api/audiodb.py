@@ -52,7 +52,7 @@ def create_empty_tables():
     if sqliteConnection:
         sqliteConnection.close()
 
-def insert(name: str, chatid: str, data: BytesIO, voice: str, language: str):
+def insert(name: str, chatid: str, data: BytesIO, voice: str, language: str, is_correct=1):
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
     cursor = sqliteConnection.cursor()
@@ -66,7 +66,7 @@ def insert(name: str, chatid: str, data: BytesIO, voice: str, language: str):
                         chatid, 
                         data.read(),
                         voice,
-                        0,
+                        is_correct,
                         language)
 
     cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
@@ -81,13 +81,42 @@ def insert(name: str, chatid: str, data: BytesIO, voice: str, language: str):
     if sqliteConnection:
         sqliteConnection.close()
 
+def update_is_correct(name: str, chatid: str, data: BytesIO, voice: str, language: str, is_correct=1):
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
+
+    sqlite_insert_audio_query = """UPDATE Audio
+                          SET is_correct = ? 
+                           WHERE 
+                          name = ? and chatid = ? and voice = ? and language = ? """
+
+    data_audio_tuple = (is_correct,
+                        name, 
+                        chatid, 
+                        data.read(),
+                        voice,
+                        language)
+
+    cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
+
+
+    sqliteConnection.commit()
+    cursor.close()
+
+  except sqlite3.Error as error:
+    logging.error("Failed to update data into sqlite", exc_info=1)
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()
+
 
 def select_list_by_chatid(chatid=GUILD_ID):
   records = None
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
     cursor = sqliteConnection.cursor()
-    sqlite_select_query = " SELECT DISTINCT * from Audio WHERE chatid = ? ORDER BY name, voice"
+    sqlite_select_query = " SELECT DISTINCT * from Audio WHERE chatid = ? AND is_correct = 1 ORDER BY name, voice"
     cursor.execute(sqlite_select_query, (chatid,))
     records = cursor.fetchall()
 
@@ -114,6 +143,22 @@ def select_by_chatid(chatid=GUILD_ID):
       sqliteConnection.close()
   return records
 
+def select_data_name_voice_by_chatid(chatid: str):
+  records = None
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
+    sqlite_select_query = " SELECT DISTINCT data, name, voice from Audio WHERE chatid = ? AND is_correct = 1 "
+    cursor.execute(sqlite_select_query, (chatid,))
+    records = cursor.fetchall()
+
+  except sqlite3.Error as error:
+    logging.error("Failed to read data from sqlite table", exc_info=1)
+  finally:
+    if sqliteConnection:
+      sqliteConnection.close()
+  return records
+
 def select_by_name_chatid_voice_language(name: str, chatid: str, voice: str, language: str):
   if chatid == "X":
     return None
@@ -123,7 +168,7 @@ def select_by_name_chatid_voice_language(name: str, chatid: str, voice: str, lan
       sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
       cursor = sqliteConnection.cursor()
 
-      sqlite_select_query = """SELECT data from Audio WHERE name = ? AND chatid = ? AND voice = ? AND language = ?"""
+      sqlite_select_query = """SELECT data from Audio WHERE name = ? AND chatid = ? AND voice = ? AND language = ? AND is_correct = 1 """
       cursor.execute(sqlite_select_query, (name, chatid, voice, language,))
       records = cursor.fetchall()
 
@@ -154,10 +199,10 @@ def select_by_chatid_voice_random(chatid: str, voice:str):
       params=None
 
       if voice == "random":
-        sqlite_select_query = """SELECT data, name from Audio WHERE chatid = ? ORDER BY RANDOM() LIMIT 1; """
+        sqlite_select_query = """SELECT data, name from Audio WHERE chatid = ?  AND is_correct = 1 ORDER BY RANDOM() LIMIT 1; """
         params=(chatid,)
       else:
-        sqlite_select_query = """SELECT data, name from Audio WHERE chatid = ? and voice = ? ORDER BY RANDOM() LIMIT 1; """
+        sqlite_select_query = """SELECT data, name from Audio WHERE chatid = ? and voice = ?  AND is_correct = 1 ORDER BY RANDOM() LIMIT 1; """
         params=(chatid,voice,)
 
       cursor.execute(sqlite_select_query, params)
@@ -202,6 +247,26 @@ def select_audio_by_id(id: int):
     raise Exception("Audio not found")
   else:
     return audio
+
+def select_count_by_text_chatid_voice(text: str, chatid: str, voice: str):
+  count = 0
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
+
+    sqlite_select_query = """SELECT count(id) from Audio WHERE name = ? and chatid = ? and voice = ?"""
+    cursor.execute(sqlite_select_query, (text, chatid, voice,))
+    records = cursor.fetchall()
+
+    for row in records:
+      count = count + 1
+  except sqlite3.Error as error:
+    logging.error("Failed to read data from sqlite table", exc_info=1)
+    return count
+  finally:
+    if sqliteConnection:
+      sqliteConnection.close()
+    return count
 
 
 
