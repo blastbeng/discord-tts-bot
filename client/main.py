@@ -1304,7 +1304,7 @@ async def text2image(interaction: discord.Interaction, text: str):
                 r = requests.get(os.environ.get("STABLE_DIFFUSION_API_URL"))
                 r.raise_for_status()  # Raises a HTTPError if the status is 4xx, 5xxx
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"The remote APIs are currently offline. blastbong#9151 must power on his powerful Notebook"), view = view, ephemeral = False)
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"The remote APIs are currently offline. blastbong#9151 must power on his powerful Notebook"), ephemeral = False)
             else:
                 currentguildid = get_current_guild_id(interaction.guild.id)
                 await interaction.response.defer(thinking=True, ephemeral=False)
