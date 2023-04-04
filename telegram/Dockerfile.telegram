@@ -2,10 +2,7 @@ FROM python:3.8-slim-bullseye
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
-         locales \
-         ffmpeg
-
-RUN pip3 install ffmpeg-normalize
+         locales
 
 RUN sed -i '/it_IT.UTF-8/s/^# //g' /etc/locale.gen && \
     locale-gen
@@ -19,20 +16,10 @@ COPY requirements.txt .
 
 RUN pip3 install -r requirements.txt
 
-#USER root
 WORKDIR /app
 
-#COPY .env .
 COPY main.py .
-COPY utils.py .
-COPY database.py .
-COPY constants.py .
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
-#RUN chown -R uwsgi:uwsgi /app
-
-#USER uwsgi
-#WORKDIR /app
 
 CMD ["./entrypoint.sh"]
-#CMD . .venv/bin/activate && exec flask run chatbot.py --host=0.0.0.0

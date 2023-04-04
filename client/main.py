@@ -160,7 +160,7 @@ logging.getLogger('discord').setLevel(int(os.environ.get("LOG_LEVEL")))
 
 discord.utils.setup_logging(level=int(os.environ.get("LOG_LEVEL")))
 
-
+loops_dict = {}
 
 def listvoices():
     try:
@@ -340,35 +340,34 @@ async def do_play(voice_client, url: str, interaction: discord.Interaction, curr
 
 class PlayAudioLoop:
     
-    def __init__(self, chatid):
-        self.chatid = chatid
+    def __init__(self, guildid):
+        for guild in client.guilds:
+            if guild.id == guildid:
+                self.guild = guild
 
     @tasks.loop(seconds=180)
     async def play_audio_loop(self):
         try:
-            for guild in client.guilds:
-                current_chatid = get_current_guild_id(str(guild.id))
-                if self.chatid == current_chatid:
-                    channelfound = None
-                    channeluserfound = None
-                    voice_client = get_voice_client_by_guildid(client.voice_clients, guild.id)                
-                    for channel in guild.voice_channels:
-                        for member in channel.members:
-                            if not member.bot:
-                                channeluserfound = channel
-                                break
-                    if voice_client is None or voice_client.channel is None:
-                        channelfound = channeluserfound
-                    else:
-                        channelfound = voice_client.channel
-                    if channelfound is not None and channeluserfound is not None:
-                        await connect_bot_by_voice_client(voice_client, channelfound, None)
-                        if hasattr(voice_client, 'play') and voice_client.is_connected() and not voice_client.is_playing():
-                            response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/" + current_chatid)
-                            if (response.status_code == 200 and response.content):
-                                message = 'play_audio_loop - random - ' + response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
-                                voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info(message))
-                    break
+            chatid = get_current_guild_id(str(self.guild.id))
+            channelfound = None
+            channeluserfound = None
+            voice_client = get_voice_client_by_guildid(client.voice_clients, self.guild.id)                
+            for channel in self.guild.voice_channels:
+                for member in channel.members:
+                    if not member.bot:
+                        channeluserfound = channel
+                        break
+            if voice_client is None or voice_client.channel is None:
+                channelfound = channeluserfound
+            else:
+                channelfound = voice_client.channel
+            if channelfound is not None and channeluserfound is not None:
+                await connect_bot_by_voice_client(voice_client, channelfound, None)
+                if hasattr(voice_client, 'play') and voice_client.is_connected() and not voice_client.is_playing():
+                    response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/" + chatid)
+                    if (response.status_code == 200 and response.content):
+                        message = 'play_audio_loop - random - ' + response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
+                        voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info(message))
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -403,9 +402,11 @@ async def on_ready():
             url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/init/" + currentguildid
             response = requests.get(url)
             if (response.status_code != 200):
-                raise Exception("Initializing chatterbot on chatid " + currentguildid + " failed")
+                logging.error("Initializing chatterbot on chatid " + currentguildid + " failed")
+            else:
+                logging.info(response.text)
 
-            PlayAudioLoop(currentguildid).play_audio_loop.start()
+            loops_dict[guild.id] = PlayAudioLoop(guild.id)
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -969,14 +970,14 @@ async def enable_internal(interaction):
     is_deferred=False
     try:
         currentguildid = get_current_guild_id(interaction.guild.id)
-        if not PlayAudioLoop(currentguildid).play_audio_loop.is_running():
+        if not loops_dict[interaction.guild.id].play_audio_loop.is_running():
             await interaction.response.defer(thinking=True, ephemeral=True)
             is_deferred=True
-            PlayAudioLoop(currentguildid).play_audio_loop.start()
+            loops_dict[interaction.guild.id].play_audio_loop.start()
             logging.info("enable - play_audio_loop.start()")
-            await interaction.followup.send(utils.translate(currentguildid,"I'm enabling the auto mode"), ephemeral = True)
+            await interaction.followup.send(utils.translate(currentguildid,"I'm enabling the auto talking feature"), ephemeral = True)
         else:
-            await interaction.response.send_message(utils.translate(currentguildid,"Auto mode is already enabled"), ephemeral = True)
+            await interaction.response.send_message(utils.translate(currentguildid,"The auto talking feature is already enabled"), ephemeral = True)
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred = is_deferred)
 
@@ -995,16 +996,16 @@ async def disable_internal(interaction: discord.Interaction):
     is_deferred=False
     try:
         currentguildid = get_current_guild_id(interaction.guild.id)
-        if PlayAudioLoop(currentguildid).play_audio_loop.is_running():
+        if loops_dict[interaction.guild.id].play_audio_loop.is_running():
             await interaction.response.defer(thinking=True, ephemeral=True)
             is_deferred=True
-            PlayAudioLoop(currentguildid).play_audio_loop.stop()
+            loops_dict[interaction.guild.id].play_audio_loop.stop()
             logging.info("disable - play_audio_loop.stop()")
-            PlayAudioLoop(currentguildid).play_audio_loop.cancel()
+            loops_dict[interaction.guild.id].play_audio_loop.cancel()
             logging.info("disable - play_audio_loop.cancel()")
-            await interaction.followup.send(utils.translate(currentguildid,"I'm disabling the auto mode"), ephemeral = True)
+            await interaction.followup.send(utils.translate(currentguildid,"I'm disabling the auto talking feature"), ephemeral = True)
         else:
-            await interaction.response.send_message(utils.translate(currentguildid,"Auto mode is already disabled"), ephemeral = True)
+            await interaction.response.send_message(utils.translate(currentguildid,"The auto talking feature is already disabled"), ephemeral = True)
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
@@ -1020,7 +1021,7 @@ async def timer(interaction: discord.Interaction, seconds: int):
         if seconds < 20 or seconds > 300:
             await interaction.response.send_message(utils.translate(currentguildid,"Seconds must be greater than 20 and lower than 600"), ephemeral = True)
         else:
-            PlayAudioLoop(currentguildid).play_audio_loop.change_interval(seconds=seconds)
+            loops_dict[interaction.guild.id].play_audio_loop.change_interval(seconds=seconds)
             logging.info("timer - play_audio_loop.change_interval(seconds="+str(seconds)+")")
             await interaction.response.send_message(utils.translate(currentguildid,"I'm setting a " + str(seconds) + " seconds timer for the auto talking feature"), ephemeral = True)
     except Exception as e:
@@ -1149,50 +1150,51 @@ async def commands(interaction: discord.Interaction):
         await send_error(e, interaction, from_generic=False)
 
 
-#@client.tree.command()
-#@app_commands.rename(text='text')
-#@app_commands.describe(text="The text to generate")
-#@app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
-#async def text2image(interaction: discord.Interaction, text: str):
-#    """Generate an image from text"""
-#    is_deferred=False
-#    try:
-#        if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
-#            try:
-#                r = requests.get(os.environ.get("STABLE_DIFFUSION_API_URL"))
-#                r.raise_for_status()  # Raises a HTTPError if the status is 4xx, 5xxx
-#            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-#                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"The remote APIs are currently offline. blastbong#9151 must power on his powerful Notebook"), ephemeral = False)
-#            else:
-#                currentguildid = get_current_guild_id(interaction.guild.id)
-#                await interaction.response.defer(thinking=True, ephemeral=False)
-#                is_deferred=True
-#                payload = {
-#                    "prompt": text,
-#                    "steps": 50,
-#                    "width": 512,
-#                    "height": 512,
-#                    "batch_size": 1,
-#                    "sampler_index": "Euler"
-#                }
-#                url = os.environ.get("STABLE_DIFFUSION_API_URL") + os.environ.get("STABLE_DIFFUSION_API_TEXT_2_IMG")
-#                response = requests.post(url, json=payload)
-#                if (response.status_code == 200 and response.text != "Internal Server Error"):
-#                    r = response.json()
-#                    for i in r['images']:
-#                        image = Image.open(BytesIO(base64.b64decode(i.split(",",1)[0])))
-#                    with BytesIO() as image_binary:
-#                        image.save(image_binary, 'PNG')
-#                        image_binary.seek(0)
-#                        file = discord.File(fp=image_binary, filename='text2image.png')
-#                    await interaction.followup.send(text, ephemeral = False, file=file)     
-#                else:
-#                    logging.error("[GUILDID : %s] generate - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
-#                    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong."), ephemeral = False)     
-#        else:
-#            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"This is a private command and can only be used by members with specific permissions on the main Bot Server"), ephemeral = False)
-#    except Exception as e:
-#        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+@client.tree.command()
+@app_commands.rename(text='text')
+@app_commands.describe(text="The text to generate")
+@app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
+async def text2image(interaction: discord.Interaction, text: str):
+    """Generate an image from text"""
+    is_deferred=False
+    try:
+        if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
+            try:
+                r = requests.get(os.environ.get("STABLE_DIFFUSION_API_URL"))
+                r.raise_for_status()  # Raises a HTTPError if the status is 4xx, 5xxx
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"The remote APIs are currently offline. blastbong#9151 must power on his powerful Notebook"), ephemeral = False)
+            else:
+                currentguildid = get_current_guild_id(interaction.guild.id)
+                await interaction.response.defer(thinking=True, ephemeral=False)
+                is_deferred=True
+                payload = {
+                    "prompt": text,
+                    "steps": 50,
+                    "width": 512,
+                    "height": 512,
+                    "batch_size": 1,
+                    "sampler_index": "Euler"
+                }
+                url = os.environ.get("STABLE_DIFFUSION_API_URL") + os.environ.get("STABLE_DIFFUSION_API_TEXT_2_IMG")
+                response = requests.post(url, json=payload)
+                if (response.status_code == 200 and response.text != "Internal Server Error"):
+                    r = response.json()
+                    for i in r['images']:
+                        image = Image.open(BytesIO(base64.b64decode(i.split(",",1)[0])))
+                    with BytesIO() as image_binary:
+                        image.save(image_binary, 'PNG')
+                        image_binary.seek(0)
+                        file = discord.File(fp=image_binary, filename='text2image.png')
+                    await interaction.followup.send(text, ephemeral = False, file=file)     
+                else:
+                    logging.error("[GUILDID : %s] generate - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
+                    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong."), ephemeral = False)     
+        else:
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"This is a private command and can only be used by members with specific permissions on the main Bot Server"), ephemeral = False)
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 
 @ask.error
@@ -1215,7 +1217,7 @@ async def commands(interaction: discord.Interaction):
 @soundsearch.error
 @speak.error
 @story.error
-#@text2image.error
+@text2image.error
 @timer.error
 @translate.error
 @stop.error

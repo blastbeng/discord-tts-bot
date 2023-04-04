@@ -791,8 +791,13 @@ class FakeYouListVoices(Resource):
 class InitChatterbotClass(Resource):
   def get(self, chatid = "000000"):
     try:
-      threading.Timer(0, get_chatbot_by_id, args=[chatid]).start()
-      return make_response("Initializing chatterbot. Watch the logs for errors.", 200)
+      #threading.Timer(0, get_chatbot_by_id, args=[chatid]).start()
+      #return make_response("Initializing chatterbot. Watch the logs for errors.", 200)
+      chatbot = get_chatbot_by_id(chatid)
+      if chatbot is not None:
+        return make_response("Initialized chatterbot on chatid "+chatid, 200)
+      else:
+        return make_response("Initializing chatterbot on chatid " + chatid + " failed", 500)
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]

@@ -28,7 +28,7 @@ services:
     container_name: jerky-tts-bot-battuteapi
     build:
       context: ./battuteAPI
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.battuteAPI
     container_name: jerky-tts-bot-battuteapi
     environment:
       - PUID=1000
@@ -65,7 +65,7 @@ services:
   jerky-tts-bot-client:
     build:
       context: ./client
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.client
     container_name: jerky-tts-bot-client
     environment:
       - PUID=1000
@@ -90,7 +90,7 @@ services:
   jerky-tts-bot-telegram:
     build:
       context: ./telegram
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.telegram
     container_name: jerky-tts-bot-telegram
     environment:
       - PUID=1000
@@ -127,5 +127,3 @@ services:
 networks:
   caching:
     driver: bridge
-
-
