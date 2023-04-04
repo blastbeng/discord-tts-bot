@@ -222,6 +222,31 @@ class TextInsultClass(Resource):
     return response
 
 
+nsaudio = api.namespace('image', 'Accumulators Image APIs')
+
+
+@nsaudio.route('/generate/bytext/<string:text>/')
+@nsaudio.route('/generate/bytext/<string:text>/<string:chatid>')
+class ImageGenerateByText(Resource):
+  @cache.cached(timeout=7200, query_string=True)
+  def get (self, text: str, chatid = "000000"):
+    try:
+      image = utils.generate_image(text)
+      if image is not None:
+        return send_file(image, attachment_filename='image.png', mimetype='image/png')
+      else:
+        @after_this_request
+        def clear_cache(response):
+          cache.delete_memoized(ImageGenerateByText.get, self, str, str, str)
+          return make_response("TTS Generation Error!", 500)
+    except Exception as e:
+      g.request_error = str(e)
+      @after_this_request
+      def clear_cache(response):
+        cache.delete_memoized(ImageGenerateByText.get, self, str, str, str)
+        return make_response(g.get('request_error'), 500)
+
+
 nsaudio = api.namespace('chatbot_audio', 'Accumulators Chatbot TTS audio APIs')
 
 
@@ -766,11 +791,8 @@ class FakeYouListVoices(Resource):
 class InitChatterbotClass(Resource):
   def get(self, chatid = "000000"):
     try:
-      if chatid == "000000":
-        threading.Timer(0, get_chatbot_by_id, args=[chatid]).start()
-        return make_response("Initializing chatterbot. Watch the logs for errors.", 200)
-      else:
-        return make_response("Initializing chatterbot on this chatid is not permitted!", 500)
+      threading.Timer(0, get_chatbot_by_id, args=[chatid]).start()
+      return make_response("Initializing chatterbot. Watch the logs for errors.", 200)
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -781,11 +803,8 @@ class InitChatterbotClass(Resource):
 class InitGeneratorClass(Resource):
   def get(self, chatid = "000000"):
     try:
-      if chatid == "000000":
-        threading.Timer(10, utils.init_generator_models, args=["000000"]).start()
-        return make_response("Initializing Generator Models. Watch the logs for errors.", 200)
-      else:
-        return make_response("Initializing Generator Models on this chatid is not permitted!", 500)
+      threading.Timer(10, utils.init_generator_models, args=["000000"]).start()
+      return make_response("Initializing Generator Models. Watch the logs for errors.", 200)
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -866,8 +885,8 @@ class DatabaseDeleteByText(Resource):
 @nsdatabase.route('/audiodb/populate/<int:count>/')
 @nsdatabase.route('/audiodb/populate/<int:count>/<string:chatid>')
 class DatabaseAudiodbPopulate(Resource):
-  def get (self, count = 100, chatid = "000000"):
-    threading.Timer(0, utils.populate_audiodb, args=[chatid, count]).start()
+  def get (self, count = 100, chatid = None):
+    threading.Timer(0, utils.populate_audiodb, args=[count, chatid]).start()
     return "Starting thread populate_audiodb. Watch the logs."
 
 	
@@ -979,9 +998,9 @@ def scrape_jokes():
 def login_fakeyou():
   utils.login_fakeyou()
   
-@scheduler.task('interval', id='populate_audiodb', hours=5, misfire_grace_time=900)
+@scheduler.task('interval', id='populate_audiodb', hours=4, misfire_grace_time=900)
 def populate_audiodb():
-  utils.populate_audiodb("000000", 20)
+  utils.populate_audiodb(20, None)
   
 @scheduler.task('interval', id='backupdb', hours=24, misfire_grace_time=900)
 def backupdb():
@@ -989,7 +1008,7 @@ def backupdb():
   
 @scheduler.task('interval', id='init_generator_models', hours=72, misfire_grace_time=900)
 def init_generator_models():
-  utils.init_generator_models("000000")
+  utils.init_generator_models()
   
 @scheduler.task('interval', id='clean_audio_zip', hours=28, misfire_grace_time=900)
 def init_generator_models():
@@ -1006,7 +1025,7 @@ limiter.init_app(app)
 scheduler.init_app(app)
 scheduler.start()
 utils.login_fakeyou()
-threading.Timer(10, utils.init_generator_models, args=["000000"]).start()
+threading.Timer(10, utils.init_generator_models).start()
 
 if __name__ == '__main__':
   app.run()

@@ -144,6 +144,7 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True):
     memoryBuff = BytesIO()
     sound.export(memoryBuff, format='mp3', bitrate="256")
     memoryBuff.seek(0)
+    #if chatid == "000000" and save:
     if chatid == "000000" and save:
       audiodb.insert(text, chatid, memoryBuff, "google", language)
       return audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
@@ -531,6 +532,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       voice_to_use = get_random_voice()
     else:
       voice_to_use = voice
+    #if chatid != "000000" or language != "it":
     if chatid != "000000" or language != "it":
       return get_tts_google(text.strip(), chatid=chatid, language=language, save=save)
     elif voice_to_use != "google":
@@ -686,73 +688,83 @@ def get_random_from_bot(chatid: str):
 
 
 
-def populate_audiodb(chatid: str, count: int):  
+def populate_audiodb(count: int, chatid: str):  
   try:
-    login_fakeyou()
-    voices = get_fakeyou_voices()
-    #voices={}
-    #voices["google"] = "google"
-    listvoices = list(voices.items())
 
-    logging.info("populate_audiodb - STARTED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(count))
-            
-    dbfile=chatid+"-db.sqlite3"
+    for file in os.listdir('./config/'):
+      if file.endswith("-db.sqlite3"):
+        
+        chatid_internal = file.replace("-db.sqlite3", "")
 
-    sqliteConnection = sqlite3.connect('./config/'+dbfile)
-    cursor = sqliteConnection.cursor()
-    
+        if (chatid is not None and chatid == chatid_internal) or chatid is None:
 
-    cursor.execute("ATTACH DATABASE ? AS audiodb",("./config/audiodb.sqlite3",))
+          logging.info("populate_audiodb - STARTED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid_internal, str(count))
 
-    sqlite_select_sentences_query = "SELECT DISTINCT * FROM ( "
-    sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT statement.text as name FROM statement WHERE statement.text NOT IN (SELECT audiodb.audio.name from audiodb.audio) ORDER BY RANDOM() LIMIT " + str(count) + ")"
-    sqlite_select_sentences_query = sqlite_select_sentences_query + " UNION "
-    sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio GROUP BY audio.name HAVING COUNT(audio.name) < " + str(len(listvoices)) + " ORDER BY RANDOM() LIMIT " + str(count) + ")"
-    sqlite_select_sentences_query = sqlite_select_sentences_query + ") LIMIT " + str(count);
-
-    log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query)
-
-    data = ()
-
-    cursor.execute(sqlite_select_sentences_query, data)
-    records = cursor.fetchall()
-
-    count = 0
-    tqdm_out = TqdmToLogger(logging,level=logging.INFO)
-
-    sentences = [] 
-
-    for row in records:
-      sentences.append(row[0])
-
-    cursor.close()
-    sqliteConnection.close()
+          login_fakeyou()
+          voices = get_fakeyou_voices()
+          #voices={}
+          #voices["google"] = "google"
+          listvoices = list(voices.items())
 
 
-    for sentence in tqdm(sentences,file=tqdm_out,desc="populate_audiodb - Progress",mininterval=60,):
-      random.shuffle(listvoices)
-      for key, voice in listvoices:
-      #for key, voice in progressBar(listvoices, prefix = 'populate_audiodb - Progress:', suffix = 'Complete', length = 50):
-        result = False
-        try:
-          logging.info("populate_audiodb - START ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s", chatid, voice, key, sentence)
-          generation = ""
-          inserted = ""
-          result = populate_tts(sentence, chatid=chatid, voice=voice)
-          if result:
-            inserted="Done"
-          else:
-            inserted="Skipped (Already in db)"
-          logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
-        except Exception as e:
-          inserted="Failed"
-          logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted, exc_info=1)  
-          if str(e).startswith("check token and text,"):
-            if utils.select_count_by_text_chatid_voice(sentence,chatid,voice) == 0:
-              audiodb.insert(sentence, chatid, memoryBuff, voice, "it", is_correct=0)
-        finally:
-          if voice != "google" and (inserted == "Done" or inserted == "Failed"):
-              time.sleep(60)
+          dbfile=os.path.join('./config/', file)
+
+          sqliteConnection = sqlite3.connect(+dbfile)
+          cursor = sqliteConnection.cursor()
+          
+
+          cursor.execute("ATTACH DATABASE ? AS audiodb",("./config/audiodb.sqlite3",))
+
+          sqlite_select_sentences_query = "SELECT DISTINCT * FROM ( "
+          sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT statement.text as name FROM statement WHERE statement.text NOT IN (SELECT audiodb.audio.name from audiodb.audio) ORDER BY RANDOM() LIMIT " + str(count) + ")"
+          sqlite_select_sentences_query = sqlite_select_sentences_query + " UNION "
+          sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = ? GROUP BY audio.name HAVING COUNT(audio.name) < " + str(len(listvoices)) + " ORDER BY RANDOM() LIMIT " + str(count) + ")"
+          sqlite_select_sentences_query = sqlite_select_sentences_query + ") LIMIT " + str(count);
+
+          log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query)
+
+          data = (chatid_internal)
+
+          cursor.execute(sqlite_select_sentences_query, data)
+          records = cursor.fetchall()
+
+          count = 0
+          tqdm_out = TqdmToLogger(logging,level=logging.INFO)
+
+          sentences = [] 
+
+          for row in records:
+            sentences.append(row[0])
+
+          cursor.close()
+          sqliteConnection.close()
+
+
+          for sentence in tqdm(sentences,file=tqdm_out,desc="populate_audiodb - Progress",mininterval=60,):
+            random.shuffle(listvoices)
+            for key, voice in listvoices:
+            #for key, voice in progressBar(listvoices, prefix = 'populate_audiodb - Progress:', suffix = 'Complete', length = 50):
+              result = False
+              try:
+                logging.info("populate_audiodb - START ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s", chatid_internal, voice, key, sentence)
+                generation = ""
+                inserted = ""
+                result = populate_tts(sentence, chatid=chatid_internal, voice=voice)
+                if result:
+                  inserted="Done"
+                else:
+                  inserted="Skipped (Already in db)"
+                logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid_internal, voice, key, sentence, inserted)
+              except Exception as e:
+                inserted="Failed"
+                logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid_internal, voice, key, sentence, inserted, exc_info=1)  
+                if str(e).startswith("check token and text,"):
+                  if utils.select_count_by_text_chatid_voice(sentence,chatid_internal,voice) == 0:
+                    audiodb.insert(sentence, chatid_internal, memoryBuff, voice, "it", is_correct=0)
+              finally:
+                if voice != "google" and (inserted == "Done" or inserted == "Failed"):
+                    time.sleep(60)
+          logging.info("populate_audiodb - ENDED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(count))
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -761,7 +773,6 @@ def populate_audiodb(chatid: str, count: int):
   finally:
     if sqliteConnection:
       sqliteConnection.close()
-    logging.info("populate_audiodb - ENDED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(count))
 
 
 
@@ -838,23 +849,27 @@ def get_audios_list_for_ft():
     audios.append(internal)
   return audios
 
-def init_generator_models(chatid: str):
+def init_generator_models():
+  for file in os.listdir('./config/'):
+    if file.endswith("-db.sqlite3"):
+      
+      chatid = file.replace("-db.sqlite3", "")
 
-  logging.info("START -- essential_generators -- Models Generator")
+      logging.info("START -- essential_generators -- Models Generator")
 
-  filename='./config/sentences_000000.txt'
-  
-  if extract_sentences_from_chatbot(filename, chatid=chatid):
+      filename='./config/sentences_'+chatid+'.txt'
+      
+      if extract_sentences_from_chatbot(filename, chatid=chatid):
 
-    text_model_path = './config/markov_textgen_000000.json'
-    word_model_path = './config/markov_wordgen_000000.json'
+        text_model_path = './config/markov_textgen_'+chatid+'.json'
+        word_model_path = './config/markov_wordgen_'+chatid+'.json'
 
-    init_text_generator(corpus=filename, output=text_model_path)
-    init_word_generator(corpus=filename, output=word_model_path)
+        init_text_generator(corpus=filename, output=text_model_path)
+        init_word_generator(corpus=filename, output=word_model_path)
 
-    logging.info("END -- essential_generators -- Models Generator")
+        logging.info("END -- essential_generators -- Models Generator")
 
-def init_text_generator(corpus='./config/sentences_000000.txt', output='./config/markov_textgen_000000.json'):
+def init_text_generator(corpus=None, output=None):
 
     if os.path.exists(output):
       os.remove(output)
@@ -866,7 +881,7 @@ def init_text_generator(corpus='./config/sentences_000000.txt', output='./config
     gen.train(set4)
     gen.save_model(output)
 
-def init_word_generator(corpus='./config/sentences_000000.txt', output='./config/markov_wordgen_000000.json'):
+def init_word_generator(corpus=None, output=None):
     
     if os.path.exists(output):
       os.remove(output)
@@ -880,8 +895,8 @@ def init_word_generator(corpus='./config/sentences_000000.txt', output='./config
 
 def generate_sentence(chatid: str):
 
-  text_model_path = './config/markov_textgen_000000.json'
-  word_model_path = './config/markov_wordgen_000000.json'
+  text_model_path = './config/markov_textgen_'+chatid+'.json'
+  word_model_path = './config/markov_wordgen_'+chatid+'.json'
 
   text_generator=MarkovTextGenerator(model=text_model_path, load_model=True)
   word_generator=MarkovWordGenerator(model=word_model_path, load_model=True)
@@ -892,8 +907,8 @@ def generate_sentence(chatid: str):
 
 def generate_paragraph(chatid: str):
 
-  text_model_path = './config/markov_textgen_000000.json'
-  word_model_path = './config/markov_wordgen_000000.json'
+  text_model_path = './config/markov_textgen_'+chatid+'.json'
+  word_model_path = './config/markov_wordgen_'+chatid+'.json'
 
   text_generator=MarkovTextGenerator(model=text_model_path, load_model=True)
   word_generator=MarkovWordGenerator(model=word_model_path, load_model=True)
