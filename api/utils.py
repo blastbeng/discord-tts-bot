@@ -22,9 +22,11 @@ import wave
 import audioop
 import logging
 import audiodb
+from functools import lru_cache
 from tqdm import tqdm
 from uuid import uuid4
 from chatterbot import ChatBot
+from chatterbot import languages
 from chatterbot.conversation import Statement
 from custom_trainer import TranslatedListTrainer
 from custom_trainer import CustomTrainer
@@ -70,7 +72,7 @@ fy=fakeyou.FakeYou()
 
 fake = Faker()
 
-wikipedia.set_lang("it")
+
 
 class TqdmToLogger(io.StringIO):
     """
@@ -114,8 +116,9 @@ def ClassFactory(name, argnames, BaseClass=BaseClass):
 
 
 
-def wiki_summary(testo: str):
+def wiki_summary(testo: str, lang: str):
   try:
+    wikipedia.set_lang(lang)
     definition = wikipedia.summary(testo, sentences=1, auto_suggest=True, redirect=True)
     return testo + ": " + definition
   except:
@@ -154,7 +157,7 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True):
     #return fp
 
 def populate_tts_google(text: str, chatid="000000", language="it"):
-  data = audiodb.select_by_name_chatid_voice_language(text, chatid, "google")
+  data = audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
   if data is not None:
     return False
   else:
@@ -179,6 +182,14 @@ def clean_input(testo: str):
   else:
     return True
 
+def get_class( kls ):
+    parts = kls.split('.')
+    module = ".".join(parts[:-1])
+    m = __import__( module )
+    for comp in parts[1:]:
+        m = getattr(m, comp)            
+    return m
+
 def get_chatterbot(chatid: str, train: False, lang = "it"):
 
   dbfile=chatid+"-db.sqlite3"
@@ -190,13 +201,24 @@ def get_chatterbot(chatid: str, train: False, lang = "it"):
   f = open(fle)
   f.close()
 
-  nlp = spacy.load(spacymodel)
+  #nlp = spacy.load(spacymodel)
+
+  language = None
+
+  classes = languages.get_language_classes()
+  for clazz in classes:
+    langclazz = get_class("chatterbot.languages." + clazz[0])
+    if langclazz.ISO_639_1 == lang:
+      language = langclazz
+      break
+
   chatbot = ChatBot(
       'PezzenteCapo',
       storage_adapter='chatterbot.storage.SQLStorageAdapter',
       database_uri='sqlite:///config/'+dbfile,
       statement_comparison_function = LevenshteinDistance,
       response_selection_method = get_random_response,
+      tagger_language=language,
       logic_adapters=[
           {
               'import_path': 'chatterbot.logic.BestMatch',
@@ -326,27 +348,27 @@ def get_random_date():
   date = fake.date_time_between(start_date=offset, end_date='now').strftime("%Y-%m-%d")
   return date
 
-def extract_sentences_from_chatbot(filename, chatid="000000", distinct=True, randomize=True):
+def extract_sentences_from_audiodb(filename, language="it", chatid="000000", distinct=True, randomize=True):
   try:
 
     if os.path.exists(filename):
       os.remove(filename)
       
-    dbfile=chatid+"-db.sqlite3"
-    sqliteConnection = sqlite3.connect('./config/'+dbfile)
+    #dbfile=chatid+"-db.sqlite3"
+    sqliteConnection = sqlite3.connect('./config/audiodb.sqlite3')
     cursor = sqliteConnection.cursor()
 
     sqlite_select_sentences_query = ""
     if distinct and randomize:
-      sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY RANDOM()"""
+      sqlite_select_sentences_query = """SELECT DISTINCT name FROM audio WHERE chatid = ? and language = ? ORDER BY RANDOM()"""
     elif not distinct and not randomize:
-      sqlite_select_sentences_query = """SELECT text FROM statement ORDER BY TEXT"""
+      sqlite_select_sentences_query = """SELECT name FROM audio WHERE chatid = ? and language = ? ORDER BY name"""
     elif distinct and not randomize:
-      sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY TEXT"""
+      sqlite_select_sentences_query = """SELECT DISTINCT name FROM audio WHERE chatid = ? and language = ? ORDER BY name"""
     elif not distinct and randomize:
-      sqlite_select_sentences_query = """SELECT text FROM statement ORDER BY RANDOM()"""
+      sqlite_select_sentences_query = """SELECT name FROM audio WHERE chatid = ? and language = ? ORDER BY RANDOM()"""
 
-    data = ()
+    data = (chatid, language,)
 
     cursor.execute(sqlite_select_sentences_query, data)
     records = cursor.fetchall()
@@ -360,7 +382,7 @@ def extract_sentences_from_chatbot(filename, chatid="000000", distinct=True, ran
         try:
           if row[0] and row[0] != "":
             sanitized = row[0].strip()
-            logging.info('extract_sentences_from_chatbot -- "' + sanitized + '"')
+            logging.info('extract_sentences_from_audiodb - [chatid:' + chatid + ',lang:' + language + '] - "' + sanitized + '"')
             if sanitized[-1] not in string.punctuation:
               if randomize:
                 if bool(random.getrandbits(1)):
@@ -533,7 +555,8 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
     else:
       voice_to_use = voice
     #if chatid != "000000" or language != "it":
-    if chatid != "000000" or language != "it":
+    #if chatid != "000000" or language != "it":
+    if chatid != "000000":
       return get_tts_google(text.strip(), chatid=chatid, language=language, save=save)
     elif voice_to_use != "google":
       datafy = None
@@ -625,27 +648,37 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
     raise Exception(e)
 
 def get_random_voice():
-  localvoices = get_fakeyou_voices()
+  localvoices = list_fakeyou_voices("it", 0)
   title, token = random.choice(list(localvoices.items()))
   return token
 
-def get_fakeyou_voices(category="Italiano"):
-  #fy.login(FAKEYOU_USER,FAKEYOU_PASS)
-  localvoices = {}
-  with open('voices.json') as filejson:
-    loaded = json.load(filejson)
-    for iterator in loaded:
-      localvoices[iterator] = loaded[iterator]
-  return localvoices
-
-def list_fakeyou_voices(lang:str):
+@lru_cache(maxsize=600)
+def list_fakeyou_voices(lang:str, limit:int):
   voices=fy.list_voices(size=0)
   foundvoices = {}
 		
   for langTag,voiceJson in zip(voices.langTag,voices.json):
     if lang.lower() in langTag.lower():
       foundvoices[voiceJson["title"]] = voiceJson["model_token"]
-		
+  
+  if limit >= 2:
+    limit = limit - 2
+
+  index = 0
+
+  l = list(foundvoices.items())
+  random.shuffle(l)
+  d_foundvoices = dict(l)
+
+  foundvoices = {}
+    
+  foundvoices["google"] = "google"
+  for key, value in d_foundvoices.items():
+    foundvoices[key] = value
+    index = index + 1
+    if limit != 0 and index >= limit:
+      break
+
   return foundvoices
 
 def login_fakeyou():
@@ -701,31 +734,27 @@ def populate_audiodb(count: int, chatid: str):
           logging.info("populate_audiodb - STARTED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid_internal, str(count))
 
           login_fakeyou()
-          voices = get_fakeyou_voices()
-          #voices={}
-          #voices["google"] = "google"
-          listvoices = list(voices.items())
 
+          #dbfile=os.path.join('./config/', file)
 
-          dbfile=os.path.join('./config/', file)
-
-          sqliteConnection = sqlite3.connect(+dbfile)
+          sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
           cursor = sqliteConnection.cursor()
           
 
-          cursor.execute("ATTACH DATABASE ? AS audiodb",("./config/audiodb.sqlite3",))
+          #cursor.execute("ATTACH DATABASE ? AS audiodb",("./config/audiodb.sqlite3",))
 
-          sqlite_select_sentences_query = "SELECT DISTINCT * FROM ( "
-          sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT statement.text as name FROM statement WHERE statement.text NOT IN (SELECT audiodb.audio.name from audiodb.audio) ORDER BY RANDOM() LIMIT " + str(count) + ")"
-          sqlite_select_sentences_query = sqlite_select_sentences_query + " UNION "
-          sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = ? GROUP BY audio.name HAVING COUNT(audio.name) < " + str(len(listvoices)) + " ORDER BY RANDOM() LIMIT " + str(count) + ")"
-          sqlite_select_sentences_query = sqlite_select_sentences_query + ") LIMIT " + str(count);
+          #sqlite_select_sentences_query = "SELECT DISTINCT * FROM ( "
+          #sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT statement.text as name FROM statement WHERE statement.text NOT IN (SELECT audiodb.audio.name from audiodb.audio) ORDER BY RANDOM() LIMIT " + str(count) + ")"
+          #sqlite_select_sentences_query = sqlite_select_sentences_query + " UNION "
+          #sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = ? GROUP BY audio.name HAVING COUNT(audio.name) < " + str(len(listvoices)) + " ORDER BY RANDOM() LIMIT " + str(count) + ")"
+          #sqlite_select_sentences_query = sqlite_select_sentences_query + ") LIMIT " + str(count);
+          sqlite_select_sentences_query = " SELECT DISTINCT name from audio WHERE CHATID = ? ORDER BY RANDOM() LIMIT " + str(count)
+          
 
           log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query)
 
-          data = (chatid_internal)
 
-          cursor.execute(sqlite_select_sentences_query, data)
+          cursor.execute(sqlite_select_sentences_query, (chatid_internal,))
           records = cursor.fetchall()
 
           count = 0
@@ -741,29 +770,35 @@ def populate_audiodb(count: int, chatid: str):
 
 
           for sentence in tqdm(sentences,file=tqdm_out,desc="populate_audiodb - Progress",mininterval=60,):
-            random.shuffle(listvoices)
-            for key, voice in listvoices:
-            #for key, voice in progressBar(listvoices, prefix = 'populate_audiodb - Progress:', suffix = 'Complete', length = 50):
-              result = False
-              try:
-                logging.info("populate_audiodb - START ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s", chatid_internal, voice, key, sentence)
-                generation = ""
-                inserted = ""
-                result = populate_tts(sentence, chatid=chatid_internal, voice=voice)
-                if result:
-                  inserted="Done"
-                else:
-                  inserted="Skipped (Already in db)"
-                logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid_internal, voice, key, sentence, inserted)
-              except Exception as e:
-                inserted="Failed"
-                logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid_internal, voice, key, sentence, inserted, exc_info=1)  
-                if str(e).startswith("check token and text,"):
-                  if utils.select_count_by_text_chatid_voice(sentence,chatid_internal,voice) == 0:
-                    audiodb.insert(sentence, chatid_internal, memoryBuff, voice, "it", is_correct=0)
-              finally:
-                if voice != "google" and (inserted == "Done" or inserted == "Failed"):
-                    time.sleep(60)
+            language = audiodb.select_distinct_language_by_name_chatid(sentence, chatid_internal)
+            if language is None:
+              audiodb.update_is_correct(sentence, chatid_internal, voice, language, is_correct=0)
+            else:
+              voices = list_fakeyou_voices(language, 0)
+              listvoices = list(voices.items())
+              if audiodb.select_count_by_text_chatid(sentence,chatid_internal) < len(listvoices):
+                random.shuffle(listvoices)
+                for key, voice in listvoices:
+                #for key, voice in progressBar(listvoices, prefix = 'populate_audiodb - Progress:', suffix = 'Complete', length = 50):
+                  result = False
+                  try:
+                    logging.info("populate_audiodb - START ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s", chatid_internal, voice, key, sentence)
+                    generation = ""
+                    inserted = ""
+                    result = populate_tts(sentence, chatid=chatid_internal, voice=voice, language=language)
+                    if result:
+                      inserted="Done"
+                    else:
+                      inserted="Skipped (Already in db)"
+                    logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid_internal, voice, key, sentence, inserted)
+                  except Exception as e:
+                    inserted="Failed"
+                    logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid_internal, voice, key, sentence, inserted, exc_info=1)  
+                    if str(e).startswith("check token and text,"):
+                      audiodb.update_is_correct(sentence, chatid_internal, voice, language, is_correct=0)
+                  finally:
+                    if voice != "google" and (inserted == "Done" or inserted == "Failed"):
+                        time.sleep(20)
           logging.info("populate_audiodb - ENDED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(count))
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -820,7 +855,7 @@ def restore(chatid: str, text: str):
   return BytesIO(bytes(sentences,'utf-8'))
 
 def get_audios_for_ft():
-  voices = get_fakeyou_voices()
+  voices = list_fakeyou_voices("it", 0)
   datas = audiodb.select_by_chatid()
   audios = []
   for data in datas:
@@ -836,7 +871,7 @@ def get_audios_for_ft():
   return audios
 
 def get_audios_list_for_ft():
-  voices = get_fakeyou_voices()
+  voices = list_fakeyou_voices("it", 0)
   datas = audiodb.select_list_by_chatid()
   audios = []
   for data in datas:
@@ -849,25 +884,21 @@ def get_audios_list_for_ft():
     audios.append(internal)
   return audios
 
-def init_generator_models():
-  for file in os.listdir('./config/'):
-    if file.endswith("-db.sqlite3"):
-      
-      chatid = file.replace("-db.sqlite3", "")
+def init_generator_models(chatid, language):
 
-      logging.info("START -- essential_generators -- Models Generator")
+  logging.info("START -- essential_generators - [chatid:" + chatid + ",lang:" + language + "] - Models Generator")
 
-      filename='./config/sentences_'+chatid+'.txt'
-      
-      if extract_sentences_from_chatbot(filename, chatid=chatid):
+  filename='./config/sentences_'+chatid+'.txt'
+  
+  if extract_sentences_from_audiodb(filename, language=language, chatid=chatid):
 
-        text_model_path = './config/markov_textgen_'+chatid+'.json'
-        word_model_path = './config/markov_wordgen_'+chatid+'.json'
+    text_model_path = './config/markov_textgen_'+chatid+'.json'
+    word_model_path = './config/markov_wordgen_'+chatid+'.json'
 
-        init_text_generator(corpus=filename, output=text_model_path)
-        init_word_generator(corpus=filename, output=word_model_path)
+    init_text_generator(corpus=filename, output=text_model_path)
+    init_word_generator(corpus=filename, output=word_model_path)
 
-        logging.info("END -- essential_generators -- Models Generator")
+    logging.info("END -- essential_generators - [chatid:" + chatid + ",lang:" + language + "] - Models Generator")
 
 def init_text_generator(corpus=None, output=None):
 
@@ -993,7 +1024,7 @@ def download_audio_zip(chatid: str):
     dirname = "./config/download_audio_zip"
     if not os.path.exists(dirname):
       os.mkdir(dirname)
-      voices = get_fakeyou_voices()
+      voices = list_fakeyou_voices("it", 0)
       datas = audiodb.select_data_name_voice_by_chatid(chatid)
       audios = []
       for data in datas:

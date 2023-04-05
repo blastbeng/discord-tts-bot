@@ -249,7 +249,7 @@ def speak(update: Update, context: CallbackContext):
             message = splitted[0].strip()
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
 
-                url = API_URL + API_PATH_UTILS + "/fakeyou/get_voices_by_cat/Italiano"
+                url = API_URL + API_PATH_UTILS + "/fakeyou/listvoices/it/0"
 
                 voices = None
                 voice = "google"
@@ -338,7 +338,7 @@ def listvoices(update: Update, context: CallbackContext):
        # else:
        #     strid = chatid
         if strid:
-            url = API_URL + API_PATH_UTILS + "/fakeyou/get_voices_by_cat/Italiano"
+            url = API_URL + API_PATH_UTILS + "/fakeyou/listvoices/it/0"
 
             response = requests.get(url)
             if (response.status_code == 200):

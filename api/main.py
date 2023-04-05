@@ -26,6 +26,7 @@ from dotenv import load_dotenv
 from threading import Thread
 from bestemmie import Bestemmie
 from libretranslator import LibreTranslator
+from chatterbot import languages
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -90,11 +91,16 @@ class TextRepeatClass(Resource):
 
 
 @nstext.route('/curse/')
-@nstext.route('/curse/<string:chatid>')
+@nstext.route('/curse/<string:chatid>/')
+@nstext.route('/curse/<string:chatid>/<string:lang>')
 class TextCurseClass(Resource):
   @cache.cached(timeout=3, query_string=True)
-  def get (self, chatid = "000000"):
-    return get_response_str(Bestemmie().random().lower())
+  def get (self, voice: str, chatid = "000000", lang="it"):
+    cursez = Bestemmie().random().lower()
+    if lang == "it":
+      return get_response_str(cursez)
+    else:
+      return get_response_str(LibreTranslator(from_lang="it", to_lang=lang, base_url=os.environ.get("TRANSLATOR_BASEURL")).translate(cursez))
 
 
 
@@ -107,77 +113,91 @@ class TextRandomClass(Resource):
     return response
 
 @nstext.route('/repeat/learn/<string:text>/')
-@nstext.route('/repeat/learn/<string:text>/<string:chatid>')
+@nstext.route('/repeat/learn/<string:text>/<string:chatid>/')
+@nstext.route('/repeat/learn/<string:text>/<string:chatid>/<string:lang>')
 class TextRepeatLearnClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, chatid = "000000"):
+  def get (self, text: str, chatid = "000000", lang = "it"):
     response = get_response_str(text)
-    chatbot = get_chatbot_by_id(chatid)
+    chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
     daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
     daemon.start()
     return response
 
 
 @nstext.route('/repeat/learn/user/<string:user>/<string:text>/')
-@nstext.route('/repeat/learn/user/<string:user>/<string:text>/<string:chatid>')
+@nstext.route('/repeat/learn/user/<string:user>/<string:text>/<string:chatid>/')
+@nstext.route('/repeat/learn/user/<string:user>/<string:text>/<string:chatid>/<string:lang>')
 class AudioRepeatLearnUserClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, user: str, text: str, chatid = "000000"):
+  def get (self, user: str, text: str, chatid = "000000", lang = "it"):
     if user in previousMessages:
-      utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid))
+      utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid=chatid, lang=lang))
     previousMessages[user] = text
     return get_response_str(text)
 
 
 @nstext.route('/ask/<string:text>/')
-@nstext.route('/ask/<string:text>/<string:chatid>')
+@nstext.route('/ask/<string:text>/<string:chatid>/')
+@nstext.route('/ask/<string:text>/<string:chatid>/<string:lang>')
 class TextAskClass(Resource):
   @cache.cached(timeout=10, query_string=True)
-  def get (self, text: str, chatid = "000000"):
-    chatbot_response = get_chatbot_by_id(chatid).get_response(text).text
+  def get (self, text: str, chatid = "000000", lang = "it"):
+    chatbot_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text).text
     return get_response_str(chatbot_response)
 
 
 @nstext.route('/ask/nolearn/<string:text>/')
-@nstext.route('/ask/nolearn/<string:text>/<string:chatid>')
+@nstext.route('/ask/nolearn/<string:text>/<string:chatid>/')
+@nstext.route('/ask/nolearn/<string:text>/<string:chatid>/<string:lang>')
 class TextAskNoLearnClass(Resource):
-  def get (self, text: str, chatid = "000000"):
-    chatbot_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
+  def get (self, text: str, chatid = "000000", lang = "it"):
+    chatbot_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
     return get_response_str(chatbot_response)
 
 
 @nstext.route('/ask/user/<string:user>/<string:text>/')
-@nstext.route('/ask/user/<string:user>/<string:text>/<string:chatid>')
+@nstext.route('/ask/user/<string:user>/<string:text>/<string:chatid>/')
+@nstext.route('/ask/user/<string:user>/<string:text>/<string:chatid>/<string:lang>')
 class TextAskUserClass(Resource):
   @cache.cached(timeout=10, query_string=True)
-  def get (self, user: str, text: str, chatid = "000000"):
+  def get (self, user: str, text: str, chatid = "000000", lang = "it"):
     dolearn = False;
     if user not in previousMessages:
       dolearn=True
-    chatbot_response = get_chatbot_by_id(chatid).get_response(text, learn=dolearn).text
+    chatbot_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=dolearn).text
     
     if user in previousMessages:
-      utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid))
+      utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid=chatid, lang=lang))
     previousMessages[user] = chatbot_response
     return get_response_str(chatbot_response)
 
 
 @nstext.route('/search/<string:text>/')
-@nstext.route('/search/<string:text>/<string:chatid>')
+@nstext.route('/search/<string:text>/<string:chatid>/')
+@nstext.route('/search/<string:text>/<string:chatid>/<string:lang>')
 class TextSearchClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, chatid = "000000"):
-    wikisaid = utils.wiki_summary(text)
+  def get (self, text: str, chatid = "000000", lang = "it"):
+    wikisaid = utils.wiki_summary(text,lang)
     return get_response_str(wikisaid)
 
 
 @nstext.route('/learn/<string:text>/<string:response>/')
-@nstext.route('/learn/<string:text>/<string:response>/<string:chatid>')
+@nstext.route('/learn/<string:text>/<string:response>/<string:chatid>/')
+@nstext.route('/learn/<string:text>/<string:response>/<string:chatid>/<string:lang>')
 class TextLearnClass(Resource):
   @cache.cached(timeout=10, query_string=True)
-  def get (self, text: str, response: str, chatid = "000000"):
-    utils.learn(text, response, get_chatbot_by_id(chatid))
+  def get (self, text: str, response: str, chatid = "000000", lang = "it"):
+    utils.learn(text, response, get_chatbot_by_id(chatid=chatid, lang=lang))
     return "Ho imparato: " + text + " => " + response
+
+
+@nstext.route('/count/<string:voice>/<string:chatid>/')
+class TextLearnClass(Resource):
+  @cache.cached(timeout=10, query_string=True)
+  def get (self, voice: str, chatid: str):
+    return get_response_str(str(audiodb.select_count_by_chatid_voice(chatid,voice)))
 
 
 @nstext.route('/translate/<string:from_lang>/<string:to_lang>/<string:text>/')
@@ -209,6 +229,13 @@ class TextInsultClass(Resource):
   @api.expect(parserinsult)
   def get (self):
     sentence = insults.get_insults()
+    lang = request.args.get("lang")
+    if lang is None:
+      lang = "it"  
+
+    if lang != "it":
+      sentence = LibreTranslator(from_lang="it", to_lang=lang, base_url=os.environ.get("TRANSLATOR_BASEURL")).translate(sentence)
+
     chatid = request.args.get("chatid")
     if chatid is None:
       chatid = "000000"
@@ -216,17 +243,17 @@ class TextInsultClass(Resource):
     if text and text != '' and text != 'none':
       sentence = text + " " + sentence
     response = Response(sentence)
-    chatbot = get_chatbot_by_id(chatid)
+    chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
     daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
     daemon.start()
     return response
 
 
-nsaudio = api.namespace('image', 'Accumulators Image APIs')
+nsimage = api.namespace('image', 'Accumulators Image APIs')
 
 
-@nsaudio.route('/generate/bytext/<string:text>/')
-@nsaudio.route('/generate/bytext/<string:text>/<string:chatid>')
+@nsimage.route('/generate/bytext/<string:text>/')
+@nsimage.route('/generate/bytext/<string:text>/<string:chatid>')
 class ImageGenerateByText(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, chatid = "000000"):
@@ -302,13 +329,16 @@ class AudioSaveRepeatClass(Resource):
 
 
 @nsaudio.route('/curse/<string:voice>/')
-@nsaudio.route('/curse/<string:voice>/<string:chatid>')
+@nsaudio.route('/curse/<string:voice>/<string:chatid>/')
+@nsaudio.route('/curse/<string:voice>/<string:chatid>/<string:lang>')
 class AudioCurseClass(Resource):
   @cache.cached(timeout=3, query_string=True)
-  def get (self, voice: str, chatid = "000000"):
+  def get (self, voice: str, chatid = "000000", lang = "it"):
     try:
-      text = Bestemmie().random().lower()
-      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language="it", save=False, call_fy=False)
+      cursez = Bestemmie().random().lower()
+      if lang != "it":
+        cursez = LibreTranslator(from_lang="it", to_lang=lang, base_url=os.environ.get("TRANSLATOR_BASEURL")).translate(cursez)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=lang, save=False, call_fy=False)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
@@ -349,12 +379,13 @@ class AudioDownloadClass(Resource):
 
 @nsaudio.route('/random/')
 @nsaudio.route('/random/<string:voice>/')
-@nsaudio.route('/random/<string:voice>/<string:chatid>')
+@nsaudio.route('/random/<string:voice>/<string:chatid>/')
+@nsaudio.route('/random/<string:voice>/<string:chatid>/<string:lang>')
 class AudioRandomClass(Resource):
   @cache.cached(timeout=2, query_string=True)
-  def get (self, voice = "random", chatid = "000000"):
+  def get (self, voice = "random", chatid = "000000", lang = "it"):
     try:
-      tts_out, text_out = audiodb.select_by_chatid_voice_random(chatid,voice)
+      tts_out, text_out = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text_out.encode('utf-8').decode('latin-1')
@@ -373,17 +404,17 @@ class AudioRandomClass(Resource):
       
 
 @nsaudio.route('/repeat/learn/<string:text>/<string:voice>/')
-@nsaudio.route('/repeat/learn/<string:text>/<string:voice>/<string:chatid>')
-@nsaudio.route('/repeat/learn/<string:text>/<string:voice>/<string:chatid>/<string:language>')
+@nsaudio.route('/repeat/learn/<string:text>/<string:voice>/<string:chatid>/')
+@nsaudio.route('/repeat/learn/<string:text>/<string:voice>/<string:chatid>/<string:lang>')
 class AudioRepeatLearnClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, voice: str, chatid = "000000", language = "it"):
+  def get (self, text: str, voice: str, chatid = "000000", lang = "it"):
     try:
-      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=language)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        if chatid == "000000" and language == "it":
-          chatbot = get_chatbot_by_id(chatid)
+        if chatid == "000000":
+          chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
           daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
           daemon.start()
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
@@ -405,16 +436,17 @@ class AudioRepeatLearnClass(Resource):
 
 
 @nsaudio.route('/repeat/learn/user/<string:user>/<string:text>/<string:voice>/')
-@nsaudio.route('/repeat/learn/user/<string:user>/<string:text>/<string:voice>/<string:chatid>')
+@nsaudio.route('/repeat/learn/user/<string:user>/<string:text>/<string:voice>/<string:chatid>/')
+@nsaudio.route('/repeat/learn/user/<string:user>/<string:text>/<string:voice>/<string:chatid>/<string:lang>')
 class AudioRepeatLearnUserClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, user: str, text: str, voice: str, chatid = "000000"):
+  def get (self, user: str, text: str, voice: str, chatid = "000000", lang = "it"):
     try:
-      tts_out = utils.get_tts(text, chatid=chatid, voice=voice)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=lang)
       if tts_out is not None:     
         def learnthis(user: str, text: str):
           if user in previousMessages:
-            utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid))
+            utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid=chatid, lang=lang))
           previousMessages[user] = text  
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         daemon = Thread(target=learnthis, args=(user,text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
@@ -440,13 +472,13 @@ class AudioRepeatLearnUserClass(Resource):
 @nsaudio.route('/ask/<string:text>/')
 @nsaudio.route('/ask/<string:text>/<string:voice>/')
 @nsaudio.route('/ask/<string:text>/<string:voice>/<string:chatid>')
-@nsaudio.route('/ask/<string:text>/<string:voice>/<string:chatid>/<string:language>')
+@nsaudio.route('/ask/<string:text>/<string:voice>/<string:chatid>/<string:lang>')
 class AudioAskClass(Resource):
   @cache.cached(timeout=10, query_string=True)
-  def get (self, text: str, voice = "random", chatid = "000000", language = "it"):
+  def get (self, text: str, voice = "random", chatid = "000000", lang= "it"):
     try:
-      chatbot_resp = get_chatbot_by_id(chatid).get_response(text).text
-      tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice=voice, language=language)
+      chatbot_resp = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text).text
+      tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice=voice, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = chatbot_resp
@@ -465,13 +497,14 @@ class AudioAskClass(Resource):
 
 
 @nsaudio.route('/ask/nolearn/<string:text>/')
-@nsaudio.route('/ask/nolearn/<string:text>/<string:chatid>')
+@nsaudio.route('/ask/nolearn/<string:text>/<string:chatid>/')
+@nsaudio.route('/ask/nolearn/<string:text>/<string:chatid>/<string:lang>')
 class AudioAskNoLearnClass(Resource):
   @cache.cached(timeout=10, query_string=True)
-  def get (self, text: str, chatid = "000000"):
+  def get (self, text: str, chatid = "000000", lang= "it"):
     try:
-      text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
-      tts_out = utils.get_tts(text_response, chatid=chatid)
+      text_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
+      tts_out = utils.get_tts(text_response, chatid=chatid, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
@@ -490,13 +523,14 @@ class AudioAskNoLearnClass(Resource):
 
 
 @nsaudio.route('/ask/nolearn/random/<string:text>/')
-@nsaudio.route('/ask/nolearn/random/<string:text>/<string:chatid>')
+@nsaudio.route('/ask/nolearn/random/<string:text>/<string:chatid>/')
+@nsaudio.route('/ask/nolearn/random/<string:text>/<string:chatid>/<string:lang>')
 class AudioAskNoLearnRandomClass(Resource):
   @cache.cached(timeout=10, query_string=True)
-  def get (self, text: str, chatid = "000000"):
+  def get (self, text: str, chatid = "000000", lang= "it"):
     try:
-      text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
-      tts_out = utils.get_tts(text_response, voice="random", chatid=chatid)
+      text_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
+      tts_out = utils.get_tts(text_response, voice="random", chatid=chatid, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
@@ -515,13 +549,14 @@ class AudioAskNoLearnRandomClass(Resource):
 
 
 @nsaudio.route('/ask/nolearn/google/<string:text>/')
-@nsaudio.route('/ask/nolearn/google/<string:text>/<string:chatid>')
+@nsaudio.route('/ask/nolearn/google/<string:text>/<string:chatid>/')
+@nsaudio.route('/ask/nolearn/google/<string:text>/<string:chatid>/<string:lang>')
 class AudioAskNoLearnNoCacheGoogleClass(Resource):
   @cache.cached(timeout=10, query_string=True)
-  def get (self, text: str, chatid = "000000"):
+  def get (self, text: str, chatid = "000000", lang= "it"):
     try:
-      text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
-      tts_out = utils.get_tts(text_response, voice="google", chatid=chatid)
+      text_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
+      tts_out = utils.get_tts(text_response, voice="google", chatid=chatid, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
@@ -534,13 +569,14 @@ class AudioAskNoLearnNoCacheGoogleClass(Resource):
 
 
 @nsaudio.route('/ask/nolearn/nocache/google/<string:text>/')
-@nsaudio.route('/ask/nolearn/nocache/google/<string:text>/<string:chatid>')
+@nsaudio.route('/ask/nolearn/nocache/google/<string:text>/<string:chatid>/')
+@nsaudio.route('/ask/nolearn/nocache/google/<string:text>/<string:chatid>/<string:lang>')
 class AudioAskNoLearnNoCacheGoogleClass(Resource):
   @cache.cached(timeout=10, query_string=True)
-  def get (self, text: str, chatid = "000000"):
+  def get (self, text: str, chatid = "000000", lang= "it"):
     try:
-      text_response = get_chatbot_by_id(chatid).get_response(text, learn=False).text
-      tts_out = utils.get_tts(text_response, voice="google", chatid=chatid)
+      text_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
+      tts_out = utils.get_tts(text_response, voice="google", chatid=chatid, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
@@ -553,20 +589,21 @@ class AudioAskNoLearnNoCacheGoogleClass(Resource):
 
 
 @nsaudio.route('/ask/user/<string:user>/<string:text>/')
-@nsaudio.route('/ask/user/<string:user>/<string:text>/<string:chatid>')
+@nsaudio.route('/ask/user/<string:user>/<string:text>/<string:chatid>/')
+@nsaudio.route('/ask/user/<string:user>/<string:text>/<string:chatid>/<string:lang>')
 class AudioAskUserClass(Resource):
   @cache.cached(timeout=10, query_string=True)
-  def get (self, user: str, text: str, chatid = "000000"):
+  def get (self, user: str, text: str, chatid = "000000", lang= "it"):
     dolearn = False;
     if user not in previousMessages:
       dolearn=True
-    chatbot_response = get_chatbot_by_id(chatid).get_response(text, learn=dolearn).text
+    chatbot_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=dolearn).text
     
     if user in previousMessages:
-      utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid))
+      utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid=chatid, lang=lang))
     previousMessages[user] = chatbot_response
     try:
-      tts_out = utils.get_tts(chatbot_response, chatid=chatid)
+      tts_out = utils.get_tts(chatbot_response, chatid=chatid, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = chatbot_response
@@ -584,14 +621,15 @@ class AudioAskUserClass(Resource):
         return make_response(g.get('request_error'), 500)
 
 @nsaudio.route('/search/<string:text>/')
-@nsaudio.route('/search/<string:text>/<string:chatid>')
+@nsaudio.route('/search/<string:text>/<string:chatid>/')
+@nsaudio.route('/search/<string:text>/<string:chatid>/<string:lang>')
 class AudioSearchClass(Resource):
   @cache.cached(timeout=10, query_string=True)
-  def get (self, text: str, chatid = "000000"):
+  def get (self, text: str, chatid = "000000", lang= "it"):
     try:
-      wikisaid = utils.wiki_summary(text)
+      wikisaid = utils.wiki_summary(text, lang)
       
-      tts_out = utils.get_tts(wikisaid, chatid=chatid, voice="null")
+      tts_out = utils.get_tts(wikisaid, chatid=chatid, voice="null", language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = wikisaid
@@ -613,22 +651,24 @@ class AudioSearchClass(Resource):
 class AudioInsultClass(Resource):
   @api.expect(parserinsult)
   def get (self):
-    sentence = insults.get_insults()
-    chatid = request.args.get("chatid")
-    if chatid is None:
-      chatid = "000000"
-    language = request.args.get("language")
-    if language is None:
-      chatid = "it"
-    text = request.args.get("text")
     try:
+      sentence = insults.get_insults()
+      lang = request.args.get("lang")
+      if lang is None:
+        lang = "it"  
+      if lang != "it":
+        sentence = LibreTranslator(from_lang="it", to_lang=lang, base_url=os.environ.get("TRANSLATOR_BASEURL")).translate(sentence)
+      chatid = request.args.get("chatid")
+      if chatid is None:
+        chatid = "000000"
+      text = request.args.get("text")
       if text and text != '' and text != 'none':
         sentence = text + " " + sentence
-      tts_out = utils.get_tts(sentence, chatid=chatid, voice="google", language=language)
+      tts_out = utils.get_tts(sentence, chatid=chatid, voice="google", language=lang)
       if tts_out is not None:    
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         if chatid == "000000" and language == "it":
-          chatbot = get_chatbot_by_id(chatid)
+          chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
           daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
           daemon.start()
         response.headers['X-Generated-Text'] = sentence
@@ -775,27 +815,25 @@ class AudioSearchClass(Resource):
 nsutils = api.namespace('utils', 'AccumulatorsUtils APIs')
 
 
-@nsutils.route('/fakeyou/get_voices_by_cat/')
-@nsutils.route('/fakeyou/get_voices_by_cat/<string:category>')
-class FakeYouGetVoicesByCatClass(Resource):
-  def get(self, category = "Italiano"):
-    return jsonify(utils.get_fakeyou_voices(category))
 
 @nsutils.route('/fakeyou/listvoices/')
 @nsutils.route('/fakeyou/listvoices/<string:lang>')
+@nsutils.route('/fakeyou/listvoices/<string:lang>/<int:limit>')
 class FakeYouListVoices(Resource):
-  def get(self, lang = "it"):
-    return jsonify(utils.list_fakeyou_voices(lang))
+  @cache.cached(timeout=300, query_string=True)
+  def get(self, lang = "it", limit=25):
+    return jsonify(utils.list_fakeyou_voices(lang, limit))
 
-@nsutils.route('/init/<string:chatid>')
+@nsutils.route('/init/<string:chatid>/')
+@nsutils.route('/init/<string:chatid>/<string:lang>')
 class InitChatterbotClass(Resource):
-  def get(self, chatid = "000000"):
+  def get(self, chatid = "000000", lang = "it"):
     try:
       #threading.Timer(0, get_chatbot_by_id, args=[chatid]).start()
       #return make_response("Initializing chatterbot. Watch the logs for errors.", 200)
-      chatbot = get_chatbot_by_id(chatid)
+      chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
       if chatbot is not None:
-        return make_response("Initialized chatterbot on chatid "+chatid, 200)
+        return make_response("Initialized chatterbot on chatid " + chatid, 200)
       else:
         return make_response("Initializing chatterbot on chatid " + chatid + " failed", 500)
     except Exception as e:
@@ -804,11 +842,11 @@ class InitChatterbotClass(Resource):
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return make_response(str(e), 500)
 
-@nsutils.route('/initgenerator/<string:chatid>')
+@nsutils.route('/initgenerator/<string:chatid>/<string:lang>')
 class InitGeneratorClass(Resource):
-  def get(self, chatid = "000000"):
+  def get(self, chatid = "000000", lang = "it"):
     try:
-      threading.Timer(10, utils.init_generator_models, args=["000000"]).start()
+      threading.Timer(10, utils.init_generator_models, args=["000000", lang]).start()
       return make_response("Initializing Generator Models. Watch the logs for errors.", 200)
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -890,7 +928,7 @@ class DatabaseDeleteByText(Resource):
 @nsdatabase.route('/audiodb/populate/<int:count>/')
 @nsdatabase.route('/audiodb/populate/<int:count>/<string:chatid>')
 class DatabaseAudiodbPopulate(Resource):
-  def get (self, count = 100, chatid = None):
+  def get (self, count = 100, chatid = "000000"):
     threading.Timer(0, utils.populate_audiodb, args=[count, chatid]).start()
     return "Starting thread populate_audiodb. Watch the logs."
 
@@ -985,13 +1023,13 @@ def admin():
 
 
 def change_chatbot_language(chatid, language):
-  chatbots_dict[chatid] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True", language)
+  chatbots_dict[chatid] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True", lang = language)
 
 
-def get_chatbot_by_id(chatid = "000000"):
+def get_chatbot_by_id(chatid = "000000", lang = "it"):
   if chatid not in chatbots_dict:
-    chatbots_dict[chatid] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True")
-  return chatbots_dict[chatid]
+    chatbots_dict[chatid + "_" + lang] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True", lang = lang)
+  return chatbots_dict[chatid + "_" + lang]
   
   
   
@@ -1003,20 +1041,16 @@ def scrape_jokes():
 def login_fakeyou():
   utils.login_fakeyou()
   
-@scheduler.task('interval', id='populate_audiodb', hours=4, misfire_grace_time=900)
+@scheduler.task('interval', id='populate_audiodb', hours=2, misfire_grace_time=900)
 def populate_audiodb():
-  utils.populate_audiodb(20, None)
+  utils.populate_audiodb(100, None)
   
-@scheduler.task('interval', id='backupdb', hours=24, misfire_grace_time=900)
+@scheduler.task('interval', id='backupdb', hours=68, misfire_grace_time=900)
 def backupdb():
   utils.backupdb("000000")
   
-@scheduler.task('interval', id='init_generator_models', hours=72, misfire_grace_time=900)
-def init_generator_models():
-  utils.init_generator_models()
-  
 @scheduler.task('interval', id='clean_audio_zip', hours=28, misfire_grace_time=900)
-def init_generator_models():
+def clean_audio_zip():
   utils.clean_audio_zip()
 
 
@@ -1030,7 +1064,6 @@ limiter.init_app(app)
 scheduler.init_app(app)
 scheduler.start()
 utils.login_fakeyou()
-threading.Timer(10, utils.init_generator_models).start()
 
 if __name__ == '__main__':
   app.run()

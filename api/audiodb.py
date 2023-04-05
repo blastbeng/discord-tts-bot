@@ -81,7 +81,7 @@ def insert(name: str, chatid: str, data: BytesIO, voice: str, language: str, is_
     if sqliteConnection:
         sqliteConnection.close()
 
-def update_is_correct(name: str, chatid: str, data: BytesIO, voice: str, language: str, is_correct=1):
+def update_is_correct(name: str, chatid: str, voice: str, language: str, is_correct=1):
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
     cursor = sqliteConnection.cursor()
@@ -94,7 +94,6 @@ def update_is_correct(name: str, chatid: str, data: BytesIO, voice: str, languag
     data_audio_tuple = (is_correct,
                         name, 
                         chatid, 
-                        data.read(),
                         voice,
                         language)
 
@@ -185,7 +184,32 @@ def select_by_name_chatid_voice_language(name: str, chatid: str, voice: str, lan
         sqliteConnection.close()
     return audio
 
-def select_by_chatid_voice_random(chatid: str, voice:str):
+
+
+def select_distinct_language_by_name_chatid(name: str, chatid: str):
+  if chatid == "X":
+    return None
+  else:
+    lang = None
+    try:
+      sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+      cursor = sqliteConnection.cursor()
+
+      sqlite_select_query = """SELECT DISTINCT language from Audio WHERE name = ? AND chatid = ? """
+      cursor.execute(sqlite_select_query, (name, chatid,))
+      records = cursor.fetchall()
+
+      for row in records:
+        lang   =  str(row[0])
+
+    except sqlite3.Error as error:
+      logging.error("Failed to read data from sqlite table", exc_info=1)
+    finally:
+      if sqliteConnection:
+        sqliteConnection.close()
+    return lang
+
+def select_by_chatid_voice_language_random(chatid: str, voice:str, language:str):
   if chatid == "X":
     return None
   else:
@@ -199,11 +223,11 @@ def select_by_chatid_voice_random(chatid: str, voice:str):
       params=None
 
       if voice == "random":
-        sqlite_select_query = """SELECT data, name from Audio WHERE chatid = ?  AND is_correct = 1 ORDER BY RANDOM() LIMIT 1; """
-        params=(chatid,)
+        sqlite_select_query = """SELECT data, name from Audio WHERE chatid = ? AND language = ? AND is_correct = 1 ORDER BY RANDOM() LIMIT 1; """
+        params=(chatid,language,)
       else:
-        sqlite_select_query = """SELECT data, name from Audio WHERE chatid = ? and voice = ?  AND is_correct = 1 ORDER BY RANDOM() LIMIT 1; """
-        params=(chatid,voice,)
+        sqlite_select_query = """SELECT data, name from Audio WHERE chatid = ? AND language = ? and voice = ? AND is_correct = 1 ORDER BY RANDOM() LIMIT 1; """
+        params=(chatid,language,voice,)
 
       cursor.execute(sqlite_select_query, params)
       records = cursor.fetchall()
@@ -259,7 +283,7 @@ def select_count_by_text_chatid_voice(text: str, chatid: str, voice: str):
     records = cursor.fetchall()
 
     for row in records:
-      count = count + 1
+      count = row[0]
   except sqlite3.Error as error:
     logging.error("Failed to read data from sqlite table", exc_info=1)
     return count
@@ -268,7 +292,46 @@ def select_count_by_text_chatid_voice(text: str, chatid: str, voice: str):
       sqliteConnection.close()
     return count
 
+def select_count_by_text_chatid(text: str, chatid: str):
+  count = 0
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
 
+    sqlite_select_query = """SELECT count(id) from Audio WHERE name = ? and chatid = ?"""
+
+    cursor.execute(sqlite_select_query, (text, chatid))
+    records = cursor.fetchall()
+
+    for row in records:
+      count = row[0]
+  except sqlite3.Error as error:
+    logging.error("Failed to read data from sqlite table", exc_info=1)
+    return count
+  finally:
+    if sqliteConnection:
+      sqliteConnection.close()
+    return count
+
+def select_count_by_chatid_voice(chatid: str, voice: str):
+  count = 0
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
+
+    sqlite_select_query = """SELECT count(id) from Audio WHERE chatid = ? and voice = ?"""
+    cursor.execute(sqlite_select_query, (chatid, voice,))
+    records = cursor.fetchall()
+
+    for row in records:
+      count = row[0]
+  except sqlite3.Error as error:
+    logging.error("Failed to read data from sqlite table", exc_info=1)
+    return count
+  finally:
+    if sqliteConnection:
+      sqliteConnection.close()
+    return count
 
 def delete_by_name(name: str, chatid: str):
   try:
