@@ -8,5 +8,3 @@ docker compose -f docker-compose.yml build jerky-tts-bot-client --no-cache
 docker compose -f docker-compose.yml build jerky-tts-bot-telegram --no-cache
 docker compose -f docker-compose.yml build jerky-tts-bot-website --no-cache
 sudo systemctl enable docker-compose@jerky-tts-bot.service --now
-sleep 10
-docker compose logs -f

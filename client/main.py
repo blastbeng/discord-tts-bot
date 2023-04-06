@@ -191,7 +191,7 @@ logging.basicConfig(
 
 logging.getLogger('discord').setLevel(int(os.environ.get("LOG_LEVEL")))
 
-discord.utils.setup_logging(level=int(os.environ.get("LOG_LEVEL")))
+discord.utils.setup_logging(level=int(os.environ.get("LOG_LEVEL")), root=False)
 
 loops_dict = {}
 
@@ -220,6 +220,7 @@ def get_voices_menu_view():
     voices = listvoices()
     options = []
     for voice in voices:
+        label = (voice[:100]) if len(voice) > 100 else voice
         options.append(discord.SelectOption(label=voice, value=voices[voice]))
         
     
@@ -381,52 +382,54 @@ class PlayAudioLoop:
 
 @client.event
 async def on_ready():
+    logging.info(f'Logged in as {client.user} (ID: {client.user.id})')
+
+@client.event
+async def on_guild_available(guild):
+
     try:
-
-        logging.info(f'Logged in as {client.user} (ID: {client.user.id})')
-
-        for guild in client.guilds:
-            currentguildid = get_current_guild_id(str(guild.id))
-            utils.check_exists_guild(currentguildid)
-            client.tree.copy_global_to(guild=guild)
-            await client.tree.sync(guild=guild)
-            logging.info(f'Syncing commands to Guild (ID: {guild.id})')
-            nick = None
-            if guild.me.nick is None:
+        currentguildid = get_current_guild_id(str(guild.id))
+        utils.check_exists_guild(currentguildid)
+        client.tree.copy_global_to(guild=guild)
+        await client.tree.sync(guild=guild)
+        logging.info(f'Syncing commands to Guild (ID: {guild.id}) (NAME: {guild.name})')
+        nick = None
+        if guild.me.nick is None:
+            nick = client.user.name + " [" + utils.get_guild_language(currentguildid) + "]"
+        elif re.search(r'\[[a-z][a-z]\]', guild.me.nick) is None:
+            if len(guild.me.nick) > 20:
                 nick = client.user.name + " [" + utils.get_guild_language(currentguildid) + "]"
-            elif re.search(r'\[[a-z][a-z]\]', guild.me.nick) is None:
-                if len(guild.me.nick) > 20:
-                    nick = client.user.name + " [" + utils.get_guild_language(currentguildid) + "]"
-                else:
-                    nick = guild.me.nick[:len(guild.me.nick) - 5] + " [" + utils.get_guild_language(currentguildid) + "]"
-            if nick is not None:
-                await guild.me.edit(nick=nick)
-                logging.info(f'Renaming bot to {nick} for Guild (ID: {guild.id})')
-
-            
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/init/" + currentguildid + "/" + utils.get_guild_language(currentguildid)
-            response = requests.get(url)
-            if (response.status_code != 200):
-                logging.error("Initializing chatterbot on chatid " + currentguildid + " failed")
             else:
-                logging.info(response.text)
+                nick = guild.me.nick[:len(guild.me.nick) - 5] + " [" + utils.get_guild_language(currentguildid) + "]"
+        if nick is not None:
+            await guild.me.edit(nick=nick)
+            logging.info(f'Renaming bot to {nick} for Guild (ID: {guild.id}) (NAME: {guild.name})')
 
-            loops_dict[guild.id] = PlayAudioLoop(guild.id)
+        
+        url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/init/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid)
+        response = requests.get(url)
+        if (response.status_code != 200):
+            logging.error("Initializing chatterbot on chatid " + currentguildid + " failed")
+        else:
+            logging.info(response.text)
 
 
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/initgenerator/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid)
-            response = requests.get(url)
-            if (response.status_code != 200):
-                logging.error("Initializing generator on chatid " + currentguildid + " failed")
-            else:
-                logging.info(response.text)
+        url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/initgenerator/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid)
+        response = requests.get(url)
+        if (response.status_code != 200):
+            logging.error("Initializing generator on chatid " + currentguildid + " failed")
+        else:
+            logging.info(response.text)
+
+
+        loops_dict[guild.id] = PlayAudioLoop(guild.id)
+        loops_dict[guild.id].play_audio_loop.start()
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
         raise Exception(e)
-
 
 @client.event
 async def on_voice_state_update(member, before, after):
@@ -445,10 +448,10 @@ async def on_guild_join(guild):
     utils.check_exists_guild(get_current_guild_id(str(guild.id)))
     client.tree.copy_global_to(guild=guild)
     await client.tree.sync(guild=guild)
-    logging.info(f'Syncing commands to Guild (ID: {guild.id})')
+    logging.info(f'Syncing commands to Guild (ID: {guild.id}) (NAME: {guild.name})')
     name = client.user.name + " [en]"
     await guild.me.edit(nick=name)
-    logging.info(f'Renaming bot to {name} to Guild (ID: {guild.id})')
+    logging.info(f'Renaming bot to {name} for Guild (ID: {guild.id}) (NAME: {guild.name})')
 
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))

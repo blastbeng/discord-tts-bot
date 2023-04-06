@@ -243,9 +243,10 @@ class TextInsultClass(Resource):
     if text and text != '' and text != 'none':
       sentence = text + " " + sentence
     response = Response(sentence)
-    chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-    daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
-    daemon.start()
+    if chatid == "000000" and language == "it":
+      chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
+      daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
+      daemon.start()
     return response
 
 
@@ -927,9 +928,10 @@ class DatabaseDeleteByText(Resource):
 @nsdatabase.route('/audiodb/populate/')
 @nsdatabase.route('/audiodb/populate/<int:count>/')
 @nsdatabase.route('/audiodb/populate/<int:count>/<string:chatid>')
+@nsdatabase.route('/audiodb/populate/<int:count>/<string:chatid>/<string:lang>')
 class DatabaseAudiodbPopulate(Resource):
-  def get (self, count = 100, chatid = "000000"):
-    threading.Timer(0, utils.populate_audiodb, args=[count, chatid]).start()
+  def get (self, count = 100, chatid = "000000", lang = "it"):
+    threading.Timer(0, utils.populate_audiodb, args=[count, chatid, lang]).start()
     return "Starting thread populate_audiodb. Watch the logs."
 
 	
@@ -1022,15 +1024,21 @@ def admin():
     return render_template('unhautorized.html')
 
 
-def change_chatbot_language(chatid, language):
-  chatbots_dict[chatid] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True", lang = language)
-
-
 def get_chatbot_by_id(chatid = "000000", lang = "it"):
   if chatid not in chatbots_dict:
     chatbots_dict[chatid + "_" + lang] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True", lang = lang)
   return chatbots_dict[chatid + "_" + lang]
   
+
+def populate_loop():
+  for x in chatbots_dict.keys():
+    key = x.split('_')
+    utils.populate_audiodb(100, key[0], key[1])
+    
+def generator_loop():
+  for x in chatbots_dict.keys():
+    key = x.split('_')
+    utils.init_generator_models(key[0], key[1])
   
   
 @scheduler.task('interval', id='scrape_jokes', hours=168, misfire_grace_time=900)
@@ -1041,11 +1049,15 @@ def scrape_jokes():
 def login_fakeyou():
   utils.login_fakeyou()
   
-@scheduler.task('interval', id='populate_audiodb', hours=2, misfire_grace_time=900)
+@scheduler.task('interval', id='populate_loop', hours=1, misfire_grace_time=900)
 def populate_audiodb():
-  utils.populate_audiodb(100, None)
+  populate_loop()
+
+@scheduler.task('interval', id='generator_loop', hours=96, misfire_grace_time=900)
+def init_generator():
+  generator_loop()
   
-@scheduler.task('interval', id='backupdb', hours=68, misfire_grace_time=900)
+@scheduler.task('interval', id='backupdb', hours=12, misfire_grace_time=900)
 def backupdb():
   utils.backupdb("000000")
   

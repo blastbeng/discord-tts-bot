@@ -333,6 +333,28 @@ def select_count_by_chatid_voice(chatid: str, voice: str):
       sqliteConnection.close()
     return count
 
+
+
+def select_count_by_name_chatid_voice_language(name: str, chatid: str, voice: str, language: str):
+  count = 0
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
+
+    sqlite_select_query = """SELECT count(id) from Audio WHERE chatid = ? and voice = ? and name = ? and language = ? """
+    cursor.execute(sqlite_select_query, (chatid, voice, name, language))
+    records = cursor.fetchall()
+
+    for row in records:
+      count = row[0]
+  except sqlite3.Error as error:
+    logging.error("Failed to read data from sqlite table", exc_info=1)
+    return count
+  finally:
+    if sqliteConnection:
+      sqliteConnection.close()
+    return count
+
 def delete_by_name(name: str, chatid: str):
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
