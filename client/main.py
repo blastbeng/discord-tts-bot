@@ -489,17 +489,17 @@ async def on_guild_available(guild):
         client.tree.copy_global_to(guild=guild)
         await client.tree.sync(guild=guild)
         logging.info(f'Syncing commands to Guild (ID: {guild.id}) (NAME: {guild.name})')
-        nick = None
-        if guild.me.nick is None:
-            nick = client.user.name + " [" + utils.get_guild_language(currentguildid) + "]"
-        elif re.search(r'\[[a-z][a-z]\]', guild.me.nick) is None:
-            if len(guild.me.nick) > 20:
-                nick = client.user.name + " [" + utils.get_guild_language(currentguildid) + "]"
-            else:
-                nick = guild.me.nick[:len(guild.me.nick) - 5] + " [" + utils.get_guild_language(currentguildid) + "]"
-        if nick is not None:
-            await guild.me.edit(nick=nick)
-            logging.info(f'Renaming bot to {nick} for Guild (ID: {guild.id}) (NAME: {guild.name})')
+        #nick = None
+        #if guild.me.nick is None:
+        #    nick = client.user.name + " [" + utils.get_guild_language(currentguildid) + "]"
+        #elif re.search(r'\[[a-z][a-z]\]', guild.me.nick) is None:
+        #    if len(guild.me.nick) > 20:
+        #        nick = client.user.name + " [" + utils.get_guild_language(currentguildid) + "]"
+        #    else:
+        #        nick = guild.me.nick[:len(guild.me.nick) - 5] + " [" + utils.get_guild_language(currentguildid) + "]"
+        #if nick is not None:
+        #    await guild.me.edit(nick=nick)
+        #    logging.info(f'Renaming bot to {nick} for Guild (ID: {guild.id}) (NAME: {guild.name})')
 
         
         url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/init/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid)
@@ -924,20 +924,20 @@ async def stop_internal(interaction: discord.Interaction):
 
 @client.tree.command()
 @app_commands.rename(name='name')
-@app_commands.describe(name="New bot nickname (20 chars limit)")
+@app_commands.describe(name="New bot nickname (32 chars limit)")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def rename(interaction: discord.Interaction, name: str):
     """Rename bot."""
     try:
-        if len(name) < 20:
+        if len(name) < 32:
             currentguildid = get_current_guild_id(interaction.guild.id)
             
-            message = interaction.user.mention + " " + utils.translate(currentguildid," renamed me to") + ' "'+name+'"'
-            name = name + " [" + utils.get_guild_language(currentguildid) + "]"
+            message = utils.translate(currentguildid,"You renamed me to") + ' "'+name+'"'
+            #name = name + " [" + utils.get_guild_language(currentguildid) + "]"
             await interaction.guild.me.edit(nick=name)
-            await interaction.response.send_message(message)
+            await interaction.response.send_message(message, ephemeral = True)
         else:
-            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"My name can't be that longer (20 chars limit)"), ephemeral = True)
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"My name cannot be longer than 32 characters"), ephemeral = True)
     except Exception as e:
         await send_error(e, interaction, from_generic=False)
 
@@ -983,20 +983,20 @@ async def language(interaction: discord.Interaction, language: app_commands.Choi
 
             utils.update_guild(currentguildid, language.value)
 
-            nick = interaction.guild.me.nick
-            if nick is None:
-                nick = client.user.name
-            else:
-                x = re.search(r'\[[a-z][a-z]\]', nick)
-                if x is not None:
-                    nick = interaction.guild.me.nick[:len(interaction.guild.me.nick) - 5]
-                elif len(nick) > 20:
-                    nick = client.user.name
-                else:
-                    nick = interaction.guild.me.nick[:len(interaction.guild.me.nick) - 5]
+            #nick = interaction.guild.me.nick
+            #if nick is None:
+            #    nick = client.user.name
+            #else:
+            #    x = re.search(r'\[[a-z][a-z]\]', nick)
+            #    if x is not None:
+            #        nick = interaction.guild.me.nick[:len(interaction.guild.me.nick) - 5]
+            #    elif len(nick) > 20:
+            #        nick = client.user.name
+            #    else:
+            #        nick = interaction.guild.me.nick[:len(interaction.guild.me.nick) - 5]
 
-            name = nick + " [" + utils.get_guild_language(currentguildid) + "]"
-            await interaction.guild.me.edit(nick=name)
+            #name = nick + " [" + utils.get_guild_language(currentguildid) + "]"
+            #await interaction.guild.me.edit(nick=name)
             await interaction.response.send_message(utils.translate(currentguildid,"Bot language changed to ") + ' "'+language.name+'"', ephemeral = True)
         else:
             await interaction.response.send_message(utils.translate(currentguildid,"Only administrators can use this command"), ephemeral = True)

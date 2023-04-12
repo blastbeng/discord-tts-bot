@@ -781,13 +781,15 @@ def populate_audiodb(limit: int, chatid: str, lang: str):
             result = populate_tts(sentence, chatid=chatid, voice=voice, language=language)
             if result is None:
               inserted="Skipped (TTS lenght limit exceeded)"
-              logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)              
+              logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted) 
+              time.sleep(60)              
             elif result is True:
               counter = counter + 1
               inserted="Done (Inserted in DB)"
               logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
               if counter >= limit:
                 break
+              time.sleep(60) 
             elif result is False:
               inserted="Skipped (Already in DB)"
               logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
