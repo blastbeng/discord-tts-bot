@@ -27,6 +27,7 @@ from threading import Thread
 from bestemmie import Bestemmie
 from libretranslator import LibreTranslator
 from chatterbot import languages
+from exceptions import AudioLimitException
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -73,14 +74,20 @@ parserinsult.add_argument("text", type=str)
 parserinsult.add_argument("chatid", type=str)
 
 def get_response_str(text: str):
-    r = Response(response=text, status=200, mimetype="text/xml")
-    r.headers["Content-Type"] = "text/xml; charset=utf-8"
-    return r
+  r = Response(response=text, status=200, mimetype="text/xml")
+  r.headers["Content-Type"] = "text/xml; charset=utf-8"
+  return r
 
 def get_response_json(data):
-    r = Response(response=data, status=200, mimetype="application/json")
-    r.headers["Content-Type"] = "application/json; charset=utf-8"
-    return r
+  r = Response(response=data, status=200, mimetype="application/json")
+  r.headers["Content-Type"] = "application/json; charset=utf-8"
+  return r
+
+def get_response_limit_error(text: str):
+  r = make_response("TTS Limit Exceeded", 400)
+  r.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+  return r
+
 
 @nstext.route('/repeat/<string:text>/')
 @nstext.route('/repeat/<string:text>/<string:chatid>')
@@ -243,10 +250,9 @@ class TextInsultClass(Resource):
     if text and text != '' and text != 'none':
       sentence = text + " " + sentence
     response = Response(sentence)
-    if chatid == "000000" and language == "it":
-      chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-      daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
-      daemon.start()
+    chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
+    daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
+    daemon.start()
     return response
 
 
@@ -266,7 +272,7 @@ class ImageGenerateByText(Resource):
         @after_this_request
         def clear_cache(response):
           cache.delete_memoized(ImageGenerateByText.get, self, str, str, str)
-          return make_response("TTS Generation Error!", 500)
+          return make_response("Generation Error!", 500)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -295,6 +301,8 @@ class AudioRepeatClass(Resource):
         def clear_cache(response):
           cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
+    except AudioLimitException:
+      return get_response_limit_error(text)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -321,6 +329,8 @@ class AudioSaveRepeatClass(Resource):
         def clear_cache(response):
           cache.delete_memoized(AudioSaveRepeatClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
+    except AudioLimitException:
+      return get_response_limit_error(text)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -335,11 +345,12 @@ class AudioSaveRepeatClass(Resource):
 class AudioCurseClass(Resource):
   @cache.cached(timeout=3, query_string=True)
   def get (self, voice: str, chatid = "000000", lang = "it"):
+    cursez = ""
     try:
       cursez = Bestemmie().random().lower()
       if lang != "it":
         cursez = LibreTranslator(from_lang="it", to_lang=lang, base_url=os.environ.get("TRANSLATOR_BASEURL")).translate(cursez)
-      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=lang, save=False, call_fy=False)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=lang, save=False, call_fy=False, limit=False)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
@@ -349,6 +360,8 @@ class AudioCurseClass(Resource):
         def clear_cache(response):
           cache.delete_memoized(AudioCurseClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
+    except AudioLimitException:
+      return get_response_limit_error(cursez)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -386,10 +399,10 @@ class AudioRandomClass(Resource):
   @cache.cached(timeout=2, query_string=True)
   def get (self, voice = "random", chatid = "000000", lang = "it"):
     try:
-      tts_out, text_out = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang)
+      tts_out, text = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.headers['X-Generated-Text'] = text_out.encode('utf-8').decode('latin-1')
+        response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
         return response
       else:
         @after_this_request
@@ -414,10 +427,9 @@ class AudioRepeatLearnClass(Resource):
       tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        if chatid == "000000":
-          chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-          daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
-          daemon.start()
+        chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
+        daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
+        daemon.start()
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
         return response
       else:
@@ -425,6 +437,8 @@ class AudioRepeatLearnClass(Resource):
         def clear_cache(response):
           cache.delete_memoized(AudioRepeatLearnClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
+    except AudioLimitException:
+      return get_response_limit_error(text)
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -459,6 +473,8 @@ class AudioRepeatLearnUserClass(Resource):
         def clear_cache(response):
           cache.delete_memoized(AudioRepeatLearnUserClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
+    except AudioLimitException:
+      return get_response_limit_error(text)
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -477,8 +493,8 @@ class AudioRepeatLearnUserClass(Resource):
 class AudioAskClass(Resource):
   @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, voice = "random", chatid = "000000", lang= "it"):
+    chatbot_resp = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text).text
     try:
-      chatbot_resp = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text).text
       tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice=voice, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -489,6 +505,8 @@ class AudioAskClass(Resource):
         def clear_cache(response):
           cache.delete_memoized(AudioAskClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
+    except AudioLimitException:
+      return get_response_limit_error(chatbot_resp)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -503,8 +521,8 @@ class AudioAskClass(Resource):
 class AudioAskNoLearnClass(Resource):
   @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, chatid = "000000", lang= "it"):
+    text_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
     try:
-      text_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
       tts_out = utils.get_tts(text_response, chatid=chatid, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -515,6 +533,8 @@ class AudioAskNoLearnClass(Resource):
         def clear_cache(response):
           cache.delete_memoized(AudioAskNoLearnClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
+    except AudioLimitException:
+      return get_response_limit_error(text_response)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -529,8 +549,8 @@ class AudioAskNoLearnClass(Resource):
 class AudioAskNoLearnRandomClass(Resource):
   @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, chatid = "000000", lang= "it"):
+    text_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
     try:
-      text_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
       tts_out = utils.get_tts(text_response, voice="random", chatid=chatid, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -541,6 +561,8 @@ class AudioAskNoLearnRandomClass(Resource):
         def clear_cache(response):
           cache.delete_memoized(AudioAskNoLearnRandomClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
+    except AudioLimitException:
+      return get_response_limit_error(text_response)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -555,8 +577,8 @@ class AudioAskNoLearnRandomClass(Resource):
 class AudioAskNoLearnNoCacheGoogleClass(Resource):
   @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, chatid = "000000", lang= "it"):
+    text_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
     try:
-      text_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
       tts_out = utils.get_tts(text_response, voice="google", chatid=chatid, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -564,6 +586,8 @@ class AudioAskNoLearnNoCacheGoogleClass(Resource):
         return response
       else:
         return make_response('request_error', 500)
+    except AudioLimitException:
+      return get_response_limit_error(text_response)
     except Exception as e:
       g.request_error = str(e)
       return make_response(g.get('request_error'), 500)
@@ -575,8 +599,8 @@ class AudioAskNoLearnNoCacheGoogleClass(Resource):
 class AudioAskNoLearnNoCacheGoogleClass(Resource):
   @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, chatid = "000000", lang= "it"):
+    text_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
     try:
-      text_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
       tts_out = utils.get_tts(text_response, voice="google", chatid=chatid, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -584,6 +608,8 @@ class AudioAskNoLearnNoCacheGoogleClass(Resource):
         return response
       else:
         return make_response('request_error', 500)
+    except AudioLimitException:
+      return get_response_limit_error(text_response)
     except Exception as e:
       g.request_error = str(e)
       return make_response(g.get('request_error'), 500)
@@ -607,13 +633,15 @@ class AudioAskUserClass(Resource):
       tts_out = utils.get_tts(chatbot_response, chatid=chatid, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.headers['X-Generated-Text'] = chatbot_response
+        response.headers['X-Generated-Text'] = chatbot_response.encode('utf-8').decode('latin-1')
         return response
       else:
         @after_this_request
         def clear_cache(response):
           cache.delete_memoized(AudioAskUserClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
+    except AudioLimitException:
+      return get_response_limit_error(chatbot_response)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -627,19 +655,21 @@ class AudioAskUserClass(Resource):
 class AudioSearchClass(Resource):
   @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, chatid = "000000", lang= "it"):
+    wikisaid = utils.wiki_summary(text, lang)
     try:
-      wikisaid = utils.wiki_summary(text, lang)
       
-      tts_out = utils.get_tts(wikisaid, chatid=chatid, voice="null", language=lang)
+      tts_out = utils.get_tts(wikisaid, chatid=chatid, voice="null", language=lang, save=False, call_fy=False, limit=False)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.headers['X-Generated-Text'] = wikisaid
+        response.headers['X-Generated-Text'] = wikisaid.encode('utf-8').decode('latin-1')
         return response
       else:
         @after_this_request
         def clear_cache(response):
           cache.delete_memoized(AudioSearchClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
+    except AudioLimitException:
+      return get_response_limit_error(wikisaid)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -652,6 +682,7 @@ class AudioSearchClass(Resource):
 class AudioInsultClass(Resource):
   @api.expect(parserinsult)
   def get (self):
+    sentence = ""
     try:
       sentence = insults.get_insults()
       lang = request.args.get("lang")
@@ -668,15 +699,16 @@ class AudioInsultClass(Resource):
       tts_out = utils.get_tts(sentence, chatid=chatid, voice="google", language=lang)
       if tts_out is not None:    
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        if chatid == "000000" and language == "it":
-          chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-          daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
-          daemon.start()
-        response.headers['X-Generated-Text'] = sentence
+        chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
+        daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
+        daemon.start()
+        response.headers['X-Generated-Text'] = sentence.encode('utf-8').decode('latin-1')
         return response
       else:
         resp = make_response("TTS Generation Error!", 500)
         return resp
+    except AudioLimitException:
+      return get_response_limit_error(sentence)
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -697,7 +729,7 @@ class YoutubeGetClass(Resource):
         return make_response("YouTube Error", 500)
       else:
         response = send_file(audio, attachment_filename='song.mp3', mimetype='audio/mp3')
-        response.headers['X-Generated-Text'] = url
+        response.headers['X-Generated-Text'] = url.encode('utf-8').decode('latin-1')
         return response
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -775,12 +807,14 @@ class AudioChuckClass(Resource):
     try:
       text = utils.get_joke("CHUCK_NORRIS")
       
-      tts_out = utils.get_tts(text, chatid="000000", voice="google")
+      tts_out = utils.get_tts(text, chatid="000000", voice="google", save=False, call_fy=False, limit=False)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
         resp = make_response("TTS Generation Error!", 500)
         return resp
+    except AudioLimitException:
+      return get_response_limit_error(text)
     except Exception as e:
       return make_response(g.get('request_error'), 500)
 
@@ -791,12 +825,14 @@ class AudioRandomJokeClass(Resource):
     try:
       text = utils.get_joke("")
       
-      tts_out = utils.get_tts(text, chatid="000000", voice="google")
+      tts_out = utils.get_tts(text, chatid="000000", voice="google", save=False, call_fy=False, limit=False)
       if tts_out is not None:
         return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
       else:
         resp = make_response("TTS Generation Error!", 500)
         return resp
+    except AudioLimitException:
+      return get_response_limit_error(text)
     except Exception as e:
       return make_response(str(e), 500)
 
@@ -847,7 +883,7 @@ class InitChatterbotClass(Resource):
 class InitGeneratorClass(Resource):
   def get(self, chatid = "000000", lang = "it"):
     try:
-      threading.Timer(10, utils.init_generator_models, args=["000000", lang]).start()
+      threading.Timer(10, utils.init_generator_models, args=[chatid, lang]).start()
       return make_response("Initializing Generator Models. Watch the logs for errors.", 200)
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -926,14 +962,13 @@ class DatabaseDeleteByText(Resource):
 
 
 @nsdatabase.route('/audiodb/populate/')
-@nsdatabase.route('/audiodb/populate/<int:count>/')
-@nsdatabase.route('/audiodb/populate/<int:count>/<string:chatid>')
-@nsdatabase.route('/audiodb/populate/<int:count>/<string:chatid>/<string:lang>')
+@nsdatabase.route('/audiodb/populate/<int:limit>/')
+@nsdatabase.route('/audiodb/populate/<int:limit>/<string:chatid>')
+@nsdatabase.route('/audiodb/populate/<int:limit>/<string:chatid>/<string:lang>')
 class DatabaseAudiodbPopulate(Resource):
-  def get (self, count = 100, chatid = "000000", lang = "it"):
-    threading.Timer(0, utils.populate_audiodb, args=[count, chatid, lang]).start()
-    return "Starting thread populate_audiodb. Watch the logs."
-
+  def get (self, limit = 100, chatid = "000000", lang = "it"):
+    threading.Timer(0, utils.populate_audiodb, args=[limit, chatid, lang]).start()
+    return get_response_str("Starting thread populate_audiodb [count:"+str(limit)+"] [chatid:"+str(chatid)+"] [lang:"+str(lang)+"]. Watch the logs.")
 	
 
 @nsdatabase.route('/upload/trainfile/json')
@@ -1029,39 +1064,17 @@ def get_chatbot_by_id(chatid = "000000", lang = "it"):
     chatbots_dict[chatid + "_" + lang] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True", lang = lang)
   return chatbots_dict[chatid + "_" + lang]
   
-
-def populate_loop():
-  for x in chatbots_dict.keys():
-    key = x.split('_')
-    utils.populate_audiodb(100, key[0], key[1])
-    
-def generator_loop():
-  for x in chatbots_dict.keys():
-    key = x.split('_')
-    utils.init_generator_models(key[0], key[1])
   
   
-@scheduler.task('interval', id='scrape_jokes', hours=168, misfire_grace_time=900)
+@scheduler.task('interval', id='scrape_jokes', hours=168)
 def scrape_jokes():
   utils.scrape_jokes()
   
-@scheduler.task('interval', id='login_fakeyou', hours=11, misfire_grace_time=900)
-def login_fakeyou():
-  utils.login_fakeyou()
-  
-@scheduler.task('interval', id='populate_loop', hours=1, misfire_grace_time=900)
-def populate_audiodb():
-  populate_loop()
-
-@scheduler.task('interval', id='generator_loop', hours=96, misfire_grace_time=900)
-def init_generator():
-  generator_loop()
-  
-@scheduler.task('interval', id='backupdb', hours=12, misfire_grace_time=900)
+@scheduler.task('interval', id='backupdb', hours=12)
 def backupdb():
   utils.backupdb("000000")
   
-@scheduler.task('interval', id='clean_audio_zip', hours=28, misfire_grace_time=900)
+@scheduler.task('interval', id='clean_audio_zip', hours=28)
 def clean_audio_zip():
   utils.clean_audio_zip()
 
@@ -1075,7 +1088,6 @@ cache.init_app(app)
 limiter.init_app(app)
 scheduler.init_app(app)
 scheduler.start()
-utils.login_fakeyou()
 
 if __name__ == '__main__':
   app.run()

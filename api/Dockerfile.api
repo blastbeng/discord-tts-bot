@@ -65,6 +65,7 @@ COPY custom_trainer.py .
 COPY insults.py .
 COPY image.py .
 COPY main.py .
+COPY exceptions.py .
 COPY config.py .
 COPY voices.json .
 COPY entrypoint.sh .

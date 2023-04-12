@@ -8,6 +8,7 @@ from os.path import dirname
 from os.path import join
 from pathlib import Path
 from datetime import datetime
+from exceptions import AudioLimitException
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -37,11 +38,15 @@ def create_empty_tables():
             id INTEGER PRIMARY KEY,
             name VARCHAR(500) NOT NULL,
             chatid VARCHAR(50) NOT NULL,
-            data BLOB NOT NULL,
+            data BLOB NULL,
             voice VARCHAR(50) NOT NULL,
-            is_correct INTEGER DEFAULT 0 NOT NULL,
+            is_correct INTEGER DEFAULT 1 NOT NULL,
             language VARCHAR(2) NOT NULL,
-            UNIQUE(name,chatid,voice)
+            counter INTEGER DEFAULT 1 NOT NULL,
+            duration INTEGER DEFAULT 0 NOT NULL,
+            tms_insert DATETIME DEFAULT CURRENT_TIMESTAMP,
+            tms_update DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(name,chatid,voice,language)
         ); """
 
     cursor.execute(sqlite_create_audio_query)
@@ -52,22 +57,23 @@ def create_empty_tables():
     if sqliteConnection:
         sqliteConnection.close()
 
-def insert(name: str, chatid: str, data: BytesIO, voice: str, language: str, is_correct=1):
+def insert(name: str, chatid: str, data: BytesIO, voice: str, language: str, is_correct=1, duration=0):
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
     cursor = sqliteConnection.cursor()
 
     sqlite_insert_audio_query = """INSERT INTO Audio
-                          (name, chatid, data, voice, is_correct, language) 
-                           VALUES 
-                          (?, ?, ?, ?, ?, ?)"""
+                          (name, chatid, data, voice, is_correct, language, duration, tms_update)  
+                          VALUES 
+                          (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"""
 
     data_audio_tuple = (name, 
                         chatid, 
-                        data.read(),
+                        data.getbuffer() if data is not None else None,
                         voice,
                         is_correct,
-                        language)
+                        language,
+                        duration,)
 
     cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
 
@@ -76,7 +82,57 @@ def insert(name: str, chatid: str, data: BytesIO, voice: str, language: str, is_
     cursor.close()
 
   except sqlite3.Error as error:
-    logging.error("Failed to insert data into sqlite", exc_info=1)
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()
+
+def insert_or_update(name: str, chatid: str, data: BytesIO, voice: str, language: str, is_correct=1, duration=0):
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+
+    count = select_count_by_name_chatid_voice_language(name, chatid, voice, language)
+    cursor = sqliteConnection.cursor()
+
+    if count > 0:
+
+      sqlite_insert_audio_query = """UPDATE Audio
+                            set data = ?, is_correct = ?, duration = ?, tms_update = CURRENT_TIMESTAMP
+                            WHERE chatid = ? and voice = ? and name = ? and language = ?"""
+
+      data_audio_tuple = (data.getbuffer() if data is not None else None,
+                          is_correct,
+                          duration,
+                          chatid,
+                          voice,
+                          name,
+                          language,)
+
+      cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
+    else:
+
+      sqlite_insert_audio_query = """INSERT INTO Audio
+                            (name, chatid, data, voice, is_correct, language, duration, tms_update) 
+                            VALUES 
+                            (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"""
+
+      data_audio_tuple = (name, 
+                          chatid, 
+                          data.getbuffer() if data is not None else None,
+                          voice,
+                          is_correct,
+                          language,
+                          duration,)
+
+      cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
+
+
+
+    sqliteConnection.commit()
+    cursor.close()
+
+  except sqlite3.Error as error:
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -87,7 +143,7 @@ def update_is_correct(name: str, chatid: str, voice: str, language: str, is_corr
     cursor = sqliteConnection.cursor()
 
     sqlite_insert_audio_query = """UPDATE Audio
-                          SET is_correct = ? 
+                          SET is_correct = ?, tms_update = CURRENT_TIMESTAMP
                            WHERE 
                           name = ? and chatid = ? and voice = ? and language = ? """
 
@@ -95,16 +151,47 @@ def update_is_correct(name: str, chatid: str, voice: str, language: str, is_corr
                         name, 
                         chatid, 
                         voice,
-                        language)
+                        language,)
 
     cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
 
 
     sqliteConnection.commit()
     cursor.close()
+  except sqlite3.Error as error:
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()
+
+def increment_counter(name: str, chatid: str, voice: str, language: str):
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
+
+    counter = select_counter_by_name_chatid_voice_language(name, chatid, voice, language)
+    
+    sqlite_insert_audio_query = """UPDATE Audio
+                            SET counter = ?, tms_update = CURRENT_TIMESTAMP
+                            WHERE 
+                            name = ? and chatid = ? and voice = ? and language = ? and is_correct = ?"""
+
+    data_audio_tuple = (counter + 1,
+                        name, 
+                        chatid, 
+                        voice,
+                        language,
+                        1 if counter < 100 else 0)
+
+    cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
+
+
+
+    sqliteConnection.commit()
+    cursor.close()
 
   except sqlite3.Error as error:
-    logging.error("Failed to update data into sqlite", exc_info=1)
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
   finally:
     if sqliteConnection:
         sqliteConnection.close()
@@ -115,12 +202,12 @@ def select_list_by_chatid(chatid=GUILD_ID):
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
     cursor = sqliteConnection.cursor()
-    sqlite_select_query = " SELECT DISTINCT * from Audio WHERE chatid = ? AND is_correct = 1 ORDER BY name, voice"
+    sqlite_select_query = " SELECT DISTINCT * from Audio WHERE chatid = ? AND is_correct = 1 AND counter > 0 ORDER BY name, voice"
     cursor.execute(sqlite_select_query, (chatid,))
     records = cursor.fetchall()
 
   except sqlite3.Error as error:
-    logging.error("Failed to read data from sqlite table", exc_info=1)
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
   finally:
     if sqliteConnection:
       sqliteConnection.close()
@@ -136,7 +223,7 @@ def select_by_chatid(chatid=GUILD_ID):
     records = cursor.fetchall()
 
   except sqlite3.Error as error:
-    logging.error("Failed to read data from sqlite table", exc_info=1)
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
   finally:
     if sqliteConnection:
       sqliteConnection.close()
@@ -147,12 +234,12 @@ def select_data_name_voice_by_chatid(chatid: str):
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
     cursor = sqliteConnection.cursor()
-    sqlite_select_query = " SELECT DISTINCT data, name, voice from Audio WHERE chatid = ? AND is_correct = 1 "
+    sqlite_select_query = " SELECT DISTINCT data, name, voice from Audio WHERE chatid = ? AND is_correct = 1 AND counter > 0 and data is not null"
     cursor.execute(sqlite_select_query, (chatid,))
     records = cursor.fetchall()
 
   except sqlite3.Error as error:
-    logging.error("Failed to read data from sqlite table", exc_info=1)
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
   finally:
     if sqliteConnection:
       sqliteConnection.close()
@@ -167,22 +254,49 @@ def select_by_name_chatid_voice_language(name: str, chatid: str, voice: str, lan
       sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
       cursor = sqliteConnection.cursor()
 
-      sqlite_select_query = """SELECT data from Audio WHERE name = ? AND chatid = ? AND voice = ? AND language = ? AND is_correct = 1 """
+      sqlite_select_query = """SELECT data, duration from Audio WHERE name = ? AND chatid = ? AND voice = ? AND language = ? AND is_correct = 1 AND counter > 0 and data is not null"""
       cursor.execute(sqlite_select_query, (name, chatid, voice, language,))
       records = cursor.fetchall()
 
       for row in records:
         data   =  row[0]
+        duration = row[1]
         cursor.close()
+        if duration > int(os.environ.get("MAX_TTS_DURATION")):
+          sqliteConnection.close()
+          raise AudioLimitException
         audio = BytesIO(data)
         audio.seek(0)
 
     except sqlite3.Error as error:
-      logging.error("Failed to read data from sqlite table", exc_info=1)
+      logging.error("Failed to Execute SQLITE Query", exc_info=1)
     finally:
       if sqliteConnection:
         sqliteConnection.close()
     return audio
+
+def select_counter_by_name_chatid_voice_language(name: str, chatid: str, voice: str, language: str):
+  if chatid == "X":
+    return None
+  else:
+    counter = 0
+    try:
+      sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+      cursor = sqliteConnection.cursor()
+
+      sqlite_select_query = """SELECT counter from Audio WHERE name = ? AND chatid = ? AND voice = ? AND language = ?"""
+      cursor.execute(sqlite_select_query, (name, chatid, voice, language,))
+      records = cursor.fetchall()
+
+      for row in records:
+        counter   =  row[0]
+
+    except sqlite3.Error as error:
+      logging.error("Failed to Execute SQLITE Query", exc_info=1)
+    finally:
+      if sqliteConnection:
+        sqliteConnection.close()
+    return counter
 
 
 
@@ -203,7 +317,7 @@ def select_distinct_language_by_name_chatid(name: str, chatid: str):
         lang   =  str(row[0])
 
     except sqlite3.Error as error:
-      logging.error("Failed to read data from sqlite table", exc_info=1)
+      logging.error("Failed to Execute SQLITE Query", exc_info=1)
     finally:
       if sqliteConnection:
         sqliteConnection.close()
@@ -223,24 +337,28 @@ def select_by_chatid_voice_language_random(chatid: str, voice:str, language:str)
       params=None
 
       if voice == "random":
-        sqlite_select_query = """SELECT data, name from Audio WHERE chatid = ? AND language = ? AND is_correct = 1 ORDER BY RANDOM() LIMIT 1; """
+        sqlite_select_query = """SELECT data, name, duration from Audio WHERE chatid = ? AND language = ? AND is_correct = 1 AND counter > 0 and data is not null ORDER BY RANDOM() LIMIT 1; """
         params=(chatid,language,)
       else:
-        sqlite_select_query = """SELECT data, name from Audio WHERE chatid = ? AND language = ? and voice = ? AND is_correct = 1 ORDER BY RANDOM() LIMIT 1; """
+        sqlite_select_query = """SELECT data, name, duration from Audio WHERE chatid = ? AND language = ? and voice = ? AND is_correct = 1 AND counter > 0 and data is not null ORDER BY RANDOM() LIMIT 1; """
         params=(chatid,language,voice,)
 
       cursor.execute(sqlite_select_query, params)
       records = cursor.fetchall()
 
       for row in records:
-        data   =  row[0]
+        data = row[0]
+        duration = row[2]
         cursor.close()
+        if duration > int(os.environ.get("MAX_TTS_DURATION")):
+          sqliteConnection.close()
+          raise AudioLimitException
         audio = BytesIO(data)
         audio.seek(0)
         name = row[1]
 
     except sqlite3.Error as error:
-      logging.error("Failed to read data from sqlite table", exc_info=1)
+      logging.error("Failed to Execute SQLITE Query", exc_info=1)
     finally:
       if sqliteConnection:
         sqliteConnection.close()
@@ -263,7 +381,7 @@ def select_audio_by_id(id: int):
       audio.seek(0)
 
   except sqlite3.Error as error:
-    logging.error("Failed to read data from sqlite table", exc_info=1)
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
   finally:
     if sqliteConnection:
       sqliteConnection.close()
@@ -285,7 +403,7 @@ def select_count_by_text_chatid_voice(text: str, chatid: str, voice: str):
     for row in records:
       count = row[0]
   except sqlite3.Error as error:
-    logging.error("Failed to read data from sqlite table", exc_info=1)
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
     return count
   finally:
     if sqliteConnection:
@@ -306,7 +424,7 @@ def select_count_by_text_chatid(text: str, chatid: str):
     for row in records:
       count = row[0]
   except sqlite3.Error as error:
-    logging.error("Failed to read data from sqlite table", exc_info=1)
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
     return count
   finally:
     if sqliteConnection:
@@ -326,7 +444,7 @@ def select_count_by_chatid_voice(chatid: str, voice: str):
     for row in records:
       count = row[0]
   except sqlite3.Error as error:
-    logging.error("Failed to read data from sqlite table", exc_info=1)
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
     return count
   finally:
     if sqliteConnection:
@@ -342,13 +460,13 @@ def select_count_by_name_chatid_voice_language(name: str, chatid: str, voice: st
     cursor = sqliteConnection.cursor()
 
     sqlite_select_query = """SELECT count(id) from Audio WHERE chatid = ? and voice = ? and name = ? and language = ? """
-    cursor.execute(sqlite_select_query, (chatid, voice, name, language))
+    cursor.execute(sqlite_select_query, (chatid, voice, name, language,))
     records = cursor.fetchall()
 
     for row in records:
       count = row[0]
   except sqlite3.Error as error:
-    logging.error("Failed to read data from sqlite table", exc_info=1)
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
     return count
   finally:
     if sqliteConnection:
@@ -377,8 +495,31 @@ def delete_by_name(name: str, chatid: str):
     cursor.close()
 
   except Exception as e:
-    logging.error("Failed to read data from sqlite table", exc_info=1)
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
     raise Exception(e)
   finally:
     if sqliteConnection:
       sqliteConnection.close()
+
+
+
+def clean_old_limited_audios(chatid: str, limit: int):
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
+
+    sqlite_insert_audio_query = """DELETE from audio where chatid = ? and data is null and duration > 0 and duration < ?"""
+
+    data_audio_tuple = (chatid, 
+                        limit,)
+
+    cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
+
+
+    sqliteConnection.commit()
+    cursor.close()
+  except sqlite3.Error as error:
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()

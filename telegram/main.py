@@ -602,26 +602,30 @@ def text2image(update: Update, context: CallbackContext):
                 context.bot.send_message(chat_id=update.effective_chat.id, text="Le API remote sono offline", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
             else:
                 text = update.message.text[12:].strip();
-                payload = {
-                    "prompt": text,
-                    "steps": 50,
-                    "width": 512,
-                    "height": 512,
-                    "batch_size": 1,
-                    "sampler_index": "Euler",
-                }
-                url = os.environ.get("STABLE_DIFFUSION_API_URL") + os.environ.get("STABLE_DIFFUSION_API_TEXT_2_IMG")
-                response = requests.post(url, json=payload)
-                if (response.status_code == 200 and response.text != "Internal Server Error"):
-                    r = response.json()
-                    for i in r['images']:
-                        image = Image.open(BytesIO(base64.b64decode(i.split(",",1)[0])))
-                    with BytesIO() as image_binary:
-                        image.save(image_binary, 'PNG')
-                        image_binary.seek(0)
-                        context.bot.send_photo(chat_id=update.effective_chat.id, photo=image_binary, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                if(text != "" and len(text) <= 500  and not text.endswith('bot')):
+                    payload = {
+                        "prompt": text,
+                        "steps": 50,
+                        "width": 512,
+                        "height": 512,
+                        "batch_size": 1,
+                        "sampler_index": "Euler",
+                    }
+                    url = os.environ.get("STABLE_DIFFUSION_API_URL") + os.environ.get("STABLE_DIFFUSION_API_TEXT_2_IMG")
+                    response = requests.post(url, json=payload)
+                    if (response.status_code == 200 and response.text != "Internal Server Error"):
+                        r = response.json()
+                        for i in r['images']:
+                            image = Image.open(BytesIO(base64.b64decode(i.split(",",1)[0])))
+                        with BytesIO() as image_binary:
+                            image.save(image_binary, 'PNG')
+                            image_binary.seek(0)
+                            context.bot.send_photo(chat_id=update.effective_chat.id, photo=image_binary, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                    else:
+                        context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
                 else:
-                    context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)   
+                    context.bot.send_message(chat_id=update.effective_chat.id, text="se vuoi che genero un immagine devi scrivere qualcosa dopo /text2image (massimo 500 caratteri)", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+               
                         
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
