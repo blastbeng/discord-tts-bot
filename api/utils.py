@@ -744,9 +744,9 @@ def populate_audiodb(limit: int, chatid: str, lang: str):
       sqlite_select_sentences_query = "SELECT DISTINCT * FROM ( "
       sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT statement.text as name FROM statement WHERE statement.text NOT IN (SELECT audiodb.audio.name from audiodb.audio) ORDER BY RANDOM() LIMIT " + str(limit) + ")"
       sqlite_select_sentences_query = sqlite_select_sentences_query + " UNION "
-      sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = ? and COUNTER > 0 and COUNTER < 100 and IS_CORRECT = 1 GROUP BY audio.name HAVING COUNT(audio.name) < " + str(len(listvoices)) + " ORDER BY RANDOM() LIMIT " + str(limit) + ")"
+      sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = ? and COUNTER > 0 and COUNTER < ? and IS_CORRECT = 1 GROUP BY audio.name HAVING COUNT(audio.name) < " + str(len(listvoices)) + " ORDER BY RANDOM() LIMIT " + str(limit) + ")"
       sqlite_select_sentences_query = sqlite_select_sentences_query + " UNION "
-      sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = ? and COUNTER > 0 and COUNTER < 100 and IS_CORRECT = 1 AND DATA IS NULL ORDER BY RANDOM() LIMIT " + str(limit) + ")"
+      sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = ? and COUNTER > 0 and COUNTER < ? and IS_CORRECT = 1 AND DATA IS NULL ORDER BY RANDOM() LIMIT " + str(limit) + ")"
       sqlite_select_sentences_query = sqlite_select_sentences_query + ") LIMIT " + str(limit);
       #sqlite_select_sentences_query = " SELECT DISTINCT name from audio WHERE CHATID = ? ORDER BY RANDOM() LIMIT " + str(count)
       
@@ -754,7 +754,7 @@ def populate_audiodb(limit: int, chatid: str, lang: str):
       log.debug("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query)
 
 
-      cursor.execute(sqlite_select_sentences_query, (chatid,chatid,))
+      cursor.execute(sqlite_select_sentences_query, (chatid,chatid,int(os.environ.get("COUNTER_LIMIT")),int(os.environ.get("COUNTER_LIMIT"))))
       records = cursor.fetchall()
 
       cursor.close()
@@ -795,7 +795,7 @@ def populate_audiodb(limit: int, chatid: str, lang: str):
               logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
           except Exception as e:
             if audiodb.select_count_by_name_chatid_voice_language(sentence, chatid, voice, language) > 0:
-              audiodb.increment_counter(sentence, chatid, voice, language)
+              audiodb.increment_counter(sentence, chatid, voice, language, int(os.environ.get("COUNTER_LIMIT")))
             else:
               audiodb.insert(sentence, chatid, None, voice, language, is_correct=1)
             inserted="Failed (" + str(e) + ")"

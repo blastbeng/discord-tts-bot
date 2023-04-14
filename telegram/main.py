@@ -43,8 +43,12 @@ API_PATH_IMAGES = os.environ.get("API_PATH_IMAGES")
 API_PATH_UTILS = os.environ.get("API_PATH_UTILS")
 BOT_NAME = os.environ.get("BOT_NAME")
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                     level=logging.INFO)
+logging.info("Starting Telegram Client...")
+
+logging.basicConfig(
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        level=int(os.environ.get("LOG_LEVEL")),
+        datefmt='%Y-%m-%d %H:%M:%S')
 
 updater = Updater(token=TOKEN, use_context=True)
 dispatcher = updater.dispatcher
@@ -813,8 +817,8 @@ def help(update: Update, context: CallbackContext):
     text = text + "askaudio - chiedi qualcosa (audio)\n"
     text = text + "chuck - Chuck Norris. (text)\n"
     text = text + "chuckaudio - Chuck Norris. (audio)\n"
-    text = text + "curse - Churse. (audio)\n"
-    text = text + "curseaudio - Churse. (audio)\n"
+    text = text + "curse - Curse. (audio)\n"
+    text = text + "curseaudio - Curse. (audio)\n"
     text = text + "generate - genera frasi casuali\n"
     text = text + "image - ricerca immagini\n"
     text = text + "insult - genera insulti (text)\n"

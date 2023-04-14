@@ -164,7 +164,7 @@ def update_is_correct(name: str, chatid: str, voice: str, language: str, is_corr
     if sqliteConnection:
         sqliteConnection.close()
 
-def increment_counter(name: str, chatid: str, voice: str, language: str):
+def increment_counter(name: str, chatid: str, voice: str, language: str, counter_limit: int):
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
     cursor = sqliteConnection.cursor()
@@ -181,7 +181,7 @@ def increment_counter(name: str, chatid: str, voice: str, language: str):
                         chatid, 
                         voice,
                         language,
-                        1 if counter < 100 else 0)
+                        1 if counter < counter_limit else 0)
 
     cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
 

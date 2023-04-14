@@ -231,17 +231,23 @@ class StopButton(discord.ui.Button["InteractionRoles"]):
 intents = discord.Intents.default()
 client = MyClient(intents=intents)
 
+
+logging.info("Starting Discord Client...")
+
 logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
         level=int(os.environ.get("LOG_LEVEL")),
         datefmt='%Y-%m-%d %H:%M:%S')
 
 logging.getLogger('discord').setLevel(int(os.environ.get("LOG_LEVEL")))
+logging.getLogger('discord.client').setLevel(int(os.environ.get("LOG_LEVEL")))
+logging.getLogger('discord.gateway').setLevel(int(os.environ.get("LOG_LEVEL")))
 
 discord.utils.setup_logging(level=int(os.environ.get("LOG_LEVEL")), root=False)
 
 loops_dict = {}
 populator_loops_dict = {}
+generator_loops_dict = {}
 
 def listvoices():
     try:
@@ -340,12 +346,20 @@ def get_voice_client_by_guildid(voice_clients, guildid):
             return vc
     return None
 
-async def connect_bot_by_voice_client(voice_client, channel, guild):
+async def connect_bot_by_voice_client(voice_client, channel, guild, member=None):
     try:  
         if (voice_client and not voice_client.is_playing() and voice_client.channel and voice_client.channel.id != channel.id) or (not voice_client or not voice_client.channel):
-            #if voice_client.is_connected():
-            #    await voice_client.disconnect()
+            userFound = False
+            if voice_client and voice_client.channel:
+                for memberSearch in voice_client.channel.members:
+                    if member is not None and member.id is not None and member.id == memberSearch.id:
+                        channel = voice_client.channel
+                        break
             await channel.connect()
+    except ClientException as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -463,6 +477,27 @@ class PopulatorLoop:
             logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 
+class GeneratorLoop:
+    
+    def __init__(self, guildid):
+        self.guildid = guildid
+
+    @tasks.loop(hours=12)
+    async def generator_loop(self):
+        try:
+            currentguildid = get_current_guild_id(str(self.guildid))
+            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/initgenerator/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid)
+            response = requests.get(url)
+            if (response.status_code != 200):
+                logging.error("Initializing generator on chatid " + currentguildid + " failed")
+            else:
+                logging.info(response.text)
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+
 @client.event
 async def on_ready():
     logging.info(f'Logged in as {client.user} (ID: {client.user.id})')
@@ -482,6 +517,9 @@ async def on_guild_available(guild):
 
         populator_loops_dict[guild.id] = PopulatorLoop(guild.id)
         populator_loops_dict[guild.id].populator_loop.start()
+
+        generator_loops_dict[guild.id] = GeneratorLoop(guild.id)
+        generator_loops_dict[guild.id].generator_loop.start()
 
 
         currentguildid = get_current_guild_id(str(guild.id))
@@ -509,14 +547,6 @@ async def on_guild_available(guild):
         else:
             logging.info(response.text)
 
-
-        url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/initgenerator/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid)
-        response = requests.get(url)
-        if (response.status_code != 200):
-            logging.error("Initializing generator on chatid " + currentguildid + " failed")
-        else:
-            logging.info(response.text)
-
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -526,9 +556,13 @@ async def on_guild_available(guild):
 @client.event
 async def on_voice_state_update(member, before, after):
     try:
-        if after.channel is not None:
+        if before.channel is not None and after.channel is not None and before.channel.id != after.channel.id:
             voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
-            await connect_bot_by_voice_client(voice_client, after.channel, None)
+            await voice_client.disconnect()
+            await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)            
+        elif before.channel is None and after.channel is not None:
+            voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
+            await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -673,7 +707,6 @@ async def ask(interaction: discord.Interaction, text: str):
 
 
 @client.tree.command()
-@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def generate(interaction: discord.Interaction):
     """Generate a random sentence."""
@@ -701,7 +734,7 @@ async def generate_internal(interaction):
                     await do_play(voice_client, url, interaction, currentguildid, defer=False)
                 else:
                     logging.error("[GUILDID : %s] generate - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
-                    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong."), ephemeral = True)     
+                    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),'Error. The generator database is still empty, try again later.\nNOTE: If you just invited the bot, this feature will be available in 12 hours if you continue to use the "speak" command.'), ephemeral = True)     
             else:
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
         else:
@@ -711,7 +744,6 @@ async def generate_internal(interaction):
 
 
 @client.tree.command()
-@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 @app_commands.checks.cooldown(1, 60, key=lambda i: (i.user.id))
 async def story(interaction: discord.Interaction):
     """Generate a random story."""
@@ -738,7 +770,7 @@ async def story_internal(interaction):
                     await do_play(voice_client, url, interaction, currentguildid, defer=False)
                 else:
                     logging.error("[GUILDID : %s] story - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
-                    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+"\nblastbong#9151", ephemeral = True)         
+                    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),'Error. The generator database is still empty, try again later.\nNOTE: If you just invited the bot, this feature will be available in 12 hours if you continue to use the "speak" command.'), ephemeral = True)         
 
             else:
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
@@ -893,6 +925,30 @@ async def restart(interaction: discord.Interaction):
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"This is a private command and can only be used by members with specific permissions on the main Bot Server"), ephemeral = True)
     except Exception as e:
         await send_error(e, interaction, from_generic=False)
+
+@client.tree.command()
+@app_commands.rename(text='text')
+@app_commands.describe(text="The text to search")
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
+async def delete(interaction: discord.Interaction, text: str):
+    """Delete sentences by text."""
+    try:
+        is_deferred=False
+        if interaction.user.guild_permissions.administrator:
+            await interaction.response.defer(thinking=True, ephemeral=True)
+            is_deferred=True
+            currentguildid = get_current_guild_id(interaction.guild.id)
+            response = requests.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/forcedelete/bytext/"+ urllib.parse.quote(str(os.environ.get("ADMIN_PASS"))) + "/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid))
+            if (response.status_code == 200):
+                await interaction.followup.send(response.text, ephemeral = True) 
+            else:
+                logging.error("[GUILDID : %s] forcedelete/bytext - Received bad response from APIs", str(currentguildid), exc_info=1)
+                await interaction.followup.send(utils.translate(currentguildid,"Error."), ephemeral = True)     
+        else:
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
@@ -1253,9 +1309,8 @@ async def commands(interaction: discord.Interaction):
         view = discord.ui.View()
         view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.CURSE))
         view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.INSULT))
-        if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
-            view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.GENERATE))
-            view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.STORY))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.GENERATE))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.STORY))
         view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.RANDOM))
 
         view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.SOUNDRANDOM))

@@ -8,11 +8,8 @@ fi
 git clone https://github.com/blastbeng/jerky-tts-bot
 cd jerky-tts-bot
 
-docker-compose build
-
-mdkdir config
-#cp api/uwsgi.ini config/uwsgi.ini
+docker compose build
 
 sudo cp ./docker-compose@.service /lib/systemd/system/docker-compose@.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now docker-compose@jerky-tts-bot.service
+./build-restart.sh

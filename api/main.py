@@ -102,7 +102,7 @@ class TextRepeatClass(Resource):
 @nstext.route('/curse/<string:chatid>/<string:lang>')
 class TextCurseClass(Resource):
   @cache.cached(timeout=3, query_string=True)
-  def get (self, voice: str, chatid = "000000", lang="it"):
+  def get (self, chatid = "000000", lang="it"):
     cursez = Bestemmie().random().lower()
     if lang == "it":
       return get_response_str(cursez)
@@ -344,16 +344,16 @@ class AudioSaveRepeatClass(Resource):
 @nsaudio.route('/curse/<string:voice>/<string:chatid>/<string:lang>')
 class AudioCurseClass(Resource):
   @cache.cached(timeout=3, query_string=True)
-  def get (self, voice: str, chatid = "000000", lang = "it"):
+  def get (self, voice = "google", chatid = "000000", lang = "it"):
     cursez = ""
     try:
       cursez = Bestemmie().random().lower()
       if lang != "it":
         cursez = LibreTranslator(from_lang="it", to_lang=lang, base_url=os.environ.get("TRANSLATOR_BASEURL")).translate(cursez)
-      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=lang, save=False, call_fy=False, limit=False)
+      tts_out = utils.get_tts(cursez, chatid=chatid, voice=voice, language=lang, save=False, call_fy=False, limit=False)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+        response.headers['X-Generated-Text'] = cursez.encode('utf-8').decode('latin-1')
         return response
       else:
         @after_this_request
@@ -1030,9 +1030,8 @@ class RestoreChatbot(Resource):
     return send_file(outtxt, attachment_filename='trainfile.txt', mimetype="text/plain")
 
 
-nsadmin = api.namespace('admin', 'Accumulators Admin APIs')
-@nsadmin.route('/forcedelete/bytext/<string:password>/<string:text>/')
-@nsadmin.route('/forcedelete/bytext/<string:password>/<string:text>/<string:chatid>')
+@nsdatabase.route('/forcedelete/bytext/<string:password>/<string:text>/')
+@nsdatabase.route('/forcedelete/bytext/<string:password>/<string:text>/<string:chatid>')
 class AdminForceDeleteByText(Resource):
   def get (self, password: str, text: str, chatid = "000000"):
     if password == ADMIN_PASS:
