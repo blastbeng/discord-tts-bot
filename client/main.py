@@ -531,9 +531,9 @@ async def on_connect():
 async def on_guild_available(guild):
 
     try:
-
         loops_dict[guild.id] = PlayAudioLoop(guild.id)
-        loops_dict[guild.id].play_audio_loop.start()
+        if str(guild.id) == str(os.environ.get("GUILD_ID")):
+            loops_dict[guild.id].play_audio_loop.start()
 
         populator_loops_dict[guild.id] = PopulatorLoop(guild.id)
         populator_loops_dict[guild.id].populator_loop.start()
