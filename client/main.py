@@ -531,8 +531,10 @@ async def on_connect():
 async def on_guild_available(guild):
 
     try:
+        currentguildid = get_current_guild_id(str(guild.id))
+        
         loops_dict[guild.id] = PlayAudioLoop(guild.id)
-        if str(guild.id) == str(os.environ.get("GUILD_ID")):
+        if currentguildid == "000000":
             loops_dict[guild.id].play_audio_loop.start()
 
         populator_loops_dict[guild.id] = PopulatorLoop(guild.id)
@@ -542,7 +544,6 @@ async def on_guild_available(guild):
         generator_loops_dict[guild.id].generator_loop.start()
 
 
-        currentguildid = get_current_guild_id(str(guild.id))
         utils.check_exists_guild(currentguildid)
         client.tree.copy_global_to(guild=guild)
         await client.tree.sync(guild=guild)
@@ -578,7 +579,8 @@ async def on_voice_state_update(member, before, after):
     try:
         if before.channel is not None and after.channel is not None and before.channel.id != after.channel.id:
             voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
-            await voice_client.disconnect()
+            if voice_client:
+                await voice_client.disconnect()
             await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)            
         elif before.channel is None and after.channel is not None:
             voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)

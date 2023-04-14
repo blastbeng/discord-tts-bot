@@ -14,11 +14,12 @@ services:
     restart: "no"
     volumes:
       - ".env:/app/.env"
-      - jerkyconfig:/app/config
+      - ./config:/app/config
       - "/tmp/jerky-tts-bot-api:/tmp/jerky-tts-bot-api"
       - "/tmp/jerky-tts-bot-discord:/tmp/jerky-tts-bot-discord"
       - "/dev/dri/card0:/dev/dri/card0"
       - "/dev/dri/renderD128:/dev/dri/renderD128"
+      #- "./config_old:/app/config_old"
     entrypoint: ./entrypoint.sh
     #ports:
     #  - "5080:5080"
@@ -109,12 +110,12 @@ networks:
   caching:
     driver: bridge
 
-volumes:
-  jerkyconfig:
-    driver: rclone:latest
-    driver_opts:
-      remote: 'jerkyconfig:'
-      allow_other: 'true'
-      vfs_cache_mode: full
-      poll_interval: 0
-      umask: 000
+#volumes:
+#  jerkyconfig:
+#    driver: rclone:latest
+#    driver_opts:
+#      remote: 'jerkyconfig:'
+#      allow_other: 'true'
+#      vfs_cache_mode: full
+#      poll_interval: 0
+#      umask: 000
