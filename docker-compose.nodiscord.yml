@@ -14,7 +14,7 @@ services:
     restart: "no"
     volumes:
       - ".env:/app/.env"
-      - "./config:/app/config"
+      - jerkyconfig:/app/config
       - "/tmp/jerky-tts-bot-api:/tmp/jerky-tts-bot-api"
       - "/tmp/jerky-tts-bot-discord:/tmp/jerky-tts-bot-discord"
       - "/dev/dri/card0:/dev/dri/card0"
@@ -36,7 +36,7 @@ services:
       - TZ=Europe/Rome
     image: "blastbeng/jerky-tts-bot-battuteapi:1.0.0"
     volumes:
-      - "./config/battuteapi_data:/usr/src/app/data"
+      - "./battuteapi_data:/usr/src/app/data"
     ports:
       - 3050:3050
     restart: "no"
@@ -108,3 +108,13 @@ services:
 networks:
   caching:
     driver: bridge
+
+volumes:
+  jerkyconfig:
+    driver: rclone:latest
+    driver_opts:
+      remote: 'jerkyconfig:'
+      allow_other: 'true'
+      vfs_cache_mode: full
+      poll_interval: 0
+      umask: 000

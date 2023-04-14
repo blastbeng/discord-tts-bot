@@ -139,3 +139,8 @@ pixray/
 diffvg
 diffvg/.env.example
 docker-compose.yml
+battuteapi_data
+battuteapi_data/
+config
+config_old/
+rclone.conf.sample
