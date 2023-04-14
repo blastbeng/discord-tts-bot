@@ -250,9 +250,6 @@ class TextInsultClass(Resource):
     if text and text != '' and text != 'none':
       sentence = text + " " + sentence
     response = Response(sentence)
-    chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-    daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
-    daemon.start()
     return response
 
 
@@ -699,9 +696,6 @@ class AudioInsultClass(Resource):
       tts_out = utils.get_tts(sentence, chatid=chatid, voice="google", language=lang)
       if tts_out is not None:    
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-        daemon = Thread(target=chatbot.get_response, args=(sentence,), daemon=True, name="insult"+utils.get_random_string(24))
-        daemon.start()
         response.headers['X-Generated-Text'] = sentence.encode('utf-8').decode('latin-1')
         return response
       else:

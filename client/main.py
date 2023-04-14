@@ -187,6 +187,8 @@ class SlashCommandButton(discord.ui.Button["InteractionRoles"]):
                 await interaction.response.send_message("/youtube <url> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"Listen to a youtube song"), ephemeral = True)
             elif self.name == constants.STOP:
                 await stop_internal(interaction)
+            elif self.name == constants.DISCLAIMER:
+                await disclaimer_internal(interaction)
             else:
                 await interaction.response.send_message("Work in progress", ephemeral = True)
         except Exception as e:
@@ -226,6 +228,24 @@ class StopButton(discord.ui.Button["InteractionRoles"]):
             
         else:
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+            
+class AcceptButton(discord.ui.Button["InteractionRoles"]):
+
+    def __init__(self):
+        super().__init__(style=discord.ButtonStyle.green, label="Accept")
+    
+    async def callback(self, interaction: discord.Interaction):
+        utils.update_guild_nsfw(get_current_guild_id(interaction.guild.id), 1)
+        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You have enabled NSFW content."), ephemeral = True)
+            
+class DeclineButton(discord.ui.Button["InteractionRoles"]):
+
+    def __init__(self):
+        super().__init__(style=discord.ButtonStyle.red, label="Decline")
+    
+    async def callback(self, interaction: discord.Interaction):
+        utils.update_guild_nsfw(get_current_guild_id(interaction.guild.id), 0)
+        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You have disabled NSFW content."), ephemeral = True)
 
 
 intents = discord.Intents.default()
@@ -349,12 +369,12 @@ def get_voice_client_by_guildid(voice_clients, guildid):
 async def connect_bot_by_voice_client(voice_client, channel, guild, member=None):
     try:  
         if (voice_client and not voice_client.is_playing() and voice_client.channel and voice_client.channel.id != channel.id) or (not voice_client or not voice_client.channel):
-            userFound = False
-            if voice_client and voice_client.channel:
-                for memberSearch in voice_client.channel.members:
-                    if member is not None and member.id is not None and member.id == memberSearch.id:
-                        channel = voice_client.channel
-                        break
+            if member is not None and member.id is not None:
+                if voice_client and voice_client.channel:
+                    for memberSearch in voice_client.channel.members:
+                        if member.id == memberSearch.id:
+                            channel = voice_client.channel
+                            break
             await channel.connect()
     except ClientException as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -568,6 +588,17 @@ async def on_voice_state_update(member, before, after):
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
+def get_disclaimer(currentguildid):
+    message = "**DISCLAIMER**"
+    message = message + "\n" + utils.translate(currentguildid,"This Bot saves data in its encrypted database, used for the auto-talking feature.")
+    message = message + "\n" + utils.translate(currentguildid,"Please don't write sensitive data, you have been warned.")
+    message = message + "\n" + utils.translate(currentguildid,"The developer takes no responsibility of what the bot generates or on what the users write using the bot commands.")
+    message = message + "\n\n" + utils.translate(currentguildid,"I am a dumb Bot and I don't want to cause any problem.")
+    message = message + "\n\n" + utils.translate(currentguildid,"The default language is English, if you want to change language ask an Administrator to do so with the command:") + " /language."
+    message = message + "\n\nNSFW => [/insult] [/curse]"        
+    message = message + "\n" + utils.translate(currentguildid,"Two commands delivers NSFW content. An administrator must approve NSFW content using the command") + " /accept."
+    return message
+
 @client.event
 async def on_guild_join(guild):
     logging.info(f'Guild joined (ID: {guild.id})')
@@ -575,9 +606,8 @@ async def on_guild_join(guild):
     client.tree.copy_global_to(guild=guild)
     await client.tree.sync(guild=guild)
     logging.info(f'Syncing commands to Guild (ID: {guild.id}) (NAME: {guild.name})')
-    name = client.user.name + " [en]"
-    await guild.me.edit(nick=name)
-    logging.info(f'Renaming bot to {name} for Guild (ID: {guild.id}) (NAME: {guild.name})')
+
+    await guild.system_channel.send(get_disclaimer(get_current_guild_id(guild.id)))
 
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
@@ -789,7 +819,10 @@ async def insult(interaction: discord.Interaction, member: Optional[discord.Memb
 
 async def insult_internal(interaction, member):
     try:
-        if interaction.user.voice and interaction.user.voice.channel:
+        currentguildid = get_current_guild_id(interaction.guild.id)
+        if utils.get_guild_nsfw(currentguildid) == 0:
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"An Administrator must approve NSFW content on this server. Ask him to use the command:") + " /accept", ephemeral = True)
+        elif interaction.user.voice and interaction.user.voice.channel:
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
@@ -798,7 +831,6 @@ async def insult_internal(interaction, member):
             elif not voice_client.is_playing():
                 insulturl=os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"insult"
                 insultresponse=""
-                currentguildid = get_current_guild_id(interaction.guild.id)
                 if member:
                     insulturl=insulturl +"?text="+urllib.parse.quote(str(member.name)) + "&chatid="+urllib.parse.quote(get_current_guild_id(interaction.guild.id)) + "&lang=" + urllib.parse.quote(utils.get_guild_language(currentguildid))
                     insultresponse=utils.translate(get_current_guild_id(interaction.guild.id),"I'm insulting") + ' "' + str(member.name) +'"'
@@ -889,7 +921,10 @@ async def curse(interaction: discord.Interaction):
 
 async def curse_internal(interaction):
     try:
-        if interaction.user.voice and interaction.user.voice.channel:
+        currentguildid = get_current_guild_id(interaction.guild.id)
+        if utils.get_guild_nsfw(currentguildid) == 0:
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"An Administrator must approve NSFW content on this server. Ask him to use the command:") + " /accept", ephemeral = True)
+        elif interaction.user.voice and interaction.user.voice.channel:
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
@@ -897,7 +932,6 @@ async def curse_internal(interaction):
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
             elif not voice_client.is_playing():
                 
-                currentguildid = get_current_guild_id(interaction.guild.id)
 
                 url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"curse/google/"+urllib.parse.quote(currentguildid)+ "/" + utils.get_guild_language(currentguildid)
                 await do_play(voice_client, url, interaction, currentguildid)
@@ -1037,7 +1071,7 @@ async def language(interaction: discord.Interaction, language: app_commands.Choi
         currentguildid = get_current_guild_id(interaction.guild.id)
         if interaction.user.guild_permissions.administrator:
 
-            utils.update_guild(currentguildid, language.value)
+            utils.update_guild_lang(currentguildid, language.value)
 
             #nick = interaction.guild.me.nick
             #if nick is None:
@@ -1307,6 +1341,7 @@ async def commands(interaction: discord.Interaction):
     """Show bot commands."""
     try:     
         view = discord.ui.View()
+        view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.DISCLAIMER))
         view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.CURSE))
         view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.INSULT))
         view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.GENERATE))
@@ -1385,11 +1420,50 @@ async def text2image(interaction: discord.Interaction, text: str):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 
+
+
+@client.tree.command()
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+async def accept(interaction: discord.Interaction):
+    """Accept or Decline NSFW content."""
+    try:
+        is_deferred=False
+        if interaction.user.guild_permissions.administrator:
+            view = discord.ui.View()
+            view.add_item(AcceptButton())
+            view.add_item(DeclineButton())
+            message = "DISCLAIMER\n"
+            message = message + utils.translate(get_current_guild_id(interaction.guild.id),"The developer takes no responsability of what the bot generates or on what the users write using the bot commands.")
+            message = "\n\n"
+            message = utils.translate(get_current_guild_id(interaction.guild.id),"Do you want to allow NSFW content for this server?")
+            await interaction.response.send_message(message, view = view,  ephemeral = True)   
+        else:
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+
+@client.tree.command()
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+async def disclaimer(interaction: discord.Interaction):
+    """Show DISCLAIMER."""
+    await disclaimer_internal(interaction)
+
+async def disclaimer_internal(interaction):
+    try:
+        is_deferred=False
+        await interaction.response.send_message(get_disclaimer(get_current_guild_id(interaction.guild.id)), ephemeral = True)   
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+
+
+@accept.error
 @ask.error
 @avatar.error
 @commands.error
 @curse.error
+@delete.error
 @disable.error
+@disclaimer.error
 @disable_tree.error
 @enable.error
 @enable_tree.error

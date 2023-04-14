@@ -53,7 +53,7 @@ dbms = database.Database(database.SQLITE, dbname='client.sqlite3')
 database.create_db_tables(dbms)
 
 def translate(guildid: str, text: str):
-  tolang=database.select_guildconfig(dbms, guildid, value = "en")
+  tolang=database.select_guildconfig_lang(dbms, guildid, value = "en")
   fromlang='en'
   if tolang == fromlang:
     return text
@@ -70,18 +70,24 @@ def translate(guildid: str, text: str):
       return text
 
 def insert_new_guild(guildid: str, language: str):
-    database.insert_guildconfig(dbms, guildid, language)
+    database.insert_guildconfig(dbms, guildid, language, 0)
 
-def update_guild(guildid: str, language: str):
-    database.update_guildconfig(dbms, guildid, language)
+def update_guild_lang(guildid: str, language: str):
+    database.update_guildconfig_lang(dbms, guildid, language)
+
+def update_guild_nsfw(guildid: str, nswf: int):
+    database.update_guildconfig_nsfw(dbms, guildid, nswf)
 
 def get_guild_language(guildid: str):
-    return database.select_guildconfig(dbms, guildid, value = "en")
+    return database.select_guildconfig_lang(dbms, guildid, value = "en")
+
+def get_guild_nsfw(guildid: str):
+    return database.select_guildconfig_nsfw(dbms, guildid, value = 0)    
 
 def check_exists_guild(guildid: str):
-    value = database.select_guildconfig(dbms, guildid, value = None)
+    value = database.select_guildconfig_lang(dbms, guildid, value = None)
     if value is None:
-      database.insert_guildconfig(dbms, guildid, "en")
+      database.insert_guildconfig(dbms, guildid, "en", 0)
 
 def random_boolean():
     return bool(random.getrandbits(1))
