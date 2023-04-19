@@ -99,3 +99,6 @@ def get_random_from_array(array):
 
 def random_choice(text: str):
     return random.choice(text)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in "txt"
