@@ -57,8 +57,6 @@ RUN spacy download es_core_news_sm
 WORKDIR /app
 
 COPY data data
-COPY templates templates
-COPY static static
 COPY libretranslator.py .
 COPY utils.py .
 COPY audiodb.py .

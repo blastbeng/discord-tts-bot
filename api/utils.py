@@ -27,6 +27,7 @@ from uuid import uuid4
 from chatterbot import ChatBot
 from chatterbot import languages
 from chatterbot.conversation import Statement
+from custom_trainer import CustomListTrainer
 from custom_trainer import TranslatedListTrainer
 from custom_trainer import CustomTrainer
 from chatterbot.comparisons import LevenshteinDistance
@@ -111,7 +112,7 @@ def wiki_summary(testo: str, lang: str):
     definition = wikipedia.summary(testo, sentences=1, auto_suggest=True, redirect=True)
     return testo + ": " + definition
   except:
-    return EXCEPTION_WIKIPEDIA + testo
+    return None
 
 
 def generate(filename: str):
@@ -231,9 +232,9 @@ def get_chatterbot(chatid: str, train: False, lang = "it"):
     cursor.execute('''SELECT COUNT(*) from STATEMENT ''')
     result=cursor.fetchall()
     if result == 0 :
-      learn('ciao', 'ciao', chatbot)
+      learn('hello', 'hello', chatbot)
       if train:
-        trainer = CustomTrainer(chatbot, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
+        trainer = CustomTrainer(chatbot, translator_provider=TRANSLATOR_PROVIDER, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
         trainer.train()      
   return chatbot
 
@@ -299,48 +300,6 @@ def html_decode(s):
         s = s.replace(code[1], code[0])
     return s.strip()
 
-def get_joke(cat: str):
-  try:
-    url="http://192.168.1.160:3050/v1/jokes"
-    if cat != "":
-      params="category="+cat
-      url=url+"?"+params
-    r = requests.get(url)
-    if r.status_code != 200:
-      return "API barzellette non raggiungibile..."
-    else:
-#      full_json = r.text
-      full = json.loads(r.text)
-      text = html_decode(full['data']['text'])
-      return text
-  except Exception as e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-    return "Riprova tra qualche secondo..."
-
-
-def scrape_jokes():
-  scrape_internal("LAPECORASCLERA", "0")
-  scrape_internal("FUORIDITESTA", "0")
-
-def scrape_internal(scraper: str, page: str):
-  try:
-    url="http://192.168.1.160:3050/v1/mngmnt/scrape"
-    params="scraper="+scraper
-    if page != 0:
-      params = params+"&pageNum="+page
-    url=url+"?"+params
-    r = requests.get(url)
-    if r.status_code != 200:
-      pass
-    else:
-      full_json = r.text
-      full = json.loads(full_json)
-  except Exception as e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 def get_random_date():
   offset = '-' + str(random.randint(1, 4)) + 'y'
@@ -415,35 +374,80 @@ def extract_sentences_from_audiodb(filename, language="it", chatid="000000", dis
         sqliteConnection.close()
   return True
 
+def extract_sentences_from_chatbot(filename, chatid="000000", distinct=True, randomize=True):
+  try:
+
+    #if os.path.exists(filename):
+    #  os.remove(filename)
+      
+    #dbfile=chatid+"-db.sqlite3"
+    sqliteConnection = sqlite3.connect('./config/' + chatid + '-db.sqlite3')
+    cursor = sqliteConnection.cursor()
+
+    sqlite_select_sentences_query = ""
+    if distinct and randomize:
+      sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY RANDOM()"""
+    elif not distinct and not randomize:
+      sqlite_select_sentences_query = """SELECT text FROM statement ORDER BY text"""
+    elif distinct and not randomize:
+      sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY text"""
+    elif not distinct and randomize:
+      sqlite_select_sentences_query = """SELECT text FROM statement  ORDER BY RANDOM()"""
+
+    data = ()
+
+    cursor.execute(sqlite_select_sentences_query, data)
+    records = cursor.fetchall()
+
+    
+    records_len = len(records)-1
+
+
+    with open(filename, 'w') as sentence_file:
+      for row in records:
+        try:
+          if row[0] and row[0] != "":
+            sanitized = row[0].strip()
+            logging.info('extract_sentences_from_chatbot - [chatid:' + chatid + '] - "' + sanitized + '"')
+            if sanitized[-1] not in string.punctuation:
+              if randomize:
+                if bool(random.getrandbits(1)):
+                  sanitized = sanitized + "."
+                else:
+                  sanitized = sanitized + " "
+              else:
+                sanitized = sanitized + "."
+            if records.index(row) != records_len:
+              if randomize:
+                if bool(random.getrandbits(1)):
+                  sanitized = sanitized + "\n"
+                else:
+                  sanitized = sanitized + " "
+              else:
+                sanitized = sanitized + "\n"
+            sentence_file.write(sanitized)
+        except Exception as e:
+          exc_type, exc_obj, exc_tb = sys.exc_info()
+          fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+          logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+    cursor.close()
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    return False
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()
+  return True
+
 def get_random_string(length):
     # choose from all lowercase letter
     letters = string.ascii_lowercase
     result_str = ''.join(random.choice(letters) for i in range(length))
     return result_str
 
-def train_json(json_req, chatbot: ChatBot):
-  try:
-    if not json_req:
-      logging.info(empty_template_trainfile_json())
-    else:
-      content = json_req
-      trainer = TranslatedListTrainer(chatbot, lang=content['language'], translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
-      i = 0
-      while(i < len(content['sentences'])):
-        trainarray=[]
-        j = 0
-        while (j < len(content['sentences'][i]["message"+str(i)])):
-          trainarray.append(content['sentences'][i]["message"+str(i)][j])
-          j = j + 1
-        
-        trainer.train(trainarray)
-        i = i + 1
-
-      logging.info(TrainJson("Done.", content['language'], []).__dict__, exc_info=1)
-  except Exception as e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 def empty_template_trainfile_json():
   trainJsonSentencesArray=[]
@@ -471,13 +475,12 @@ def empty_template_trainfile_json():
   return trainJson.__dict__
 
 def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in "txt"
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in "txt"
 
 def train_txt(trainfile, chatbot: ChatBot, lang: str):
   try:
       logging.info("Loading: %s", trainfile)
-      trainer = TranslatedListTrainer(chatbot, lang=lang, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
+      trainer = CustomListTrainer(chatbot)
       trainfile_array = []
       with open(trainfile) as file:
           for line in file:
@@ -501,27 +504,32 @@ def delete_by_text(chatid: str, text: str, force = False):
     sqliteConnection = sqlite3.connect(dbfile)
     cursor = sqliteConnection.cursor()
 
-    sqlite_delete_query = "DELETE FROM Statement WHERE text like '" + text + "%' OR text like '%" + text + "' OR text LIKE '%" + text + "%' OR text = '" + text + "' COLLATE NOCASE"
+    sqlite_delete_query1 = "DELETE FROM Statement WHERE text like '" + text + "%' OR text like '%" + text + "' OR text LIKE '%" + text + "%' OR text = '" + text + "' COLLATE NOCASE"
+    sqlite_delete_query2 = "DELETE FROM Statement WHERE in_response_to like '" + text + "%' OR in_response_to like '%" + text + "' OR in_response_to LIKE '%" + text + "%' OR in_response_to = '" + text + "' COLLATE NOCASE"
 
     data_tuple = ()
 
-    logging.info("delete_by_text - Executing: %s", sqlite_delete_query)
+    logging.info("delete_by_text - Executing: %s", sqlite_delete_query1)
 
-    cursor.execute(sqlite_delete_query, data_tuple)
+    cursor.execute(sqlite_delete_query1, data_tuple)
+
+    logging.info("delete_by_text - Executing: %s", sqlite_delete_query2)
+
+    cursor.execute(sqlite_delete_query2, data_tuple)
+
     sqliteConnection.commit()
     cursor.close()
-
-    if force:
-      delete_from_audiodb_by_text(chatid, text)
-      return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot e dal db audio!')
-    else:
-      return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot!')
   except sqlite3.Error as error:
     logging.error("Failed to delete data from sqlite", exc_info=1)
     return("Errore!")
   finally:
     if sqliteConnection:
         sqliteConnection.close()
+  if force:
+    delete_from_audiodb_by_text(chatid, text)
+    return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot e dal db audio!')
+  else:
+    return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot!')
 
 
 
@@ -535,7 +543,7 @@ def delete_from_audiodb_by_text(chatid: str, text: str):
 
     data_tuple = ()
 
-    logging.info("delete_from_audiodb_by_text - Executing:  %s", sqlite_delete_query, exc_info=1)
+    logging.info("delete_from_audiodb_by_text - Executing:  %s", sqlite_delete_query)
 
     cursor.execute(sqlite_delete_query, data_tuple)
     sqliteConnection.commit()
@@ -782,14 +790,12 @@ def populate_audiodb(limit: int, chatid: str, lang: str):
             if result is None:
               inserted="Skipped (TTS lenght limit exceeded)"
               logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted) 
-              time.sleep(60)              
             elif result is True:
               counter = counter + 1
               inserted="Done (Inserted in DB)"
               logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
               if counter >= limit:
                 break
-              time.sleep(60) 
             elif result is False:
               inserted="Skipped (Already in DB)"
               logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
@@ -800,7 +806,7 @@ def populate_audiodb(limit: int, chatid: str, lang: str):
               audiodb.insert(sentence, chatid, None, voice, language, is_correct=1)
             inserted="Failed (" + str(e) + ")"
             logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
-            time.sleep(60) 
+          time.sleep(60) 
     else:
       logging.debug("populate_audiodb - NO RECORDS FOUND!\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
     
@@ -816,7 +822,7 @@ def populate_audiodb(limit: int, chatid: str, lang: str):
 def backupdb(chatid: str):  
   try:
     dbfile='./config/'+chatid+"-db.sqlite3"
-    dst="./config/backups/" + chatid + "-db_backup_" + str(time.time()) + ".sqlite3"
+    dst="./backups/" + chatid + "-db_backup_" + str(time.time()) + ".sqlite3"
     shutil.copyfile(dbfile, dst)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -855,36 +861,6 @@ def restore(chatid: str, text: str):
     if sqliteConnection:
         sqliteConnection.close()
   return BytesIO(bytes(sentences,'utf-8'))
-
-def get_audios_for_ft():
-  voices = list_fakeyou_voices("it", 0)
-  datas = audiodb.select_by_chatid()
-  audios = []
-  for data in datas:
-    key = [k for k, v in voices.items() if v == data[4]][0]
-    internal = []
-    internal.append(data[0])
-    internal.append(data[1])
-    #internal.append("https://"+API_USER+":"+API_PASS+"@discord-voicebot.fabiovalentino.it/chatbot_audio/download/"+ str(data[0]))
-    internal.append("https://discord-voicebot.fabiovalentino.it/chatbot_audio/download/"+ str(data[0]))
-    internal.append(key)
-    internal.append(data[5])
-    audios.append(internal)
-  return audios
-
-def get_audios_list_for_ft():
-  voices = list_fakeyou_voices("it", 0)
-  datas = audiodb.select_list_by_chatid()
-  audios = []
-  for data in datas:
-    key = [k for k, v in voices.items() if v == data[4]][0]
-    internal = []
-    internal.append(data[1])
-    #internal.append("https://"+API_USER+":"+API_PASS+"@discord-voicebot.fabiovalentino.it/chatbot_audio/download/"+ str(data[0]))
-    internal.append("https://discord-voicebot.fabiovalentino.it/chatbot_audio/download/"+ str(data[0]))
-    internal.append(key)
-    audios.append(internal)
-  return audios
 
 def init_generator_models(chatid, language):
 

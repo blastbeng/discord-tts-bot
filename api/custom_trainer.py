@@ -12,6 +12,48 @@ from chatterbot.exceptions import OptionalDependencyImportError
 from libretranslator import LibreTranslator
 
 
+class CustomListTrainer(Trainer):
+    """
+    Allows a chat bot to be trained using a list of strings
+    where the list represents a conversation.
+    """
+
+    def train(self, conversation):
+        """
+        Train the chat bot based on the provided list of
+        statements that represents a single conversation.
+        """
+        #previous_statement_text = None
+        previous_statement_search_text = ''
+
+        statements_to_create = []
+
+        for conversation_count, text in enumerate(conversation):
+            if self.show_training_progress:
+                utils.print_progress_bar(
+                    'List Trainer',
+                    conversation_count + 1, len(conversation)
+                )
+
+            statement_search_text = self.chatbot.storage.tagger.get_text_index_string(text)
+
+            statement = self.get_preprocessed_statement(
+                Statement(
+                    text=text,
+                    search_text=statement_search_text,
+                    in_response_to=None,
+                    search_in_response_to=previous_statement_search_text,
+                    conversation=''
+                )
+            )
+
+            #previous_statement_text = statement.text
+            previous_statement_search_text = statement_search_text
+
+            statements_to_create.append(statement)
+
+        self.chatbot.storage.create_many(statements_to_create)
+
 class CustomTrainer(Trainer):
 
     def __init__(self, chatbot, **kwargs):
@@ -107,7 +149,7 @@ class CustomTrainer(Trainer):
                             search_text=statement_search_text,
                             in_response_to=previous_statement_text,
                             search_in_response_to=previous_statement_search_text,
-                            conversation='training'
+                            conversation=''
                         )
 
                         statement.add_tags(*categories)
@@ -199,7 +241,7 @@ class TranslatedListTrainer(Trainer):
                         search_text=statement_search_text,
                         in_response_to=previous_statement_text,
                         search_in_response_to=previous_statement_search_text,
-                        conversation='training'
+                        conversation=''
                     )
                 )
 

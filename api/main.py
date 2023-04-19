@@ -187,6 +187,8 @@ class TextSearchClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, chatid = "000000", lang = "it"):
     wikisaid = utils.wiki_summary(text,lang)
+    if wikisaid is None:
+      wikisaid = LibreTranslator(from_lang="it", to_lang=lang, base_url=os.environ.get("TRANSLATOR_BASEURL")).translate("Non ho trovato nessun risultato per") + ': "' + text +'"'
     return get_response_str(wikisaid)
 
 
@@ -653,9 +655,10 @@ class AudioSearchClass(Resource):
   @cache.cached(timeout=10, query_string=True)
   def get (self, text: str, chatid = "000000", lang= "it"):
     wikisaid = utils.wiki_summary(text, lang)
-    try:
-      
-      tts_out = utils.get_tts(wikisaid, chatid=chatid, voice="null", language=lang, save=False, call_fy=False, limit=False)
+    try:     
+      if wikisaid is None:
+        wikisaid = LibreTranslator(from_lang="it", to_lang=lang, base_url=os.environ.get("TRANSLATOR_BASEURL")).translate("Non ho trovato nessun risultato per") + ' :"' + text +"'"
+      tts_out = utils.get_tts(wikisaid, chatid=chatid, voice="google", language=lang, save=False, call_fy=False, limit=False)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = wikisaid.encode('utf-8').decode('latin-1')
@@ -775,62 +778,6 @@ class SoundboardQueryClass(Resource):
         cache.delete_memoized(SoundboardQueryClass.get, self, str, str, str)
         return make_response(g.get('request_error'), 500)
 
-nsjokestext = api.namespace('jokes_text', 'Accumulators Jokes APIs')
-
-
-@nsjokestext.route('/chuck')
-class TextChuckClass(Resource):
-  @cache.cached(timeout=2)
-  def get(self):
-    jokesaid = utils.get_joke("CHUCK_NORRIS")
-    return get_response_str(jokesaid)
-
-
-@nsjokestext.route('/random')
-class TextRandomJokeClass(Resource):
-  def get(self):
-    jokesaid = utils.get_joke("")
-    return get_response_str(utils.get_joke(""))
-
-nsjokesaudio = api.namespace('jokes_audio', 'Accumulators Jokes Audio APIs')
-
-
-@nsjokesaudio.route('/chuck')
-class AudioChuckClass(Resource):
-  def get(self):
-    try:
-      text = utils.get_joke("CHUCK_NORRIS")
-      
-      tts_out = utils.get_tts(text, chatid="000000", voice="google", save=False, call_fy=False, limit=False)
-      if tts_out is not None:
-        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-      else:
-        resp = make_response("TTS Generation Error!", 500)
-        return resp
-    except AudioLimitException:
-      return get_response_limit_error(text)
-    except Exception as e:
-      return make_response(g.get('request_error'), 500)
-
-
-@nsjokesaudio.route('/random')
-class AudioRandomJokeClass(Resource):
-  def get(self):
-    try:
-      text = utils.get_joke("")
-      
-      tts_out = utils.get_tts(text, chatid="000000", voice="google", save=False, call_fy=False, limit=False)
-      if tts_out is not None:
-        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-      else:
-        resp = make_response("TTS Generation Error!", 500)
-        return resp
-    except AudioLimitException:
-      return get_response_limit_error(text)
-    except Exception as e:
-      return make_response(str(e), 500)
-
-
 
 nsimages = api.namespace('images', 'Accumulators Images APIs')
 
@@ -930,13 +877,32 @@ class ParagraphGenerateClass(Resource):
 nsdatabase = api.namespace('database', 'Accumulators Database APIs')
 
 
+@nsdatabase.route('/download/sentences/')
+@nsdatabase.route('/download/sentences/<string:chatid>')
+class DownloadSentencesDb(Resource):
+  @cache.cached(timeout=600, query_string=True)
+  def get(self, chatid = "000000"):
+    try:
+      filename = os.path.dirname(os.path.realpath(__file__)) + '/config/download_sentences_'+chatid+'.txt'
+      if utils.extract_sentences_from_chatbot(filename, chatid=chatid, randomize=False):
+        return send_file(filename, attachment_filename='sentences.txt', mimetype="text/plain")
+      else:
+        return make_response("Failed to download sentences.", 500)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
+
+
+
 @nsdatabase.route('/create/zipfile/')
 @nsdatabase.route('/create/zipfile/<string:chatid>')
 class  DatabaseCreateZipFile(Resource):
   def get (self, chatid = "000000"):
     try:
       if chatid == "000000":
-        threading.Timer(0, utils.download_audio_zip, args=[chatid]).start()
+        threading.Timer(0, utils.download_db_zip, args=[chatid]).start()
         return make_response("Creating zipfile under ./config dir. Watch the logs for errors.", 200)
       else:
         return make_response("Creating zipfile not permitted for this chatid!", 500)
@@ -965,22 +931,6 @@ class DatabaseAudiodbPopulate(Resource):
     return get_response_str("Starting thread populate_audiodb [count:"+str(limit)+"] [chatid:"+str(chatid)+"] [lang:"+str(lang)+"]. Watch the logs.")
 	
 
-@nsdatabase.route('/upload/trainfile/json')
-class DatabaseTrainFile(Resource):
-  def post (self):    
-    try:
-      chatid = request.form.get("chatid")
-      if chatid is None:
-        chatid = "000000"
-      threading.Timer(0, utils.train_json, args=[request.get_json(), get_chatbot_by_id(chatid)]).start()
-      return get_response_str("Done. Watch the logs for errors.")
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-      return utils.empty_template_trainfile_json()
-	
-
 @nsdatabase.route('/upload/trainfile/txt')
 class DatabaseTrainFile(Resource):
   def post (self):
@@ -988,13 +938,16 @@ class DatabaseTrainFile(Resource):
       chatid = request.form.get("chatid")
       if chatid is None:
         chatid = "000000"
+      lang = request.form.get("lang")
+      if lang is None:
+        lang = "it"
       trf=request.files['trainfile']
-      if not trf and allowed_file(trf):
+      if not trf and utils.allowed_file(trf):
         return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
       else:
         trainfile=TMP_DIR + '/' + utils.get_random_string(24) + ".txt"
         trf.save(trainfile)
-        threading.Timer(0, utils.train_txt, args=[trainfile, get_chatbot_by_id(chatid), request.form.get("language")]).start()
+        threading.Timer(0, utils.train_txt, args=[trainfile, get_chatbot_by_id(chatid, lang), lang]).start()
         return get_response_str("Done. Watch the logs for errors.")
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -1002,11 +955,6 @@ class DatabaseTrainFile(Resource):
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
 
-@nsdatabase.route('/jokes/scrape')
-class ScrapeJokesObj(Resource):
-  def get (self):
-    threading.Timer(0, utils.scrape_jokes, args=[]).start()
-    return "Starting thread scrape_jokes. Watch the logs."
 
 @nsdatabase.route('/backup/chatbot/')
 @nsdatabase.route('/backup/chatbot/<string:chatid>')
@@ -1024,44 +972,18 @@ class RestoreChatbot(Resource):
     return send_file(outtxt, attachment_filename='trainfile.txt', mimetype="text/plain")
 
 
-@nsdatabase.route('/forcedelete/bytext/<string:password>/<string:text>/')
-@nsdatabase.route('/forcedelete/bytext/<string:password>/<string:text>/<string:chatid>')
+@nsdatabase.route('/forcedelete/bytext/<string:text>/')
+@nsdatabase.route('/forcedelete/bytext/<string:text>/<string:chatid>')
 class AdminForceDeleteByText(Resource):
-  def get (self, password: str, text: str, chatid = "000000"):
-    if password == ADMIN_PASS:
-      return get_response_str(utils.delete_by_text(chatid, text, force=True))
-    else:
-      return get_response_str("cazzo fai, non sei autorizzato a usare sto schifo di servizio! fuori dalle palle!")
-
-@app.route('/upload')
-def upload_file():
-  return render_template('upload.html')
-
-@app.route('/manager')
-def manager():
-  return render_template('list.html', audios=utils.get_audios_list_for_ft())
-
-@app.route('/admin', methods=['GET', 'POST'])
-def admin():
-  default_value = ''
-  user = request.form.get('user', default_value)
-  psw = request.form.get('psw', default_value)
-  if user == ADMIN_USER and psw == ADMIN_PASS:  
-    return render_template('admin.html', audios=utils.get_audios_for_ft())
-  else:
-    return render_template('unhautorized.html')
-
+  def get (self, text: str, chatid = "000000"):
+    return get_response_str(utils.delete_by_text(chatid, text, force=True))
 
 def get_chatbot_by_id(chatid = "000000", lang = "it"):
   if chatid not in chatbots_dict:
     chatbots_dict[chatid + "_" + lang] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True", lang = lang)
   return chatbots_dict[chatid + "_" + lang]
   
-  
-  
-@scheduler.task('interval', id='scrape_jokes', hours=168)
-def scrape_jokes():
-  utils.scrape_jokes()
+ 
   
 @scheduler.task('interval', id='backupdb', hours=12)
 def backupdb():

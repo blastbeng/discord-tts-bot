@@ -32,6 +32,7 @@ from discord.ext import commands, tasks
 from discord.ext.commands import Greedy, Context
 from discord.errors import ClientException
 from requests.exceptions import ReadTimeout
+from datetime import datetime
 
 
 from io import BytesIO
@@ -189,6 +190,14 @@ class SlashCommandButton(discord.ui.Button["InteractionRoles"]):
                 await stop_internal(interaction)
             elif self.name == constants.DISCLAIMER:
                 await disclaimer_internal(interaction)
+            elif self.name == constants.TRAIN:
+                await interaction.response.send_message("/train <file> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot inserts in its database the sentencess present in the TXT file"), ephemeral = True)
+            elif self.name == constants.WIKIPEDIA:
+                await interaction.response.send_message("/wikipedia <text> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot searches something on wikipedia"), ephemeral = True)
+            elif self.name == constants.DELETE:
+                await interaction.response.send_message("/delete <text> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot deletes all the sentences containing the given text"), ephemeral = True)
+            elif self.name == constants.DOWNLOAD:
+                await download_internal(interaction)       
             else:
                 await interaction.response.send_message("Work in progress", ephemeral = True)
         except Exception as e:
@@ -268,6 +277,7 @@ discord.utils.setup_logging(level=int(os.environ.get("LOG_LEVEL")), root=False)
 loops_dict = {}
 populator_loops_dict = {}
 generator_loops_dict = {}
+cvc_loops_dict = {}
 
 def listvoices():
     try:
@@ -375,7 +385,9 @@ async def connect_bot_by_voice_client(voice_client, channel, guild, member=None)
                         if member.id == memberSearch.id:
                             channel = voice_client.channel
                             break
-            await channel.connect()
+            perms = channel.permissions_for(channel.guild.me)
+            if (perms.administrator or (perms.connect and perms.speak)):
+                await channel.connect()
     except ClientException as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -455,10 +467,12 @@ class PlayAudioLoop:
             channeluserfound = None
             voice_client = get_voice_client_by_guildid(client.voice_clients, self.guild.id)                
             for channel in self.guild.voice_channels:
-                for member in channel.members:
-                    if not member.bot:
-                        channeluserfound = channel
-                        break
+                perms = channel.permissions_for(channel.guild.me)
+                if (perms.administrator or (perms.connect and perms.speak)):
+                    for member in channel.members:
+                        if not member.bot:
+                            channeluserfound = channel
+                            break
             if voice_client is None or voice_client.channel is None:
                 channelfound = channeluserfound
             else:
@@ -518,6 +532,49 @@ class GeneratorLoop:
             logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 
+class CheckVoiceConnectionLoop:
+    
+    def __init__(self, guildid):
+        self.guildid = guildid
+
+    @tasks.loop(minutes=1)
+    async def check_voice_connection_loop(self):
+        try:
+            voice_client = get_voice_client_by_guildid(client.voice_clients, self.guildid)
+            if voice_client and voice_client.channel:
+                userFound = False
+                for member in voice_client.channel.members:
+                    if not member.bot:
+                        userFound = True
+                        break
+                if not userFound:
+                    await voice_client.disconnect()
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+
+
+@tasks.loop(hours=6)
+async def change_presence_loop():
+    try:
+        url = "https://steamspy.com/api.php?request=top100in2weeks"
+        response = requests.get(url)
+        if (response.status_code == 200):
+            game_array = []
+            for key, value in response.json().items():
+                game_array.append(value['name'])
+            game = str(utils.get_random_from_array(game_array))
+            logging.info("change_presence_loop - change_presence - game: " + game)
+            await client.change_presence(activity=discord.Game(name=game))
+        else:
+            logging.error("change_presence_loop - steamspy API ERROR - status_code: " + str(response.status_code))
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
 @client.event
 async def on_ready():
     logging.info(f'Logged in as {client.user} (ID: {client.user.id})')
@@ -525,7 +582,7 @@ async def on_ready():
 @client.event
 async def on_connect():
     logging.info(f'Connected as {client.user} (ID: {client.user.id})')
-    await client.change_presence(activity=discord.Game(name="Rocket League"))
+    change_presence_loop.start()
 
 @client.event
 async def on_guild_available(guild):
@@ -534,8 +591,7 @@ async def on_guild_available(guild):
         currentguildid = get_current_guild_id(str(guild.id))
         
         loops_dict[guild.id] = PlayAudioLoop(guild.id)
-        if currentguildid == "000000":
-            loops_dict[guild.id].play_audio_loop.start()
+        loops_dict[guild.id].play_audio_loop.start()
 
         populator_loops_dict[guild.id] = PopulatorLoop(guild.id)
         populator_loops_dict[guild.id].populator_loop.start()
@@ -543,22 +599,14 @@ async def on_guild_available(guild):
         generator_loops_dict[guild.id] = GeneratorLoop(guild.id)
         generator_loops_dict[guild.id].generator_loop.start()
 
+        cvc_loops_dict[guild.id] = CheckVoiceConnectionLoop(guild.id)
+        cvc_loops_dict[guild.id].check_voice_connection_loop.start()
+
 
         utils.check_exists_guild(currentguildid)
         client.tree.copy_global_to(guild=guild)
         await client.tree.sync(guild=guild)
         logging.info(f'Syncing commands to Guild (ID: {guild.id}) (NAME: {guild.name})')
-        #nick = None
-        #if guild.me.nick is None:
-        #    nick = client.user.name + " [" + utils.get_guild_language(currentguildid) + "]"
-        #elif re.search(r'\[[a-z][a-z]\]', guild.me.nick) is None:
-        #    if len(guild.me.nick) > 20:
-        #        nick = client.user.name + " [" + utils.get_guild_language(currentguildid) + "]"
-        #    else:
-        #        nick = guild.me.nick[:len(guild.me.nick) - 5] + " [" + utils.get_guild_language(currentguildid) + "]"
-        #if nick is not None:
-        #    await guild.me.edit(nick=nick)
-        #    logging.info(f'Renaming bot to {nick} for Guild (ID: {guild.id}) (NAME: {guild.name})')
 
         
         url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/init/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid)
@@ -579,9 +627,12 @@ async def on_voice_state_update(member, before, after):
     try:
         if before.channel is not None and after.channel is not None and before.channel.id != after.channel.id:
             voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
-            if voice_client:
-                await voice_client.disconnect()
-            await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)            
+
+            perms = after.channel.permissions_for(after.channel.guild.me)
+            if (perms.administrator or (perms.connect and perms.speak)):
+                if voice_client:
+                    await voice_client.disconnect()
+                await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
         elif before.channel is None and after.channel is not None:
             voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
             await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
@@ -707,6 +758,34 @@ async def speak(interaction: discord.Interaction, text: str, use_google: Optiona
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
     except Exception as e:
         await send_error(e, interaction, from_generic=False)
+
+
+@client.tree.command()
+@app_commands.rename(text='text')
+@app_commands.describe(text="The text to search")
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+async def wikipedia(interaction: discord.Interaction, text: str):
+    """Search something on wikipedia"""
+    try:
+        if interaction.user.voice and interaction.user.voice.channel:
+            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+            await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
+
+            if not hasattr(voice_client, 'play') and voice_client.is_connected():
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
+            elif not voice_client.is_playing():
+
+                currentguildid = get_current_guild_id(interaction.guild.id)
+                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"search/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+                await do_play(voice_client, url, interaction, currentguildid)
+
+            else:
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)            
+        else:
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False)
+
 
 @client.tree.command()
 @app_commands.rename(text='text')
@@ -915,6 +994,8 @@ async def random_internal(interaction, use_random):
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred = True)
 
+
+
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def curse(interaction: discord.Interaction):
@@ -966,7 +1047,6 @@ async def restart(interaction: discord.Interaction):
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
-@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def delete(interaction: discord.Interaction, text: str):
     """Delete sentences by text."""
     try:
@@ -975,11 +1055,49 @@ async def delete(interaction: discord.Interaction, text: str):
             await interaction.response.defer(thinking=True, ephemeral=True)
             is_deferred=True
             currentguildid = get_current_guild_id(interaction.guild.id)
-            response = requests.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/forcedelete/bytext/"+ urllib.parse.quote(str(os.environ.get("ADMIN_PASS"))) + "/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid))
+            response = requests.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/forcedelete/bytext/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid))
             if (response.status_code == 200):
                 await interaction.followup.send(response.text, ephemeral = True) 
             else:
                 logging.error("[GUILDID : %s] forcedelete/bytext - Received bad response from APIs", str(currentguildid), exc_info=1)
+                await interaction.followup.send(utils.translate(currentguildid,"Error."), ephemeral = True)     
+        else:
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+
+@client.tree.command()
+@app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
+async def download(interaction: discord.Interaction):
+    """Delete sentences by text."""
+    await download_internal(interaction)
+
+async def download_internal(interaction: discord.Interaction):
+    try:
+        is_deferred=False
+        if interaction.user.guild_permissions.administrator:
+            await interaction.response.defer(thinking=True, ephemeral=True)
+            is_deferred=True
+            currentguildid = get_current_guild_id(interaction.guild.id)
+            response = requests.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/download/sentences/" + urllib.parse.quote(currentguildid))
+
+            if (response.status_code == 200):
+
+                nameout = str(interaction.guild.name) + "_" + str(client.user.name)  + "_Backup_"  + datetime.now().strftime("%d%m%Y_%H%M%S") + ".txt"
+
+                filepath = os.environ.get("TMP_DIR") + nameout
+                with open(filepath, 'w') as filewrite:
+                    filewrite.write(response.text)            
+                    #for line in response.text.splitlines():
+                    #    filewrite.write(line)            
+                    #    filewrite.write("\n")            
+
+
+                await interaction.followup.send("Bot Backup.", file=discord.File(filename=nameout, fp=open(filepath, "rb")), ephemeral = True) 
+
+                os.remove(filepath)
+            else:
+                logging.error("[GUILDID : %s] download/sentences - Received bad response from APIs", str(currentguildid), exc_info=1)
                 await interaction.followup.send(utils.translate(currentguildid,"Error."), ephemeral = True)     
         else:
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
@@ -1075,20 +1193,6 @@ async def language(interaction: discord.Interaction, language: app_commands.Choi
 
             utils.update_guild_lang(currentguildid, language.value)
 
-            #nick = interaction.guild.me.nick
-            #if nick is None:
-            #    nick = client.user.name
-            #else:
-            #    x = re.search(r'\[[a-z][a-z]\]', nick)
-            #    if x is not None:
-            #        nick = interaction.guild.me.nick[:len(interaction.guild.me.nick) - 5]
-            #    elif len(nick) > 20:
-            #        nick = client.user.name
-            #    else:
-            #        nick = interaction.guild.me.nick[:len(interaction.guild.me.nick) - 5]
-
-            #name = nick + " [" + utils.get_guild_language(currentguildid) + "]"
-            #await interaction.guild.me.edit(nick=name)
             await interaction.response.send_message(utils.translate(currentguildid,"Bot language changed to ") + ' "'+language.name+'"', ephemeral = True)
         else:
             await interaction.response.send_message(utils.translate(currentguildid,"Only administrators can use this command"), ephemeral = True)
@@ -1366,8 +1470,13 @@ async def commands(interaction: discord.Interaction):
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.RENAME))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TIMER))  
 
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.DOWNLOAD))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.red, constants.DELETE))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRAIN))
+
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.SOUNDSEARCH))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.YOUTUBE))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.WIKIPEDIA))
         view.add_item(SlashCommandButton(discord.ButtonStyle.red, constants.STOP))
 
         await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"These are the bot's commands"), view = view, ephemeral = False)
@@ -1458,6 +1567,53 @@ async def disclaimer_internal(interaction):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 
+@client.tree.command()
+@app_commands.rename(file='file')
+@app_commands.describe(file="The sentences file")
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+async def train(interaction: discord.Interaction, file: discord.Attachment):
+    """Train the Bot using a sentences file."""
+    is_deferred=False
+    try:
+        currentguildid = get_current_guild_id(interaction.guild.id)
+        if not utils.allowed_file(file.filename):
+            await interaction.response.send_message(utils.translate(currentguildid,"Please upload a valid text file.") + " (.txt)", ephemeral = True)     
+        else:
+            is_deferred=True
+            await interaction.response.defer(thinking=True, ephemeral=True)
+        
+            url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/upload/trainfile/txt"
+            form_data = {'chatid': str(currentguildid),
+                        'lang': utils.get_guild_language(currentguildid)
+                        }
+            trainfile = await file.to_file()
+            filepath = os.environ.get("TMP_DIR") + "/trainfile.txt"
+            with open(filepath, 'wb') as filewrite:
+                filewrite.write(trainfile.fp.getbuffer())
+
+            try:
+                with open(filepath, "r") as f:
+                    for l in f:
+                        logging.info("[GUILDID : %s] upload/trainfile/txt - Found line: " + l)
+
+                response = requests.post(url, data=form_data, files={"trainfile": open(filepath, "rb")})
+
+                if (response.status_code == 200):
+                    await interaction.followup.send(utils.translate(currentguildid,"Done."), ephemeral = True) 
+                else:
+                    logging.error("[GUILDID : %s] upload/trainfile/txt - Received bad response from APIs", str(currentguildid), exc_info=1)
+                    await interaction.followup.send(utils.translate(currentguildid,"Error."), ephemeral = True)  
+
+            except UnicodeDecodeError:
+                logging.error("[GUILDID : %s] train - Uploaded bad text file.", str(currentguildid), exc_info=1)
+                await interaction.response.send_message(utils.translate(currentguildid,"Please upload a valid text file.") + " (.txt)", ephemeral = True)   
+
+            os.remove(filepath)   
+
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+
+
 @accept.error
 @ask.error
 @avatar.error
@@ -1467,6 +1623,7 @@ async def disclaimer_internal(interaction):
 @disable.error
 @disclaimer.error
 @disable_tree.error
+@download.error
 @enable.error
 @enable_tree.error
 @generate.error
@@ -1483,9 +1640,11 @@ async def disclaimer_internal(interaction):
 @story.error
 @text2image.error
 @timer.error
+@train.error
 @translate.error
 @stop.error
 @youtube.error
+@wikipedia.error
 async def on_generic_error(interaction: discord.Interaction, e: app_commands.AppCommandError):
     await send_error(e, interaction, from_generic=True)
 

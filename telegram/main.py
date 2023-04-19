@@ -37,8 +37,6 @@ GROUP_CHAT_ID = os.environ.get("GROUP_CHAT_ID")
 API_URL = os.environ.get("API_URL")
 API_PATH_TEXT = os.environ.get("API_PATH_TEXT")
 API_PATH_AUDIO = os.environ.get("API_PATH_AUDIO")
-API_PATH_JOKES_TEXT = os.environ.get("API_PATH_JOKES_TEXT")
-API_PATH_JOKES_AUDIO = os.environ.get("API_PATH_JOKES_AUDIO")
 API_PATH_IMAGES = os.environ.get("API_PATH_IMAGES")
 API_PATH_UTILS = os.environ.get("API_PATH_UTILS")
 BOT_NAME = os.environ.get("BOT_NAME")
@@ -394,111 +392,8 @@ def image(update: Update, context: CallbackContext):
           
 dispatcher.add_handler(CommandHandler('image', image))
 
-def chuck(update: Update, context: CallbackContext):
-    try:
-        chatid = str(update.effective_chat.id)
-        if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
-            strid = "000000"
-        #else:
-        #    strid = chatid
-        if strid:
-            url = API_URL + API_PATH_JOKES_TEXT + "chuck"
-
-            response = requests.get(url)
-            if (response.status_code == 200):
-                context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-            else:
-                context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                        
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
-      context.bot.send_message(chat_id=update.effective_chat.id, text="Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-
-dispatcher.add_handler(CommandHandler('chuck', chuck))
 
 
-
-
-def joke(update: Update, context: CallbackContext):
-    try:
-        chatid = str(update.effective_chat.id)
-        if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
-            strid = "000000"
-        #else:
-       #     strid = chatid
-        if strid:
-            url = API_URL + API_PATH_JOKES_TEXT + "random"
-
-            response = requests.get(url)
-            if (response.status_code == 200):
-                context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-            else:
-                context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                        
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
-      context.bot.send_message(chat_id=update.effective_chat.id, text="Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-
-dispatcher.add_handler(CommandHandler('joke', joke))
-
-
-
-
-def jokeaudio(update: Update, context: CallbackContext):
-    try:
-        chatid = str(update.effective_chat.id)
-        if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
-            strid = "000000"
-        #else:
-        #    strid = chatid
-        if strid:
-            url = API_URL + API_PATH_JOKES_AUDIO + "random"
-
-            response = requests.get(url)
-            if (response.status_code == 200):
-                audio = BytesIO(response.content)
-                context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, title="Barzelletta", performer="ScemoPezzente", filename=get_random_string(12)+ "audio.wav")
-            else:
-                context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                        
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
-      context.bot.send_message(chat_id=update.effective_chat.id, text="Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-
-dispatcher.add_handler(CommandHandler('jokeaudio', jokeaudio))
-
-
-
-def chuckaudio(update: Update, context: CallbackContext):
-    try:
-        chatid = str(update.effective_chat.id)
-        if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
-            strid = "000000"
-        #else:
-        #    strid = chatid
-        if strid:
-            url = API_URL + API_PATH_JOKES_AUDIO + "chuck"
-
-            response = requests.get(url)
-            if (response.status_code == 200):
-                audio = BytesIO(response.content)
-                context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, title="Barzelletta", performer="ScemoPezzente", filename=get_random_string(12)+ "audio.wav")
-            else:
-                context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                        
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
-      context.bot.send_message(chat_id=update.effective_chat.id, text="Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-
-dispatcher.add_handler(CommandHandler('chuckaudio', chuckaudio))
 
 def search(update: Update, context: CallbackContext):
     try:
@@ -815,16 +710,12 @@ def help(update: Update, context: CallbackContext):
 
     text = "ask - chiedi qualcosa (text)\n"
     text = text + "askaudio - chiedi qualcosa (audio)\n"
-    text = text + "chuck - Chuck Norris. (text)\n"
-    text = text + "chuckaudio - Chuck Norris. (audio)\n"
     text = text + "curse - Curse. (audio)\n"
     text = text + "curseaudio - Curse. (audio)\n"
     text = text + "generate - genera frasi casuali\n"
     text = text + "image - ricerca immagini\n"
     text = text + "insult - genera insulti (text)\n"
     text = text + "insultaudio - genera insulti (audio)\n"
-    text = text + "joke - barzelletta (text)\n"
-    text = text + "jokeaudio - barzelletta (audio)\n"
     text = text + "help - visualizza i comandi\n"
     text = text + "listvoices - elenca i modelli vocali\n"
     text = text + "restart - riavvia il bot\n"
