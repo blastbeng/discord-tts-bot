@@ -722,6 +722,8 @@ async def speak(interaction: discord.Interaction, text: str, use_google: Optiona
 
             if not hasattr(voice_client, 'play') and voice_client.is_connected():
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
+            elif not text.contains(os.environ.get("FILTER_NAMES")):
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"ha, ha, ha! DO not use this words"), ephemeral = True)
             elif not voice_client.is_playing():
 
                 currentguildid = get_current_guild_id(interaction.guild.id)

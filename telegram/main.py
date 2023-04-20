@@ -40,6 +40,7 @@ API_PATH_AUDIO = os.environ.get("API_PATH_AUDIO")
 API_PATH_IMAGES = os.environ.get("API_PATH_IMAGES")
 API_PATH_UTILS = os.environ.get("API_PATH_UTILS")
 BOT_NAME = os.environ.get("BOT_NAME")
+FILTER_NAMES = os.environ.get("FILTER_NAMES")
 
 logging.info("Starting Telegram Client...")
 
@@ -249,7 +250,7 @@ def speak(update: Update, context: CallbackContext):
             userinput = update.message.text[7:].strip();
             splitted = userinput.split("-")
             message = splitted[0].strip()
-            if(message != "" and len(message) <= 500  and not message.endswith('bot')):
+            if(message != "" and len(message) <= 500  and not message.endswith('bot') and not message.contains(FILTER_NAMES)):
 
                 url = API_URL + API_PATH_UTILS + "/fakeyou/listvoices/it/0"
 
