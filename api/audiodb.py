@@ -206,6 +206,8 @@ def select_list_by_chatid(chatid=GUILD_ID):
     cursor.execute(sqlite_select_query, (chatid,))
     records = cursor.fetchall()
 
+    cursor.close()
+
   except sqlite3.Error as error:
     logging.error("Failed to Execute SQLITE Query", exc_info=1)
   finally:
@@ -238,6 +240,8 @@ def select_data_name_voice_by_chatid(chatid: str):
     cursor.execute(sqlite_select_query, (chatid,))
     records = cursor.fetchall()
 
+    cursor.close()
+
   except sqlite3.Error as error:
     logging.error("Failed to Execute SQLITE Query", exc_info=1)
   finally:
@@ -268,6 +272,8 @@ def select_by_name_chatid_voice_language(name: str, chatid: str, voice: str, lan
         audio = BytesIO(data)
         audio.seek(0)
 
+      cursor.close()
+
     except sqlite3.Error as error:
       logging.error("Failed to Execute SQLITE Query", exc_info=1)
     finally:
@@ -290,6 +296,8 @@ def select_counter_by_name_chatid_voice_language(name: str, chatid: str, voice: 
 
       for row in records:
         counter   =  row[0]
+
+      cursor.close()
 
     except sqlite3.Error as error:
       logging.error("Failed to Execute SQLITE Query", exc_info=1)
@@ -315,6 +323,8 @@ def select_distinct_language_by_name_chatid(name: str, chatid: str):
 
       for row in records:
         lang   =  str(row[0])
+
+      cursor.close()
 
     except sqlite3.Error as error:
       logging.error("Failed to Execute SQLITE Query", exc_info=1)
@@ -357,6 +367,8 @@ def select_by_chatid_voice_language_random(chatid: str, voice:str, language:str)
         audio.seek(0)
         name = row[1]
 
+      cursor.close()
+
     except sqlite3.Error as error:
       logging.error("Failed to Execute SQLITE Query", exc_info=1)
     finally:
@@ -380,6 +392,8 @@ def select_audio_by_id(id: int):
       audio = BytesIO(data)
       audio.seek(0)
 
+    cursor.close()
+
   except sqlite3.Error as error:
     logging.error("Failed to Execute SQLITE Query", exc_info=1)
   finally:
@@ -402,6 +416,8 @@ def select_count_by_text_chatid_voice(text: str, chatid: str, voice: str):
 
     for row in records:
       count = row[0]
+
+    cursor.close()
   except sqlite3.Error as error:
     logging.error("Failed to Execute SQLITE Query", exc_info=1)
     return count
@@ -423,6 +439,8 @@ def select_count_by_text_chatid(text: str, chatid: str):
 
     for row in records:
       count = row[0]
+
+    cursor.close()
   except sqlite3.Error as error:
     logging.error("Failed to Execute SQLITE Query", exc_info=1)
     return count
@@ -443,6 +461,8 @@ def select_count_by_chatid_voice(chatid: str, voice: str):
 
     for row in records:
       count = row[0]
+
+    cursor.close()
   except sqlite3.Error as error:
     logging.error("Failed to Execute SQLITE Query", exc_info=1)
     return count
@@ -465,6 +485,8 @@ def select_count_by_name_chatid_voice_language(name: str, chatid: str, voice: st
 
     for row in records:
       count = row[0]
+
+    cursor.close()
   except sqlite3.Error as error:
     logging.error("Failed to Execute SQLITE Query", exc_info=1)
     return count

@@ -198,6 +198,13 @@ class SlashCommandButton(discord.ui.Button["InteractionRoles"]):
                 await interaction.response.send_message("/delete <text> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot deletes all the sentences containing the given text"), ephemeral = True)
             elif self.name == constants.DOWNLOAD:
                 await download_internal(interaction)       
+            elif self.name == constants.BLOCK:
+                await interaction.response.send_message("/block <word> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot adds a word to the blacklist"), ephemeral = True)
+            elif self.name == constants.UNBLOCK:
+                await interaction.response.send_message("/unblock <word> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot removes a word from the blacklist"), ephemeral = True)
+            elif self.name == constants.UNBLOCKALL:
+                await interaction.response.send_message("/unblockall -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot removes all the words from the blacklist"), ephemeral = True)
+            
             else:
                 await interaction.response.send_message("Work in progress", ephemeral = True)
         except Exception as e:
@@ -423,6 +430,10 @@ async def do_play(voice_client, url: str, interaction: discord.Interaction, curr
         elif response.status_code == 400:
             logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
             message = message + "\n\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Error. Can't reproduce audio.\nThe Generated TTS is longer than the maximum limit. ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
+            await interaction.followup.send(message, ephemeral = True)
+        elif response.status_code == 406:
+            logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
+            message = utils.translate(get_current_guild_id(interaction.guild.id),"Error. The sentence contains a word that is blocked by filters.") + " ["+ str(message) +"]"
             await interaction.followup.send(message, ephemeral = True)
         else:
             logging.error("[GUILDID : %s] do_play - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
@@ -688,18 +699,16 @@ async def leave(interaction: discord.Interaction):
     
 async def leave_internal(interaction):
     try:
-        if interaction.user.guild_permissions.administrator:
-            if interaction.user.voice and interaction.user.voice.channel:
-                voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
-                if voice_client and voice_client.channel.id == interaction.user.voice.channel.id:
-                    await voice_client.disconnect()
-                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"I'm leaving the voice channel"), ephemeral = True)
-                else:
-                    await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"I'm not connected to any voice channel"), ephemeral = True)       
+        
+        if interaction.user.voice and interaction.user.voice.channel:
+            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+            if voice_client and voice_client.channel.id == interaction.user.voice.channel.id:
+                await voice_client.disconnect()
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"I'm leaving the voice channel"), ephemeral = True)
             else:
-                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
-        else:        
-            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
+                await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"I'm not connected to any voice channel"), ephemeral = True)       
+        else:
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
     except Exception as e:
         await send_error(e, interaction, from_generic=False)
 
@@ -1473,6 +1482,9 @@ async def commands(interaction: discord.Interaction):
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.DOWNLOAD))
         view.add_item(SlashCommandButton(discord.ButtonStyle.red, constants.DELETE))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRAIN))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.BLOCK))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.UNBLOCK))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.UNBLOCKALL))
 
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.SOUNDSEARCH))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.YOUTUBE))
@@ -1600,6 +1612,11 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
 
                 if (response.status_code == 200):
                     await interaction.followup.send(utils.translate(currentguildid,"Done."), ephemeral = True) 
+                elif response.status_code == 406:
+                    message = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
+                    logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
+                    message = utils.translate(get_current_guild_id(interaction.guild.id),"Error. The sentence contains a word that is blocked by filters.") + " ["+ str(message) +"]"
+                    await interaction.followup.send(message, ephemeral = True)
                 else:
                     logging.error("[GUILDID : %s] upload/trainfile/txt - Received bad response from APIs", str(currentguildid), exc_info=1)
                     await interaction.followup.send(utils.translate(currentguildid,"Error."), ephemeral = True)  
@@ -1614,9 +1631,78 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 
+
+@client.tree.command()
+@app_commands.rename(word='word')
+@app_commands.describe(word="The word to block")
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+async def block(interaction: discord.Interaction, word: str):
+    """Add a word to the blacklist"""
+    try:
+
+        currentguildid = get_current_guild_id(interaction.guild.id)
+        url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/filters/addword/" + urllib.parse.quote(word) +"/"+urllib.parse.quote(currentguildid)
+
+        response = requests.get(url)
+        if (response.status_code == 200):
+            await interaction.response.send_message(utils.translate(currentguildid,"Word added to the blacklist") + "["+word+"]", ephemeral = True)
+        else:
+            logging.error("[GUILDID : %s] block - Received bad response from APIs [word:%s]", str(currentguildid), word, exc_info=1)
+            await interaction.response.send_message(utils.translate(currentguildid,"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+"\nblastbong#9151", ephemeral = True)
+
+            
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False)
+
+
+@client.tree.command()
+@app_commands.rename(word='word')
+@app_commands.describe(word="The word to block")
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+async def unblock(interaction: discord.Interaction, word: str):
+    """Remove a word from the blacklist"""
+    try:
+
+        currentguildid = get_current_guild_id(interaction.guild.id)
+        url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/filters/deleteword/" + urllib.parse.quote(word) +"/"+urllib.parse.quote(currentguildid)
+
+        response = requests.get(url)
+        if (response.status_code == 200):
+            await interaction.response.send_message(utils.translate(currentguildid,"Word removed from blacklist") + "["+word+"]", ephemeral = True)
+        else:
+            logging.error("[GUILDID : %s] block - Received bad response from APIs [word:%s]", str(currentguildid), word, exc_info=1)
+            await interaction.response.send_message(utils.translate(currentguildid,"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+"\nblastbong#9151", ephemeral = True)
+
+            
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False)
+
+
+@client.tree.command()
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+async def unblockall(interaction: discord.Interaction):
+    """Remove all the words from the blacklist"""
+    try:
+        if interaction.user.guild_permissions.administrator:
+            currentguildid = get_current_guild_id(interaction.guild.id)
+            url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/filters/deleteall/" +urllib.parse.quote(currentguildid)
+
+            response = requests.get(url)
+            if (response.status_code == 200):
+                await interaction.response.send_message(utils.translate(currentguildid,"All the words removed from blacklist") + "["+word+"]", ephemeral = True)
+            else:
+                logging.error("[GUILDID : %s] block - Received bad response from APIs [word:%s]", str(currentguildid), word, exc_info=1)
+                await interaction.response.send_message(utils.translate(currentguildid,"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+"\nblastbong#9151", ephemeral = True)
+        else:        
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
+            
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False)
+
 @accept.error
 @ask.error
 @avatar.error
+@block.error
 @commands.error
 @curse.error
 @delete.error
@@ -1643,6 +1729,8 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
 @train.error
 @translate.error
 @stop.error
+@unblock.error
+@unblockall.error
 @youtube.error
 @wikipedia.error
 async def on_generic_error(interaction: discord.Interaction, e: app_commands.AppCommandError):
