@@ -6,12 +6,14 @@ import image
 import utils
 import insults
 import audiodb
+import filtersdb
 import requests
 import json
 import threading
 import random
 import sys
 import shutil
+from io import BytesIO
 from datetime import datetime
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -28,6 +30,7 @@ from bestemmie import Bestemmie
 from libretranslator import LibreTranslator
 from chatterbot import languages
 from exceptions import AudioLimitException
+from exceptions import BlockedWordException
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -64,6 +67,18 @@ limiter = Limiter(
 )
 
 app.config.from_object(Config())
+
+@app.before_request
+def block_by_filters():
+  request_args = {**request.view_args, **request.args} if request.view_args else {**request.args}
+  if "chatid" in request_args and "filters" not in request.full_path:
+    wordlist = filtersdb.select_all(str(request_args["chatid"]))
+    for word in wordlist:
+      if word.lower() in (str(request_args)).lower():
+        return get_response_filters_error(word)
+    
+
+
 cache = Cache(app)
 api = Api(app)
 
@@ -85,6 +100,11 @@ def get_response_json(data):
 
 def get_response_limit_error(text: str):
   r = make_response("TTS Limit Exceeded", 400)
+  r.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+  return r
+
+def get_response_filters_error(text: str):
+  r = make_response("This sentence contains a word that is blocked by filters", 406)
   r.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
   return r
 
@@ -944,7 +964,15 @@ class DatabaseTrainFile(Resource):
         return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
       else:
         trainfile=TMP_DIR + '/' + utils.get_random_string(24) + ".txt"
+        out_stream = BytesIO()
         trf.save(trainfile)
+        with open(trainfile) as f:
+          wordlist = filtersdb.select_all(str(chatid))
+          for word in wordlist:
+            for line in f:
+              if word.lower() in line.lower():
+                os.remove(trainfile)
+                return get_response_filters_error(word)
         threading.Timer(0, utils.train_txt, args=[trainfile, get_chatbot_by_id(chatid, lang), lang]).start()
         return get_response_str("Done. Watch the logs for errors.")
     except Exception as e:
@@ -952,6 +980,56 @@ class DatabaseTrainFile(Resource):
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
+
+
+@nsdatabase.route('/filters/addword/<string:word>/')
+@nsdatabase.route('/filters/addword/<string:word>/<string:chatid>')
+class FiltersAdd(Resource):
+  def get (self, chatid = "000000", word = ""):
+    try:
+      if word != "":
+        filtersdb.insert(chatid, word)
+        return get_response_str("Adding to blocked words: " + word)
+      else:
+        return make_response(str("ERROR: No word provided"), 500)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
+
+
+@nsdatabase.route('/filters/deleteword/<string:word>/')
+@nsdatabase.route('/filters/deleteword/<string:word>/<string:chatid>')
+@nsdatabase.route('/backup/chatbot')
+class FiltersDelete(Resource):
+  def get (self, chatid = "000000", word = ""):
+    try:
+      if word != "":
+        filtersdb.delete(chatid, word)
+        return get_response_str("Removing from blocked words: " + word)
+      else:
+        return make_response(str("ERROR: No word provided"), 500)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
+
+
+@nsdatabase.route('/filters/deleteall/')
+@nsdatabase.route('/filters/deleteall/<string:chatid>')
+@nsdatabase.route('/backup/chatbot')
+class FiltersDelete(Resource):
+  def get (self, chatid = "000000"):
+    try:
+      filtersdb.delete_all(chatid)
+      return get_response_str("Removing from blocked words: " + word)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
 
 
 @nsdatabase.route('/backup/chatbot/')
@@ -997,6 +1075,7 @@ def clean_audio_zip():
 previousMessages = {}
 chatbots_dict = {}
 audiodb.create_empty_tables()
+filtersdb.create_empty_tables()
 cache.init_app(app)
 limiter.init_app(app)
 scheduler.init_app(app)

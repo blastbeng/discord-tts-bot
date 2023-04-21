@@ -2,6 +2,7 @@ import io
 import logging
 import os
 import random
+import filtersdb
 
 from chatterbot.conversation import Statement
 from chatterbot.trainers import Trainer
