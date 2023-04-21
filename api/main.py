@@ -290,7 +290,7 @@ class AudioRepeatClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, text: str, voice: str, chatid = "000000", language = "it"):
     try:
-      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=language, save=False)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=language, limit=False, save=False)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
@@ -300,8 +300,6 @@ class AudioRepeatClass(Resource):
         def clear_cache(response):
           cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
           return make_response("TTS Generation Error!", 500)
-    except AudioLimitException:
-      return get_response_limit_error(text)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
