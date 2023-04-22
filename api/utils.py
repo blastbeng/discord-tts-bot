@@ -306,25 +306,15 @@ def get_random_date():
   date = fake.date_time_between(start_date=offset, end_date='now').strftime("%Y-%m-%d")
   return date
 
-def extract_sentences_from_audiodb(filename, language="it", chatid="000000", distinct=True, randomize=True):
+
+
+def extract_sentences_from_audiodb(filename, language="it", chatid="000000"):
   try:
 
-    #if os.path.exists(filename):
-    #  os.remove(filename)
-      
-    #dbfile=chatid+"-db.sqlite3"
     sqliteConnection = sqlite3.connect('./config/audiodb.sqlite3')
     cursor = sqliteConnection.cursor()
 
-    sqlite_select_sentences_query = ""
-    if distinct and randomize:
-      sqlite_select_sentences_query = """SELECT DISTINCT name FROM audio WHERE chatid = ? and language = ? ORDER BY RANDOM()"""
-    elif not distinct and not randomize:
-      sqlite_select_sentences_query = """SELECT name FROM audio WHERE chatid = ? and language = ? ORDER BY name"""
-    elif distinct and not randomize:
-      sqlite_select_sentences_query = """SELECT DISTINCT name FROM audio WHERE chatid = ? and language = ? ORDER BY name"""
-    elif not distinct and randomize:
-      sqlite_select_sentences_query = """SELECT name FROM audio WHERE chatid = ? and language = ? ORDER BY RANDOM()"""
+    sqlite_select_sentences_query = """SELECT DISTINCT name FROM audio WHERE chatid = ? and language = ? ORDER BY RANDOM()"""
 
     data = (chatid, language,)
 
@@ -337,32 +327,10 @@ def extract_sentences_from_audiodb(filename, language="it", chatid="000000", dis
 
     with open(filename, 'w') as sentence_file:
       for row in records:
-        try:
-          if row[0] and row[0] != "":
-            sanitized = row[0].strip()
-            logging.info('extract_sentences_from_audiodb - [chatid:' + chatid + ',lang:' + language + '] - "' + sanitized + '"')
-            if sanitized[-1] not in string.punctuation:
-              if randomize:
-                if bool(random.getrandbits(1)):
-                  sanitized = sanitized + "."
-                else:
-                  sanitized = sanitized + " "
-              else:
-                sanitized = sanitized + "."
-            if records.index(row) != records_len:
-              if randomize:
-                if bool(random.getrandbits(1)):
-                  sanitized = sanitized + "\n"
-                else:
-                  sanitized = sanitized + " "
-              else:
-                sanitized = sanitized + "\n"
-            sentence_file.write(sanitized)
-        except Exception as e:
-          exc_type, exc_obj, exc_tb = sys.exc_info()
-          fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-          logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-
+        logging.info('extract_sentences_from_audiodb - [chatid:' + chatid + ',lang:' + language + '] - "' + row[0] + '"')
+        sentence_file.write(row[0])
+        sentence_file.write("\n")
+        
     cursor.close()
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -374,25 +342,13 @@ def extract_sentences_from_audiodb(filename, language="it", chatid="000000", dis
         sqliteConnection.close()
   return True
 
-def extract_sentences_from_chatbot(filename, chatid="000000", distinct=True, randomize=True):
+def extract_sentences_from_chatbot(filename, chatid="000000"):
   try:
 
-    #if os.path.exists(filename):
-    #  os.remove(filename)
-      
-    #dbfile=chatid+"-db.sqlite3"
     sqliteConnection = sqlite3.connect('./config/' + chatid + '-db.sqlite3')
     cursor = sqliteConnection.cursor()
 
-    sqlite_select_sentences_query = ""
-    if distinct and randomize:
-      sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY RANDOM()"""
-    elif not distinct and not randomize:
-      sqlite_select_sentences_query = """SELECT text FROM statement ORDER BY text"""
-    elif distinct and not randomize:
-      sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY text"""
-    elif not distinct and randomize:
-      sqlite_select_sentences_query = """SELECT text FROM statement  ORDER BY RANDOM()"""
+    sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY text"""
 
     data = ()
 
@@ -405,31 +361,9 @@ def extract_sentences_from_chatbot(filename, chatid="000000", distinct=True, ran
 
     with open(filename, 'w') as sentence_file:
       for row in records:
-        try:
-          if row[0] and row[0] != "":
-            sanitized = row[0].strip()
-            logging.info('extract_sentences_from_chatbot - [chatid:' + chatid + '] - "' + sanitized + '"')
-            if sanitized[-1] not in string.punctuation:
-              if randomize:
-                if bool(random.getrandbits(1)):
-                  sanitized = sanitized + "."
-                else:
-                  sanitized = sanitized + " "
-              else:
-                sanitized = sanitized + "."
-            if records.index(row) != records_len:
-              if randomize:
-                if bool(random.getrandbits(1)):
-                  sanitized = sanitized + "\n"
-                else:
-                  sanitized = sanitized + " "
-              else:
-                sanitized = sanitized + "\n"
-            sentence_file.write(sanitized)
-        except Exception as e:
-          exc_type, exc_obj, exc_tb = sys.exc_info()
-          fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-          logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+        logging.info('extract_sentences_from_chatbot - [chatid:' + chatid + '] - "' + row[0] + '"')
+        sentence_file.write(row[0])
+        sentence_file.write("\n")
 
     cursor.close()
   except Exception as e:
@@ -477,7 +411,7 @@ def empty_template_trainfile_json():
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in "txt"
 
-def train_txt(trainfile, chatbot: ChatBot, lang: str):
+def train_txt(trainfile, chatbot: ChatBot, lang: str, chatid: str):
   try:
       logging.info("Loading: %s", trainfile)
       trainer = CustomListTrainer(chatbot)
@@ -493,10 +427,56 @@ def train_txt(trainfile, chatbot: ChatBot, lang: str):
         trainer.train(trainfile_array)
       logging.info("Done. Deleting: " + trainfile)
       os.remove(trainfile)
+
+      clean_duplicates(chatid)
+
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+def clean_duplicates(chatid: str):
+  try:
+    dbfile='./config/'+chatid+"-db.sqlite3"
+    sqliteConnection = sqlite3.connect(dbfile)
+    cursor = sqliteConnection.cursor()
+
+    sqlite_delete_query = """DELETE FROM statement
+                             WHERE EXISTS (
+                               SELECT 1 FROM statement s2
+                               WHERE statement.text = s2.text
+                               AND statement.id > s2.id
+                             );"""
+    
+    data_tuple = ()
+
+    logging.info("clean_duplicates - Executing: %s", sqlite_delete_query1)
+
+    cursor.execute(sqlite_delete_query2, data_tuple)
+
+    sqliteConnection.commit()
+    cursor.close()
+  except sqlite3.Error as error:
+    logging.error("Failed to delete data from sqlite", exc_info=1)
+    return("Errore!")
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()
+
+def vacuum_chatbot_db(chatid: str):
+  try:
+    dbfile='./config/'+chatid+"-db.sqlite3"
+    sqliteConnection = sqlite3.connect(dbfile)
+    cursor = sqliteConnection.cursor()
+
+    cursor.execute("VACUUM")
+
+    cursor.close()
+  except sqlite3.Error as error:
+    logging.error("Failed to Execute VACUUM", exc_info=1)
+  finally:
+    if sqliteConnection:
+      sqliteConnection.close()
 
 def delete_by_text(chatid: str, text: str, force = False):
   try:
@@ -517,6 +497,7 @@ def delete_by_text(chatid: str, text: str, force = False):
 
     cursor.execute(sqlite_delete_query2, data_tuple)
 
+
     sqliteConnection.commit()
     cursor.close()
   except sqlite3.Error as error:
@@ -526,7 +507,8 @@ def delete_by_text(chatid: str, text: str, force = False):
     if sqliteConnection:
         sqliteConnection.close()
   if force:
-    delete_from_audiodb_by_text(chatid, text)
+    #delete_from_audiodb_by_text(chatid, text)
+    audiodb.update_is_correct_by_word(text, chatid, 0)
     return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot e dal db audio!')
   else:
     return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot!')
@@ -1033,3 +1015,57 @@ def rmdir(directory):
       else:
           item.unlink()
   directory.rmdir()
+
+
+def reset(chatid: str):
+  try:
+    dbfile='./config/'+chatid+"-db.sqlite3"
+    sqliteConnection = sqlite3.connect(dbfile)
+    cursor = sqliteConnection.cursor()
+
+    sqlite_delete_query = "DELETE FROM Statement"
+    
+    data_tuple = ()
+
+    logging.info("reset - Executing: %s", sqlite_delete_query)
+
+    cursor.execute(sqlite_delete_query, data_tuple)
+
+    sqliteConnection.commit()
+    cursor.close()
+  except sqlite3.Error as error:
+    logging.error("Failed to delete data from sqlite", exc_info=1)
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()
+
+  utils.vacuum_chatbot_db(chatid)
+
+  delete_from_audiodb(chatid, text)
+  audiodb.vacuum()
+
+  filtersdb.delete_all(chatid)
+  filtersdb.vacuum()
+
+
+def delete_from_audiodb(chatid: str):
+  try:
+    dbfile="./config/audiodb.sqlite3"
+    sqliteConnection = sqlite3.connect(dbfile)
+    cursor = sqliteConnection.cursor()
+
+    sqlite_delete_query = "DELETE FROM Audio WHERE chatid = ?"
+
+    data_tuple = (chatid, )
+
+    logging.info("delete_from_audiodb - Executing:  %s", sqlite_delete_query)
+
+    cursor.execute(sqlite_delete_query, data_tuple)
+    sqliteConnection.commit()
+    cursor.close()
+
+  except sqlite3.Error as error:
+    logging.error("Failed to delete data from sqlite", exc_info=1)
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()

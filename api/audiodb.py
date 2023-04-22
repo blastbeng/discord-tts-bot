@@ -164,6 +164,48 @@ def update_is_correct(name: str, chatid: str, voice: str, language: str, is_corr
     if sqliteConnection:
         sqliteConnection.close()
 
+
+
+def update_is_correct_by_word(text: str, chatid: str, is_correct: int):
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
+
+    sqlite_query = "UPDATE Audio SET is_correct = ? WHERE chatid = ? and data is not null and duration <= ? and  (name like '" + text + "%' OR name like '%" + text + "' OR name LIKE '%" + text + "%' OR name = '" + text + "') COLLATE NOCASE"
+
+    data_audio_tuple = (is_correct,chatid,int(os.environ.get("MAX_TTS_DURATION")),)
+
+    cursor.execute(sqlite_query, data_audio_tuple)
+
+
+    sqliteConnection.commit()
+    cursor.close()
+  except sqlite3.Error as error:
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()
+
+def update_is_correct_if_not_none(chatid: str, is_correct: int):
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
+
+    sqlite_query = "UPDATE Audio SET is_correct = ? WHERE chatid = ? and data is not null and duration <= ?"
+
+    data_audio_tuple = (is_correct,chatid,int(os.environ.get("MAX_TTS_DURATION")),)
+
+    cursor.execute(sqlite_query, data_audio_tuple)
+
+
+    sqliteConnection.commit()
+    cursor.close()
+  except sqlite3.Error as error:
+    logging.error("Failed to Execute SQLITE Query", exc_info=1)
+  finally:
+    if sqliteConnection:
+        sqliteConnection.close()
+
 def increment_counter(name: str, chatid: str, voice: str, language: str, counter_limit: int):
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
@@ -545,3 +587,17 @@ def clean_old_limited_audios(chatid: str, limit: int):
   finally:
     if sqliteConnection:
         sqliteConnection.close()
+
+def vacuum():
+  try:
+    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+    cursor = sqliteConnection.cursor()
+
+    cursor.execute("VACUUM")
+
+    cursor.close()
+  except sqlite3.Error as error:
+    logging.error("Failed to Execute VACUUM", exc_info=1)
+  finally:
+    if sqliteConnection:
+      sqliteConnection.close()

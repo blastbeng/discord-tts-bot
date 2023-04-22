@@ -78,7 +78,6 @@ def block_by_filters():
         return get_response_filters_error(word)
     
 
-
 cache = Cache(app)
 api = Api(app)
 
@@ -827,6 +826,7 @@ class InitChatterbotClass(Resource):
     try:
       #threading.Timer(0, get_chatbot_by_id, args=[chatid]).start()
       #return make_response("Initializing chatterbot. Watch the logs for errors.", 200)
+      utils.vacuum_chatbot_db(chatid)
       chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
       if chatbot is not None:
         return make_response("Initialized chatterbot on chatid " + chatid, 200)
@@ -902,7 +902,7 @@ class DownloadSentencesDb(Resource):
   def get(self, chatid = "000000"):
     try:
       filename = os.path.dirname(os.path.realpath(__file__)) + '/config/download_sentences_'+chatid+'.txt'
-      if utils.extract_sentences_from_chatbot(filename, chatid=chatid, randomize=False):
+      if utils.extract_sentences_from_chatbot(filename, chatid=chatid):
         return send_file(filename, attachment_filename='sentences.txt', mimetype="text/plain")
       else:
         return make_response("Failed to download sentences.", 500)
@@ -973,7 +973,7 @@ class DatabaseTrainFile(Resource):
               if word.lower() in line.lower():
                 os.remove(trainfile)
                 return get_response_filters_error(word)
-        threading.Timer(0, utils.train_txt, args=[trainfile, get_chatbot_by_id(chatid, lang), lang]).start()
+        threading.Timer(0, utils.train_txt, args=[trainfile, get_chatbot_by_id(chatid, lang), lang, chatid]).start()
         return get_response_str("Done. Watch the logs for errors.")
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -989,6 +989,7 @@ class FiltersAdd(Resource):
     try:
       if word != "":
         filtersdb.insert(chatid, word)
+        audiodb.update_is_correct_by_word(word, chatid, 0)
         return get_response_str("Adding to blocked words: " + word)
       else:
         return make_response(str("ERROR: No word provided"), 500)
@@ -1001,12 +1002,12 @@ class FiltersAdd(Resource):
 
 @nsdatabase.route('/filters/deleteword/<string:word>/')
 @nsdatabase.route('/filters/deleteword/<string:word>/<string:chatid>')
-@nsdatabase.route('/backup/chatbot')
 class FiltersDelete(Resource):
   def get (self, chatid = "000000", word = ""):
     try:
       if word != "":
         filtersdb.delete(chatid, word)
+        audiodb.update_is_correct_by_word(word, chatid, 1)
         return get_response_str("Removing from blocked words: " + word)
       else:
         return make_response(str("ERROR: No word provided"), 500)
@@ -1017,14 +1018,28 @@ class FiltersDelete(Resource):
       return make_response(str(e), 500)
 
 
+@nsdatabase.route('/reset/')
+@nsdatabase.route('/reset/<string:chatid>')
+class FiltersDelete(Resource):
+  def get (self, chatid = "000000"):
+    try:
+      utils.reset(chatid, word)
+      return get_response_str("All the sentences deleted from the database")
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
+
+
 @nsdatabase.route('/filters/deleteall/')
 @nsdatabase.route('/filters/deleteall/<string:chatid>')
-@nsdatabase.route('/backup/chatbot')
 class FiltersDelete(Resource):
   def get (self, chatid = "000000"):
     try:
       filtersdb.delete_all(chatid)
-      return get_response_str("Removing from blocked words: " + word)
+      audiodb.update_is_correct_if_not_none(chatid, 1)
+      return get_response_str("Removing all from blocked words")
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -1068,6 +1083,11 @@ def backupdb():
 @scheduler.task('interval', id='clean_audio_zip', hours=28)
 def clean_audio_zip():
   utils.clean_audio_zip()
+
+@scheduler.task('interval', id='clean_audio_zip', hours=12)
+def clean_audio_zip():
+  audiodb.vacuum()
+  filtersdb.vacuum()
 
 
 
