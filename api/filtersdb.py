@@ -121,7 +121,9 @@ def delete(chatid: str, word: str):
     cursor = sqliteConnection.cursor()
     sqlite_select_query = " DELETE FROM WordFilters WHERE chatid = ? AND word = ?"
     cursor.execute(sqlite_select_query, (chatid,word.lower(),))
-
+    
+    sqliteConnection.commit()
+    cursor.close()
   except sqlite3.Error as error:
     logging.error("Failed to Execute SQLITE Query", exc_info=1)
   finally:
@@ -136,6 +138,9 @@ def delete_all(chatid: str):
     cursor = sqliteConnection.cursor()
     sqlite_select_query = " DELETE FROM WordFilters WHERE chatid = ?"
     cursor.execute(sqlite_select_query, (chatid,))
+    
+    sqliteConnection.commit()
+    cursor.close()
 
   except sqlite3.Error as error:
     logging.error("Failed to Execute SQLITE Query", exc_info=1)
@@ -143,3 +148,17 @@ def delete_all(chatid: str):
     if sqliteConnection:
       sqliteConnection.close()
   return blocked
+
+def vacuum():
+  try:
+    sqliteConnection = sqlite3.connect("./config/filters.sqlite3")
+    cursor = sqliteConnection.cursor()
+
+    cursor.execute("VACUUM")
+
+    cursor.close()
+  except sqlite3.Error as error:
+    logging.error("Failed to Execute VACUUM", exc_info=1)
+  finally:
+    if sqliteConnection:
+      sqliteConnection.close()

@@ -174,12 +174,8 @@ class SlashCommandButton(discord.ui.Button["InteractionRoles"]):
                 await join_internal(interaction)
             elif self.name == constants.LEAVE:
                 await leave_internal(interaction)
-            elif self.name == constants.LANGUAGE:
-                await interaction.response.send_message("/language <language> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot change its main language"), ephemeral = True)
             elif self.name == constants.RENAME:
                 await interaction.response.send_message("/rename <name> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot change its name"), ephemeral = True)
-            elif self.name == constants.AVATAR:
-                await interaction.response.send_message("/avatar <image> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot change its avatar"), ephemeral = True)
             elif self.name == constants.SOUNDRANDOM:
                 await soundrandom_internal(interaction, "random")
             elif self.name == constants.SOUNDSEARCH:
@@ -194,22 +190,45 @@ class SlashCommandButton(discord.ui.Button["InteractionRoles"]):
                 await interaction.response.send_message("/train <file> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot inserts in its database the sentencess present in the TXT file"), ephemeral = True)
             elif self.name == constants.WIKIPEDIA:
                 await interaction.response.send_message("/wikipedia <text> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot searches something on wikipedia"), ephemeral = True)
-            elif self.name == constants.DELETE:
-                await interaction.response.send_message("/delete <text> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot deletes all the sentences containing the given text"), ephemeral = True)
             elif self.name == constants.DOWNLOAD:
                 await download_internal(interaction)       
             elif self.name == constants.BLOCK:
-                await interaction.response.send_message("/block <word> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot adds a word to the blacklist"), ephemeral = True)
+                await interaction.response.send_message("/block <word> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot adds a word to the blacklist"), ephemeral = True)         
             elif self.name == constants.UNBLOCK:
-                await interaction.response.send_message("/unblock <word> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot removes a word from the blacklist"), ephemeral = True)
-            elif self.name == constants.UNBLOCKALL:
-                await interaction.response.send_message("/unblockall -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot removes all the words from the blacklist"), ephemeral = True)
-            
+                await interaction.response.send_message("/unblock <word> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot removes a word from the blacklist"), ephemeral = True)         
             else:
                 await interaction.response.send_message("Work in progress", ephemeral = True)
         except Exception as e:
             await send_error(e, interaction, from_generic=False)
+
+
+
+class AdminCommandButton(discord.ui.Button["InteractionRoles"]):
+
+    def __init__(self, style, name):
+        super().__init__(style=style, label="/"+name)
+        self.name = name
+    
+    async def callback(self, interaction: discord.Interaction):
+        try:
             
+            if self.name == constants.LANGUAGE:
+                await interaction.response.send_message("/language <language> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot change its main language"), ephemeral = True)
+            elif self.name == constants.AVATAR:
+                await interaction.response.send_message("/avatar <image> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot change its avatar"), ephemeral = True)
+            elif self.name == constants.DELETE:
+                await interaction.response.send_message("/delete <text> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot deletes all the sentences containing the given text"), ephemeral = True)
+            elif self.name == constants.DOWNLOAD:
+                await download_internal(interaction)       
+            elif self.name == constants.UNBLOCKALL:
+                await interaction.response.send_message("/unblockall -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot removes all the words from the blacklist"), ephemeral = True)         
+            elif self.name == constants.RESET:
+                await interaction.response.send_message("/reset -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot resets its database and deletes all the saved sentences"), ephemeral = True)         
+            else:
+                await interaction.response.send_message("Work in progress", ephemeral = True)
+        except Exception as e:
+            await send_error(e, interaction, from_generic=False)
+
 class PlayButton(discord.ui.Button["InteractionRoles"]):
 
     def __init__(self, content, message):
@@ -673,6 +692,20 @@ async def on_guild_join(guild):
 
     await guild.system_channel.send(get_disclaimer(get_current_guild_id(guild.id)))
 
+@client.event
+async def on_guild_remove(guild):
+    try:
+        if str(interaction.guild.id) != str(os.environ.get("GUILD_ID")):
+            utils.delete_guild(str(guild.id))
+            url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/reset/" +urllib.parse.quote(str(guild.id))
+            response = requests.get(url)
+            if (response.status_code != 200):
+                logging.error("[GUILDID : %s] on_guild_remove -> reset - Received bad response from APIs", str(guild.id), exc_info=1)
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def join(interaction: discord.Interaction):
@@ -1055,6 +1088,7 @@ async def restart(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
+@app_commands.checks.has_permissions(administrator=True)
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def delete(interaction: discord.Interaction, text: str):
     """Delete sentences by text."""
@@ -1076,6 +1110,7 @@ async def delete(interaction: discord.Interaction, text: str):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
+@app_commands.checks.has_permissions(administrator=True)
 @app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
 async def download(interaction: discord.Interaction):
     """Delete sentences by text."""
@@ -1164,6 +1199,7 @@ async def rename(interaction: discord.Interaction, name: str):
 @app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 @app_commands.rename(image='image')
 @app_commands.describe(image="New bot avatar")
+@app_commands.checks.has_permissions(administrator=True)
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def avatar(interaction: discord.Interaction, image: discord.Attachment):
     """Change bot avatar."""
@@ -1190,6 +1226,7 @@ async def avatar(interaction: discord.Interaction, image: discord.Attachment):
         await send_error(e, interaction, from_generic=False)
 
 @client.tree.command()
+@app_commands.checks.has_permissions(administrator=True)
 @app_commands.rename(language='language')
 @app_commands.describe(language="New bot language")
 @app_commands.choices(language=optionslanguages)
@@ -1475,26 +1512,55 @@ async def commands(interaction: discord.Interaction):
         
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.SPEAK))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRANSLATE))
-        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.LANGUAGE))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.RENAME))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TIMER))  
 
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.DOWNLOAD))
-        view.add_item(SlashCommandButton(discord.ButtonStyle.red, constants.DELETE))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRAIN))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.BLOCK))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.UNBLOCK))
-        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.UNBLOCKALL))
 
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.SOUNDSEARCH))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.YOUTUBE))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.WIKIPEDIA))
         view.add_item(SlashCommandButton(discord.ButtonStyle.red, constants.STOP))
 
-        await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"These are the bot's commands"), view = view, ephemeral = False)
+        message = utils.translate(get_current_guild_id(interaction.guild.id),"These are the bot's base commands")
+        message = "\n\n"
+        message = utils.translate(get_current_guild_id(interaction.guild.id),"To show the bot's admin commands use") + "  /admin"
+
+        await interaction.response.send_message(message, view = view, ephemeral = False)
     except Exception as e:
         await send_error(e, interaction, from_generic=False)
 
+
+@client.tree.command()
+@app_commands.checks.has_permissions(administrator=True)
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+async def admin(interaction: discord.Interaction):
+    """Show Admin bot commands."""
+    try:     
+        if interaction.user.guild_permissions.administrator:
+
+            view = discord.ui.View()
+            view.add_item(AdminCommandButton(discord.ButtonStyle.green, constants.DOWNLOAD))
+            view.add_item(AdminCommandButton(discord.ButtonStyle.primary, constants.LANGUAGE))
+            view.add_item(AdminCommandButton(discord.ButtonStyle.primary, constants.AVATAR))
+            view.add_item(AdminCommandButton(discord.ButtonStyle.primary, constants.DELETE))
+            view.add_item(AdminCommandButton(discord.ButtonStyle.primary, constants.UNBLOCKALL))
+            view.add_item(AdminCommandButton(discord.ButtonStyle.red, constants.RESET))
+
+            message = utils.translate(get_current_guild_id(interaction.guild.id),"These are the bot's admin commands")
+            message = "\n\n"
+            message = utils.translate(get_current_guild_id(interaction.guild.id),"To show the bot's base commands use") + "  /commands"
+
+            await interaction.response.send_message(message, view = view, ephemeral = True)
+     
+        else:
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
+    
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False)
 
 @client.tree.command()
 @app_commands.rename(text='text')
@@ -1635,7 +1701,7 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
 @client.tree.command()
 @app_commands.rename(word='word')
 @app_commands.describe(word="The word to block")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 10.0, key=lambda i: (i.user.id))
 async def block(interaction: discord.Interaction, word: str):
     """Add a word to the blacklist"""
     try:
@@ -1645,7 +1711,7 @@ async def block(interaction: discord.Interaction, word: str):
 
         response = requests.get(url)
         if (response.status_code == 200):
-            await interaction.response.send_message(utils.translate(currentguildid,"Word added to the blacklist") + "["+word+"]", ephemeral = True)
+            await interaction.response.send_message(utils.translate(currentguildid,"Word added to the blacklist") + " ["+word+"]", ephemeral = True)
         else:
             logging.error("[GUILDID : %s] block - Received bad response from APIs [word:%s]", str(currentguildid), word, exc_info=1)
             await interaction.response.send_message(utils.translate(currentguildid,"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+"\nblastbong#9151", ephemeral = True)
@@ -1657,8 +1723,8 @@ async def block(interaction: discord.Interaction, word: str):
 
 @client.tree.command()
 @app_commands.rename(word='word')
-@app_commands.describe(word="The word to block")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.describe(word="The word to unblock")
+@app_commands.checks.cooldown(1, 10.0, key=lambda i: (i.user.id))
 async def unblock(interaction: discord.Interaction, word: str):
     """Remove a word from the blacklist"""
     try:
@@ -1668,9 +1734,9 @@ async def unblock(interaction: discord.Interaction, word: str):
 
         response = requests.get(url)
         if (response.status_code == 200):
-            await interaction.response.send_message(utils.translate(currentguildid,"Word removed from blacklist") + "["+word+"]", ephemeral = True)
+            await interaction.response.send_message(utils.translate(currentguildid,"Word removed from blacklist") + " ["+word+"]", ephemeral = True)
         else:
-            logging.error("[GUILDID : %s] block - Received bad response from APIs [word:%s]", str(currentguildid), word, exc_info=1)
+            logging.error("[GUILDID : %s] unblock - Received bad response from APIs [word:%s]", str(currentguildid), word, exc_info=1)
             await interaction.response.send_message(utils.translate(currentguildid,"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+"\nblastbong#9151", ephemeral = True)
 
             
@@ -1679,7 +1745,8 @@ async def unblock(interaction: discord.Interaction, word: str):
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.has_permissions(administrator=True)
+@app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
 async def unblockall(interaction: discord.Interaction):
     """Remove all the words from the blacklist"""
     try:
@@ -1689,9 +1756,9 @@ async def unblockall(interaction: discord.Interaction):
 
             response = requests.get(url)
             if (response.status_code == 200):
-                await interaction.response.send_message(utils.translate(currentguildid,"All the words removed from blacklist") + "["+word+"]", ephemeral = True)
+                await interaction.response.send_message(utils.translate(currentguildid,"All the words removed from blacklist"), ephemeral = True)
             else:
-                logging.error("[GUILDID : %s] block - Received bad response from APIs [word:%s]", str(currentguildid), word, exc_info=1)
+                logging.error("[GUILDID : %s] unblockall - Received bad response from APIs", str(currentguildid), exc_info=1)
                 await interaction.response.send_message(utils.translate(currentguildid,"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+"\nblastbong#9151", ephemeral = True)
         else:        
             await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
@@ -1699,6 +1766,30 @@ async def unblockall(interaction: discord.Interaction):
     except Exception as e:
         await send_error(e, interaction, from_generic=False)
 
+
+@client.tree.command()
+@app_commands.checks.has_permissions(administrator=True)
+@app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
+async def reset(interaction: discord.Interaction):
+    """Resets the bot database"""
+    try:
+        if interaction.user.guild_permissions.administrator:
+            currentguildid = get_current_guild_id(interaction.guild.id)
+            url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/reset/" +urllib.parse.quote(currentguildid)
+
+            response = requests.get(url)
+            if (response.status_code == 200):
+                await interaction.response.send_message(utils.translate(currentguildid,"All the sentences saved in the bot's database have been deleted"), ephemeral = True)
+            else:
+                logging.error("[GUILDID : %s] reset - Received bad response from APIs", str(currentguildid), exc_info=1)
+                await interaction.response.send_message(utils.translate(currentguildid,"Error. Something dumb just happened. You can try to contact the dev and ask what's wrong.")+"\nblastbong#9151", ephemeral = True)
+        else:        
+            await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
+            
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False)
+
+@admin.error
 @accept.error
 @ask.error
 @avatar.error
@@ -1720,6 +1811,7 @@ async def unblockall(interaction: discord.Interaction):
 @leave.error
 @random.error
 @rename.error
+@reset.error
 @soundrandom.error
 @soundsearch.error
 @speak.error
