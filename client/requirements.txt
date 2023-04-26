@@ -6,3 +6,4 @@ psutil
 sqlalchemy==2.0.7
 Pillow
 PyNaCl
+eventlet

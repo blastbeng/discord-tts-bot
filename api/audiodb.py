@@ -348,6 +348,31 @@ def select_counter_by_name_chatid_voice_language(name: str, chatid: str, voice: 
         sqliteConnection.close()
     return counter
 
+def select_voice_by_name_chatid_language(name: str, chatid: str, language: str):
+  if chatid == "X":
+    return None
+  else:
+    voice = None
+    try:
+      sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
+      cursor = sqliteConnection.cursor()
+
+      sqlite_select_query = """SELECT voice from Audio WHERE name = ? AND chatid = ? AND language = ? ORDER BY RANDOM() LIMIT 1; """
+      cursor.execute(sqlite_select_query, (name, chatid, language,))
+      records = cursor.fetchall()
+
+      for row in records:
+        voice   =  row[0]
+
+      cursor.close()
+
+    except sqlite3.Error as error:
+      logging.error("Failed to Execute SQLITE Query", exc_info=1)
+    finally:
+      if sqliteConnection:
+        sqliteConnection.close()
+    return voice
+
 
 
 def select_distinct_language_by_name_chatid(name: str, chatid: str):

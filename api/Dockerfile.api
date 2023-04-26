@@ -67,7 +67,6 @@ COPY image.py .
 COPY main.py .
 COPY exceptions.py .
 COPY config.py .
-COPY voices.json .
 COPY entrypoint.sh .
 COPY uwsgi.ini .
 RUN chmod +x entrypoint.sh

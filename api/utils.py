@@ -14,6 +14,7 @@ import os
 import io
 import urllib
 import yt_dlp
+from functools import lru_cache
 from datetime import datetime
 import string
 import fakeyou
@@ -22,7 +23,6 @@ import wave
 import audioop
 import logging
 import audiodb
-from functools import lru_cache
 from uuid import uuid4
 from chatterbot import ChatBot
 from chatterbot import languages
@@ -383,30 +383,6 @@ def get_random_string(length):
     return result_str
 
 
-def empty_template_trainfile_json():
-  trainJsonSentencesArray=[]
-
-  message0=[]
-  message0.append("Hello, How are you?")
-  message0.append("I am fine, thanks.")
-
-  Conversation0 = ClassFactory("ConversationClass", "message0")
-  conversation0 = Conversation0(message0=message0)
-
-  trainJsonSentencesArray.append(conversation0.__dict__)
-
-  message1=[]
-  message1.append("How was your day?")
-  message1.append("It was good, thanks.")
-
-  Conversation1 = ClassFactory("ConversationClass", "message1")
-  conversation1 = Conversation1(message1=message1)
-
-  trainJsonSentencesArray.append(conversation1.__dict__)
-
-  trainJson = TrainJson("Error! Please use this format.", "en", trainJsonSentencesArray)
-
-  return trainJson.__dict__
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in "txt"
@@ -418,12 +394,9 @@ def train_txt(trainfile, chatbot: ChatBot, lang: str, chatid: str):
       trainfile_array = []
       with open(trainfile) as file:
           for line in file:
-              if line.split():
-                trainfile_array.append(line.strip())
-              else:
-                trainer.train(trainfile_array)
-                trainfile_array=[]
+              trainfile_array.append(line.strip())
       if len(trainfile_array) > 0:
+        random.shuffle(trainfile_array)
         trainer.train(trainfile_array)
       logging.info("Done. Deleting: " + trainfile)
       os.remove(trainfile)
@@ -450,9 +423,9 @@ def clean_duplicates(chatid: str):
     
     data_tuple = ()
 
-    logging.info("clean_duplicates - Executing: %s", sqlite_delete_query1)
+    logging.info("clean_duplicates - Executing: %s", sqlite_delete_query)
 
-    cursor.execute(sqlite_delete_query2, data_tuple)
+    cursor.execute(sqlite_delete_query, data_tuple)
 
     sqliteConnection.commit()
     cursor.close()
@@ -540,7 +513,7 @@ def delete_from_audiodb_by_text(chatid: str, text: str):
 def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it", save=True, call_fy=True, limit=True):
   try:
     if voice is None or voice == "null" or voice == "random":
-      voice_to_use = get_random_voice()
+      voice_to_use = get_random_voice(lang=language)
     else:
       voice_to_use = voice
     if voice_to_use != "google":
@@ -603,7 +576,7 @@ def download_tts(id: int):
 def populate_tts(text: str, chatid="000000", voice=None, israndom=False, language="it"):
   try:
     if voice is None or voice == "null" or voice == "random":
-      voice_to_use = get_random_voice()
+      voice_to_use = get_random_voice(lang=language)
     else:
       voice_to_use = voice
     if voice_to_use != "google": 
@@ -640,38 +613,62 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno)
     raise Exception(e)
 
-def get_random_voice():
-  localvoices = list_fakeyou_voices("it", 0)
+def get_random_voice(lang="it"):
+  localvoices = list_fakeyou_voices(lang)
   title, token = random.choice(list(localvoices.items()))
   return token
 
-@lru_cache(maxsize=600)
-def list_fakeyou_voices(lang:str, limit:int):
-  voices=fy.list_voices(size=0)
-  foundvoices = {}
-		
-  for langTag,voiceJson in zip(voices.langTag,voices.json):
-    if lang.lower() in langTag.lower():
-      foundvoices[voiceJson["title"]] = voiceJson["model_token"]
-  
-  if limit >= 1:
-    limit = limit - 1
+@lru_cache(maxsize=7200)
+def list_fakeyou_voices(lang:str):
+  foundvoices = None
+  try:
+    fy=fakeyou.FakeYou()
+    login_fakeyou(fy)
 
-  index = 0
-
-  l = list(foundvoices.items())
-  random.shuffle(l)
-  d_foundvoices = dict(l)
-
-  foundvoices = {}
+    file_path = "./config/voices_"+lang+".json"
     
-  for key, value in d_foundvoices.items():
-    foundvoices[key] = value
-    index = index + 1
-    if limit != 0 and index >= limit:
-      break
+    if bool(random.getrandbits(1)):
+      proxies = {'http': 'http://192.168.1.160:9058'}
+      fy.session.proxies.update(proxies)
+    else:
+      proxies = {}
+      fy.session.proxies.update(proxies)
 
-  return foundvoices
+    voices=fy.list_voices(size=0)
+      
+    if voices is not None:
+      foundvoices = {}
+
+      for langTag,voiceJson in zip(voices.langTag,voices.json):
+        if lang.lower() in langTag.lower():
+          foundvoices[voiceJson["title"]] = voiceJson["model_token"]
+
+      
+      foundvoices["google"] = "google"
+      
+      with open(file_path, "w") as write_file:
+        json_string = json.dumps(foundvoices, ensure_ascii=False, indent=4).encode('utf-8').decode('utf-8')
+        write_file.write(json_string)
+
+    elif os.path.isfile(file_path):
+
+      with open(file_path) as f:
+        data = f.read()
+
+      foundvoices = json.loads(data)
+
+    else:
+      
+      foundvoices = {}
+      foundvoices["google"] = "google"
+
+    return foundvoices
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    list_fakeyou_voices.cache_clear()
+    raise Exception(e)
 
 def get_random_from_bot(chatid: str):
   try:
@@ -709,10 +706,7 @@ def populate_audiodb(limit: int, chatid: str, lang: str):
   try:
     logging.debug("populate_audiodb - STARTED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
 
-    fy=fakeyou.FakeYou()
-    login_fakeyou(fy)
-
-    voices = list_fakeyou_voices(lang, 0)
+    voices = list_fakeyou_voices(lang)
     listvoices = list(voices.items())
     random.shuffle(listvoices)
 
@@ -984,7 +978,7 @@ def download_audio_zip(chatid: str):
     dirname = "./config/download_audio_zip"
     if not os.path.exists(dirname):
       os.mkdir(dirname)
-      voices = list_fakeyou_voices("it", 0)
+      voices = list_fakeyou_voices("it")
       datas = audiodb.select_data_name_voice_by_chatid(chatid)
       audios = []
       for data in datas:
