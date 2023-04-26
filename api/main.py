@@ -415,12 +415,20 @@ class AudioRandomClass(Resource):
   @cache.cached(timeout=2, query_string=True)
   def get (self, voice = "random", chatid = "000000", lang = "it"):
     try:
-      tts_out, text = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang)
-      if tts_out is not None:
-        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
-        return response
-      else:
+      #tts_out, text = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang)
+      tts_out = None
+      counter = 0
+      while tts_out is None:
+        text = utils.get_random_from_bot(chatid)
+        if voice is None or voice == "null" or voice == "random":
+          voice = audiodb.select_voice_by_name_chatid_language(text.strip(), chatid, lang)
+        if voice is not None:
+          tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=lang)
+          if tts_out is not None:
+            response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+            response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+            return response
+      if tts_out is None:
         @after_this_request
         def clear_cache(response):
           cache.delete_memoized(AudioRandomClass.get, self, str, str, str)
@@ -813,11 +821,22 @@ nsutils = api.namespace('utils', 'AccumulatorsUtils APIs')
 
 @nsutils.route('/fakeyou/listvoices/')
 @nsutils.route('/fakeyou/listvoices/<string:lang>')
-@nsutils.route('/fakeyou/listvoices/<string:lang>/<int:limit>')
 class FakeYouListVoices(Resource):
-  @cache.cached(timeout=300, query_string=True)
-  def get(self, lang = "it", limit=25):
-    return jsonify(utils.list_fakeyou_voices(lang, limit))
+  @cache.cached(timeout=7200, query_string=True)
+  def get(self, lang = "it"):
+    try:
+      voices = utils.list_fakeyou_voices(lang)
+      if voices is not None:
+        return jsonify(voices)
+      else:
+        cache.delete_memoized(FakeYouListVoices.get, self, str)
+        return make_response("No voices found!", 500)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      cache.delete_memoized(FakeYouListVoices.get, self, str)
+      return make_response(str(e), 500)
 
 @nsutils.route('/init/<string:chatid>/')
 @nsutils.route('/init/<string:chatid>/<string:lang>')
