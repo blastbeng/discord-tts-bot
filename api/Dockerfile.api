@@ -28,7 +28,8 @@ RUN apt-get update && \
         libpcre3-dev \
         libpcre3 \
         hunspell-it \
-        sqlite3
+        sqlite3 \
+        iputils-ping
         
 RUN echo 'vm.overcommit_memory=1' >> /etc/sysctl.conf
 

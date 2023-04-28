@@ -64,12 +64,12 @@ services:
       - "/tmp/jerky-tts-bot-discord:/tmp/jerky-tts-bot-discord"
     image: "blastbeng/jerky-tts-bot-client:1.0.0"
     restart: "no"
-  jerky-tts-bot-tor:
-    container_name: jerky-tts-bot-tor
-    ports:
-      - '192.168.1.160:9058:9051'
-    image: dockage/tor-privoxy
-    restart: "no"
+  #jerky-tts-bot-tor:
+  #  container_name: jerky-tts-bot-tor
+  #  ports:
+  #    - '192.168.1.160:9058:9051'
+  #  image: dockage/tor-privoxy
+  #  restart: "no"
   jerky-tts-bot-telegram:
     build:
       context: ./telegram

@@ -7,3 +7,7 @@ class BlockedWordException(Exception):
         self.message = "This sentence contains a word that is blocked by filters [" + word + "]"
     def __str__(self):
         return self.message
+
+class TimeExceededException(Exception):
+    "Max execution time exceeded"
+    pass

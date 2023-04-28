@@ -380,7 +380,7 @@ async def do_play(voice_client, url: str, interaction: discord.Interaction, curr
         if defer:
             await interaction.response.defer(thinking=True, ephemeral = ephermeal)
             
-        response = response = requests.get(url, timeout=10)
+        response = response = requests.get(url, timeout=20)
         message = url
         if "X-Generated-Text" in response.headers:
             message = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
@@ -457,7 +457,7 @@ class PlayAudioLoop:
             if channelfound is not None and channeluserfound is not None:
                 await connect_bot_by_voice_client(voice_client, channelfound, None)
                 if hasattr(voice_client, 'play') and voice_client.is_connected() and not voice_client.is_playing():
-                    response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/" + currentguildid + "/" + utils.get_guild_language(currentguildid), timeout=10)
+                    response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/" + currentguildid + "/" + utils.get_guild_language(currentguildid), timeout=20)
                     if (response is not None and response.status_code == 200 and response.content):
                         text = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
                         message = 'play_audio_loop - random - ' + text
@@ -482,7 +482,7 @@ class PopulatorLoop:
     async def populator_loop(self):
         try:
             currentguildid = get_current_guild_id(str(self.guildid))
-            response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/1/" + currentguildid + "/" + utils.get_guild_language(currentguildid))
+            response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/1/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/1") 
             if (response.status_code == 200 and response.text):
                 logging.info("populator_loop - " + str(response.text))
             else:
@@ -785,7 +785,7 @@ async def ask(interaction: discord.Interaction, text: str):
             elif not voice_client.is_playing():
                 currentguildid = get_current_guild_id(interaction.guild.id)
                 
-                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/1/random/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
                 await do_play(voice_client, url, interaction, currentguildid)
             else:
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
