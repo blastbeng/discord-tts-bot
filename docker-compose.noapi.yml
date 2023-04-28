@@ -1,35 +1,6 @@
 ---
 version: "3.3"
 services:
-  jerky-tts-bot-api:
-    build:
-      context: ./api
-      dockerfile: Dockerfile.api
-    container_name: jerky-tts-bot-api
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Rome
-    image: "blastbeng/jerky-tts-bot-api:1.0.0"
-    ports:
-      - "5080:5080"
-    restart: "no"
-    volumes:
-      - ".env:/app/.env"
-      - "./config:/app/config"
-      - "./backups:/app/backups"
-      - "/tmp/jerky-tts-bot-api:/tmp/jerky-tts-bot-api"
-      - "/tmp/jerky-tts-bot-discord:/tmp/jerky-tts-bot-discord"
-      - "/dev/dri/card0:/dev/dri/card0"
-      - "/dev/dri/renderD128:/dev/dri/renderD128"
-    entrypoint: ./entrypoint.sh
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:5080/utils/healthcheck"]
-      interval: 30s
-      timeout: 5s
-      retries: 12
-    networks:
-      - caching
   redis:
     image: redis
     container_name: jerky-tts-bot-redis
@@ -45,9 +16,6 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Rome
-    depends_on:
-      jerky-tts-bot-api:
-        condition: service_healthy
     volumes:
       - ".env:/app/.env"
       - "./config:/app/config"
@@ -64,9 +32,6 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Rome
-    depends_on:
-      jerky-tts-bot-api:
-        condition: service_healthy
     volumes:
       - ".env:/app/.env"
     image: "blastbeng/jerky-tts-bot-telegram:1.0.0"

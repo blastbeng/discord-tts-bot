@@ -52,6 +52,9 @@ from bs4 import BeautifulSoup
 from glob import glob
 from zipfile import ZipFile
 from exceptions import AudioLimitException
+from exceptions import TimeExceededException
+import multiprocessing
+from functools import wraps
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -69,6 +72,7 @@ logging.basicConfig(
 log = logging.getLogger('werkzeug')
 log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
+fy=fakeyou.FakeYou()
 
 def login_fakeyou(fy):
   try:
@@ -78,7 +82,6 @@ def login_fakeyou(fy):
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno)
 
-fy=fakeyou.FakeYou()
 login_fakeyou(fy)
 
 fake = Faker()
@@ -105,6 +108,52 @@ def ClassFactory(name, argnames, BaseClass=BaseClass):
         BaseClass.__init__(self, name[:-len("Class")])
     newclass = type(name, (BaseClass,),{"__init__": __init__})
     return newclass
+
+def parametrized(dec):
+    def layer(*args, **kwargs):
+        def repl(f):
+            return dec(f, *args, **kwargs)
+        return repl
+    return layer
+
+def function_runner(*args, **kwargs):
+    """Used as a wrapper function to handle
+    returning results on the multiprocessing side"""
+
+    send_end = kwargs.pop("__send_end")
+    function = kwargs.pop("__function")
+    try:
+        result = function(*args, **kwargs)
+    except Exception as e:
+        send_end.send(e)
+        return
+    send_end.send(result)
+
+
+@parametrized
+def run_with_timer(func, max_execution_time):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        recv_end, send_end = multiprocessing.Pipe(False)
+        kwargs["__send_end"] = send_end
+        kwargs["__function"] = func
+        
+        ## PART 2
+        p = multiprocessing.Process(target=function_runner, args=args, kwargs=kwargs)
+        p.start()
+        p.join(max_execution_time)
+        if p.is_alive():
+            p.terminate()
+            p.join()
+            raise TimeExceededException("Exceeded Execution Time")
+        result = recv_end.recv()
+
+        if isinstance(result, Exception):
+            raise result
+
+        return result
+
+    return wrapper
 
 def wiki_summary(testo: str, lang: str):
   try:
@@ -521,12 +570,6 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       if datafy is not None:
         return datafy
       elif call_fy:
-        if bool(random.getrandbits(1)):
-          proxies = {'http': 'http://192.168.1.160:9058'}
-          fy.session.proxies.update(proxies)
-        else:
-          proxies = {}
-          fy.session.proxies.update(proxies)
         wav = fy.say(text.strip(), voice_to_use)
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
@@ -584,12 +627,12 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
       if datafy is not None:
         return False
       else:
-        if bool(random.getrandbits(1)):
-          proxies = {'http': 'http://192.168.1.160:9058'}
-          fy.session.proxies.update(proxies)
-        else:
-          proxies = {}
-          fy.session.proxies.update(proxies)
+        #if bool(random.getrandbits(1)):
+        #  proxies = {'http': 'http://192.168.1.160:9058'}
+        #  fy.session.proxies.update(proxies)
+        #else:
+        #  proxies = {}
+        #  fy.session.proxies.update(proxies)
         wav = fy.say(text.strip(), voice_to_use)
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
@@ -622,17 +665,15 @@ def get_random_voice(lang="it"):
 def list_fakeyou_voices(lang:str):
   foundvoices = None
   try:
-    fy=fakeyou.FakeYou()
-    login_fakeyou(fy)
 
     file_path = "./config/voices_"+lang+".json"
     
-    if bool(random.getrandbits(1)):
-      proxies = {'http': 'http://192.168.1.160:9058'}
-      fy.session.proxies.update(proxies)
-    else:
-      proxies = {}
-      fy.session.proxies.update(proxies)
+    #if bool(random.getrandbits(1)):
+    #  proxies = {'http': 'http://192.168.1.160:9058'}
+    #  fy.session.proxies.update(proxies)
+    #else:
+    #  proxies = {}
+    #  fy.session.proxies.update(proxies)
 
     voices=fy.list_voices(size=0)
       
@@ -702,7 +743,11 @@ def get_random_from_bot(chatid: str):
 
 
 
+@run_with_timer(max_execution_time=600)
 def populate_audiodb(limit: int, chatid: str, lang: str):  
+  populate_audiodb_internal(limit, chatid, lang)
+
+def populate_audiodb_internal(limit: int, chatid: str, lang: str):  
   try:
     logging.debug("populate_audiodb - STARTED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
 
@@ -735,7 +780,7 @@ def populate_audiodb(limit: int, chatid: str, lang: str):
       #sqlite_select_sentences_query = " SELECT DISTINCT name from audio WHERE CHATID = ? ORDER BY RANDOM() LIMIT " + str(count)
       
 
-      log.debug("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query)
+      log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query)
 
 
       cursor.execute(sqlite_select_sentences_query, (chatid,chatid,int(os.environ.get("COUNTER_LIMIT")),int(os.environ.get("COUNTER_LIMIT"))))
@@ -759,7 +804,7 @@ def populate_audiodb(limit: int, chatid: str, lang: str):
             language = lang
           result = False
           try:
-            logging.debug("populate_audiodb - START ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s", chatid, voice, key, sentence)
+            logging.info("populate_audiodb - START ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s", chatid, voice, key, sentence)
             generation = ""
             inserted = ""
             result = populate_tts(sentence, chatid=chatid, voice=voice, language=language)
@@ -782,15 +827,17 @@ def populate_audiodb(limit: int, chatid: str, lang: str):
               audiodb.insert(sentence, chatid, None, voice, language, is_correct=1)
             inserted="Failed (" + str(e) + ")"
             logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
-          time.sleep(60) 
+            raise Exception(e)
+          time.sleep(30)
     else:
-      logging.debug("populate_audiodb - NO RECORDS FOUND!\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
+      logging.info("populate_audiodb - NO RECORDS FOUND!\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
     
-    logging.debug("populate_audiodb - ENDED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
+    logging.info("populate_audiodb - ENDED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    logging.error("populate_audiodb - ENDED POPULATION WITH ERROR\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
     raise Exception(e)
 
 
@@ -1063,3 +1110,18 @@ def delete_from_audiodb(chatid: str):
   finally:
     if sqliteConnection:
         sqliteConnection.close()
+
+
+def delete_tts(limit=100):
+  try:
+    user = fy.get_user(FAKEYOU_USER,limit=limit)
+    if user is not None and user.ttsResults is not None and user.ttsResults.json is not None:
+      for tokenJson in user.ttsResults.json:
+        token = tokenJson['tts_result_token']
+        result = fy.delete_tts_result(token)
+        if result:
+          logging.info("delete_tts - DELETED: %s", token)
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)

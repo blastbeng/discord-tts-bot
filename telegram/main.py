@@ -75,7 +75,7 @@ def ask(update: Update, context: CallbackContext):
         if strid:
             message = update.message.text[5:].strip();
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
-                url = API_URL + API_PATH_TEXT + "ask/user/" + urllib.parse.quote(str(update.message.chat.id)) + "/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid)
+                url = API_URL + API_PATH_TEXT + "ask/" + urllib.parse.quote(str(update.message.chat.id)) + "/1/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid)
 
                 response = requests.get(url)
                 if (response.status_code == 200):
@@ -215,7 +215,7 @@ def askaudio(update: Update, context: CallbackContext):
         if strid:
             message = update.message.text[10:].strip();
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
-                url = API_URL + API_PATH_AUDIO + "ask/user/" + urllib.parse.quote(str(update.message.chat.id)) + "/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid)
+                url = API_URL + API_PATH_AUDIO + "ask/" + urllib.parse.quote(str(update.message.chat.id)) + "/1/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid)
 
                 response = requests.get(url)
                 if (response.status_code == 200):

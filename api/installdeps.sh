@@ -1,4 +1,4 @@
-#/bin/sh
+#/usr/bin/bash
 export TMPDIR=/home/blast/tmp/python
 mkdir -p $TMPDIR
 /usr/bin/python3 -m venv .venv
