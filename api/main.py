@@ -84,6 +84,8 @@ api = Api(app)
 nstext = api.namespace('chatbot_text', 'Accumulators Chatbot Text APIs')
 
 parserinsult = reqparse.RequestParser()
+parserinsult.add_argument("gender", type=str)
+parserinsult.add_argument("lang", type=str)
 parserinsult.add_argument("text", type=str)
 parserinsult.add_argument("chatid", type=str)
 
@@ -256,7 +258,14 @@ class TextTranslateClass(Resource):
 class TextInsultClass(Resource):
   @api.expect(parserinsult)
   def get (self):
-    sentence = insults.get_insults()
+    gender = request.args.get("gender")
+    if gender is None:
+      gender = False
+    elif gender == "f":
+      gender = True
+
+    sentence = insults.get_insults(gender)
+
     lang = request.args.get("lang")
     if lang is None:
       lang = "it"  
@@ -267,9 +276,13 @@ class TextInsultClass(Resource):
     chatid = request.args.get("chatid")
     if chatid is None:
       chatid = "000000"
+
     text = request.args.get("text")
     if text and text != '' and text != 'none':
       sentence = text + " " + sentence
+    if chatid == "000000":
+      chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
+      threading.Thread(target=lambda: chatbot.get_response(sentence)).start()
     response = Response(sentence)
     return response
 
@@ -574,7 +587,13 @@ class AudioInsultClass(Resource):
   def get (self):
     sentence = ""
     try:
-      sentence = insults.get_insults()
+      gender = request.args.get("gender")
+      if gender is None:
+        gender = False
+      elif gender == "f":
+        gender = True
+
+      sentence = insults.get_insults(gender)
       lang = request.args.get("lang")
       if lang is None:
         lang = "it"  
@@ -586,6 +605,9 @@ class AudioInsultClass(Resource):
       text = request.args.get("text")
       if text and text != '' and text != 'none':
         sentence = text + " " + sentence
+      if chatid == "000000":
+        chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
+        threading.Thread(target=lambda: chatbot.get_response(sentence)).start()
       tts_out = utils.get_tts(sentence, chatid=chatid, voice="google", language=lang)
       if tts_out is not None:    
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
@@ -818,7 +840,7 @@ class  DatabaseCreateZipFile(Resource):
   def get (self, chatid = "000000"):
     try:
       if chatid == "000000":
-        threading.Timer(0, utils.download_db_zip, args=[chatid]).start()
+        threading.Timer(0, utils.download_audio_zip, args=[chatid]).start()
         return make_response("Creating zipfile under ./config dir. Watch the logs for errors.", 200)
       else:
         return make_response("Creating zipfile not permitted for this chatid!", 500)
@@ -845,9 +867,9 @@ class DatabaseDeleteByText(Resource):
 class DatabaseAudiodbPopulate(Resource):
   def get (self, limit = 100, chatid = "000000", lang = "it", usetimer = 0):
     if usetimer == 1:
-      threading.Timer(0, utils.populate_audiodb, args=[limit, chatid, lang]).start()
+      threading.Timer(0, utils.populate_audiodb_limited, args=[limit, chatid, lang]).start()
     else:
-      threading.Timer(0, utils.populate_audiodb_internal, args=[limit, chatid, lang]).start()
+      threading.Timer(0, utils.populate_audiodb_unlimited, args=[limit, chatid, lang]).start()
     return get_response_str("Starting thread populate_audiodb [count:"+str(limit)+"] [chatid:"+str(chatid)+"] [lang:"+str(lang)+"]. Watch the logs.")
 	
 
@@ -978,7 +1000,7 @@ def get_chatbot_by_id(chatid = "000000", lang = "it"):
   
  
   
-@scheduler.task('interval', id='backupdb', hours=12)
+@scheduler.task('interval', id='backupdb', hours=11)
 def backupdb():
   utils.backupdb("000000")
   
@@ -986,20 +1008,14 @@ def backupdb():
 def clean_audio_zip():
   utils.clean_audio_zip()
   
-@scheduler.task('interval', id='delete_tts', hours=1)
-def clean_audio_zip():
+@scheduler.task('interval', id='delete_tts', hours=12)
+def delete_tts():
   utils.delete_tts(limit=100)
 
-@scheduler.task('interval', id='clean_audio_zip', hours=12)
-def clean_audio_zip():
+@scheduler.task('interval', id='vacuum', hours=13)
+def vacuum():
   audiodb.vacuum()
   filtersdb.vacuum()
-  
-@scheduler.task('interval', id='login_fakeyou', hours=12)
-def clean_audio_zip():
-  utils.login_fakeyou()
-
-
 
 #if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
 previousMessages = {}

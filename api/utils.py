@@ -72,17 +72,16 @@ logging.basicConfig(
 log = logging.getLogger('werkzeug')
 log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
+
+
 fy=fakeyou.FakeYou()
 
-def login_fakeyou(fy):
-  try:
-    fy.login(FAKEYOU_USER,FAKEYOU_PASS)
-  except Exception as e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno)
-
-login_fakeyou(fy)
+try:
+  fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+except Exception as e:
+  exc_type, exc_obj, exc_tb = sys.exc_info()
+  fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+  logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno)
 
 fake = Faker()
 
@@ -276,15 +275,9 @@ def get_chatterbot(chatid: str, train: False, lang = "it"):
       ]
   )
 
-  with sqlite3.connect("./config/"+dbfile) as db:
-    cursor = db.cursor()
-    cursor.execute('''SELECT COUNT(*) from STATEMENT ''')
-    result=cursor.fetchall()
-    if result == 0 :
-      learn('hello', 'hello', chatbot)
-      if train:
-        trainer = CustomTrainer(chatbot, translator_provider=TRANSLATOR_PROVIDER, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
-        trainer.train()      
+  if train:
+    trainer = CustomTrainer(chatbot, translator_provider=TRANSLATOR_PROVIDER, translator_baseurl=TRANSLATOR_BASEURL, translator_email=MYMEMORY_TRANSLATOR_EMAIL)
+    trainer.train()      
   return chatbot
 
 
@@ -570,6 +563,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       if datafy is not None:
         return datafy
       elif call_fy:
+        fy.login(FAKEYOU_USER,FAKEYOU_PASS)
         wav = fy.say(text.strip(), voice_to_use)
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
@@ -633,6 +627,7 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
         #else:
         #  proxies = {}
         #  fy.session.proxies.update(proxies)
+        fy.login(FAKEYOU_USER,FAKEYOU_PASS)
         wav = fy.say(text.strip(), voice_to_use)
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
@@ -674,8 +669,13 @@ def list_fakeyou_voices(lang:str):
     #else:
     #  proxies = {}
     #  fy.session.proxies.update(proxies)
-
-    voices=fy.list_voices(size=0)
+    
+    voices = None
+    try:
+      fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+      voices=fy.list_voices(size=0)
+    except Exception as e:
+      pass
       
     if voices is not None:
       foundvoices = {}
@@ -742,18 +742,32 @@ def get_random_from_bot(chatid: str):
         sqliteConnection.close()
 
 
+    
+
+def populate_audiodb_unlimited(limit: int, chatid: str, lang: str):  
+  populate_audiodb_internal(limit, chatid, lang)
+  delete_tts(limit=limit)
+
+def populate_audiodb_limited(limit: int, chatid: str, lang: str):  
+  try:
+    populate_audiodb(limit, chatid, lang)
+  except TimeExceededException as et:
+    logging.info("populate_audiodb - ENDED POPULATION\n         REACHED UP MAX EXECUTION TIME\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
+  finally:
+    delete_tts(limit=limit)
 
 @run_with_timer(max_execution_time=600)
 def populate_audiodb(limit: int, chatid: str, lang: str):  
   populate_audiodb_internal(limit, chatid, lang)
 
 def populate_audiodb_internal(limit: int, chatid: str, lang: str):  
+
   try:
     logging.debug("populate_audiodb - STARTED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
 
     voices = list_fakeyou_voices(lang)
     listvoices = list(voices.items())
-    random.shuffle(listvoices)
+    #random.shuffle(listvoices)
 
     records = None
 
@@ -770,21 +784,33 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
     
       cursor.execute("ATTACH DATABASE ? AS audiodb",("./config/audiodb.sqlite3",))
 
-      sqlite_select_sentences_query = "SELECT DISTINCT * FROM ( "
-      sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT statement.text as name FROM statement WHERE statement.text NOT IN (SELECT audiodb.audio.name from audiodb.audio) ORDER BY RANDOM() LIMIT " + str(limit) + ")"
-      sqlite_select_sentences_query = sqlite_select_sentences_query + " UNION "
-      sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = ? and COUNTER > 0 and COUNTER < ? and IS_CORRECT = 1 GROUP BY audio.name HAVING COUNT(audio.name) < " + str(len(listvoices)) + " ORDER BY RANDOM() LIMIT " + str(limit) + ")"
-      sqlite_select_sentences_query = sqlite_select_sentences_query + " UNION "
-      sqlite_select_sentences_query = sqlite_select_sentences_query + " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = ? and COUNTER > 0 and COUNTER < ? and IS_CORRECT = 1 AND DATA IS NULL ORDER BY RANDOM() LIMIT " + str(limit) + ")"
-      sqlite_select_sentences_query = sqlite_select_sentences_query + ") LIMIT " + str(limit);
-      #sqlite_select_sentences_query = " SELECT DISTINCT name from audio WHERE CHATID = ? ORDER BY RANDOM() LIMIT " + str(count)
+      sentences = []
+
+      sqlite_select_sentences_query1 = " SELECT * FROM (SELECT DISTINCT statement.text as name FROM statement WHERE statement.text NOT IN (SELECT audiodb.audio.name from audiodb.audio) ORDER BY RANDOM() LIMIT " + str(limit) + ")"
+      log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query1)
+      cursor.execute(sqlite_select_sentences_query1, ())
+      records1 = cursor.fetchall()
+
+      for row1 in records1:
+        sentences.append(row1[0])
       
+      sqlite_select_sentences_query2 = " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = '" + chatid + "' and COUNTER > 0 and COUNTER < " + str(os.environ.get("COUNTER_LIMIT")) + " and IS_CORRECT = 1 GROUP BY audio.name HAVING COUNT(audio.name) < " + str(len(listvoices)) + " ORDER BY RANDOM() LIMIT " + str(limit) + ")"
+      log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query2)
+      cursor.execute(sqlite_select_sentences_query2, ())
+      records2 = cursor.fetchall()
 
-      log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query)
+      for row2 in records2:
+        sentences.append(row2[0])
+      
+      sqlite_select_sentences_query3 = " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = '" + chatid + "' and COUNTER > 0 and COUNTER < " + str(os.environ.get("COUNTER_LIMIT")) + " and IS_CORRECT = 1 AND DATA IS NULL ORDER BY RANDOM() LIMIT " + str(limit) + ")"
+      log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query3)
+      cursor.execute(sqlite_select_sentences_query3, ())
+      records3 = cursor.fetchall()
 
+      for row3 in records3:
+        sentences.append(row3[0])
 
-      cursor.execute(sqlite_select_sentences_query, (chatid,chatid,int(os.environ.get("COUNTER_LIMIT")),int(os.environ.get("COUNTER_LIMIT"))))
-      records = cursor.fetchall()
+      
 
       cursor.close()
     except Exception as e:
@@ -792,42 +818,33 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
     finally:
       if 'sqliteConnection' in locals() and sqliteConnection:
         sqliteConnection.close()
-
-    counter = 0
-
-    if records is not None:
-      for key, voice in listvoices:
-        for row in records:
-          sentence = row[0]
-          language = audiodb.select_distinct_language_by_name_chatid(sentence, chatid)
-          if language is None:
-            language = lang
-          result = False
-          try:
-            logging.info("populate_audiodb - START ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s", chatid, voice, key, sentence)
-            generation = ""
-            inserted = ""
-            result = populate_tts(sentence, chatid=chatid, voice=voice, language=language)
-            if result is None:
-              inserted="Skipped (TTS lenght limit exceeded)"
-              logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted) 
-            elif result is True:
-              counter = counter + 1
-              inserted="Done (Inserted in DB)"
-              logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
-              if counter >= limit:
-                break
-            elif result is False:
-              inserted="Skipped (Already in DB)"
-              logging.info("populate_audiodb - END ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
-          except Exception as e:
-            if audiodb.select_count_by_name_chatid_voice_language(sentence, chatid, voice, language) > 0:
-              audiodb.increment_counter(sentence, chatid, voice, language, int(os.environ.get("COUNTER_LIMIT")))
-            else:
-              audiodb.insert(sentence, chatid, None, voice, language, is_correct=1)
-            inserted="Failed (" + str(e) + ")"
-            logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
-            raise Exception(e)
+    if len(sentences) > 0:
+      for sentence in sentences:
+        key, voice = random.choice(listvoices)
+        language = audiodb.select_distinct_language_by_name_chatid(sentence, chatid)
+        if language is None:
+          language = lang
+        result = False
+        try:
+          #logging.info("populate_audiodb - START ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s", chatid, voice, key, sentence)
+          generation = ""
+          inserted = ""
+          result = populate_tts(sentence, chatid=chatid, voice=voice, language=language)
+          if result is None:
+            inserted="Skipped (TTS lenght limit exceeded)"
+          elif result is True:
+            inserted="Done (Inserted in DB)"
+          elif result is False:
+            inserted="Skipped (Already in DB)"
+          logging.info("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+        except Exception as e:
+          if audiodb.select_count_by_name_chatid_voice_language(sentence, chatid, voice, language) > 0:
+            audiodb.increment_counter(sentence, chatid, voice, language, int(os.environ.get("COUNTER_LIMIT")))
+          else:
+            audiodb.insert(sentence, chatid, None, voice, language, is_correct=1)
+          inserted="Failed (" + str(e) + ")"
+          logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+          #raise Exception(e)
           time.sleep(30)
     else:
       logging.info("populate_audiodb - NO RECORDS FOUND!\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
@@ -872,7 +889,7 @@ def restore(chatid: str, text: str):
 
     logging.info("restore - Executing: %s", sqlite_select_query)
     
-    for row in records:
+    for row in records:\
       sentences = sentences + "\n" + row[0] 
 
     cursor.close()
@@ -1114,6 +1131,7 @@ def delete_from_audiodb(chatid: str):
 
 def delete_tts(limit=100):
   try:
+    fy.login(FAKEYOU_USER,FAKEYOU_PASS)
     user = fy.get_user(FAKEYOU_USER,limit=limit)
     if user is not None and user.ttsResults is not None and user.ttsResults.json is not None:
       for tokenJson in user.ttsResults.json:

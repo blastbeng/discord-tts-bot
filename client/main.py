@@ -288,17 +288,15 @@ def get_languages_menu():
 
 optionslanguages = get_languages_menu()
 
-
-
-def get_bool_menu():
+def get_gender_menu():
 
     options = []    
-    options.append(app_commands.Choice(name="Yes",      value=1))
-    options.append(app_commands.Choice(name="No",       value=0))
+    options.append(app_commands.Choice(name="M",      value="m"))
+    options.append(app_commands.Choice(name="F",      value="f"))
 
     return options
 
-optionsbool = get_bool_menu()
+optionsgender = get_gender_menu()
 
 async def send_error(e, interaction, from_generic=False, is_deferred=False):
     currentguildid=get_current_guild_id(interaction.guild.id)
@@ -482,7 +480,7 @@ class PopulatorLoop:
     async def populator_loop(self):
         try:
             currentguildid = get_current_guild_id(str(self.guildid))
-            response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/1/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/1") 
+            response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/20/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/1") 
             if (response.status_code == 200 and response.text):
                 logging.info("populator_loop - " + str(response.text))
             else:
@@ -876,17 +874,25 @@ async def story_internal(interaction):
 @client.tree.context_menu(name="Insult")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def insult_tree(interaction: discord.Interaction, member: discord.Member):
-    await insult_internal(interaction, member)
+    await insult_internal(interaction, member, "m")
 
 @client.tree.command()
 @app_commands.rename(member='member')
 @app_commands.describe(member="The user to insult")
+@app_commands.rename(gender='gender')
+@app_commands.describe(gender="The gender to use")
+@app_commands.choices(gender=optionsgender)
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
-async def insult(interaction: discord.Interaction, member: Optional[discord.Member] = None):
+async def insult(interaction: discord.Interaction, member: Optional[discord.Member] = None, gender: app_commands.Choice[str] = "M"):
     """Insult someone"""
-    await insult_internal(interaction, member)
+    gender = ""
+    if hasattr(gender, 'name'):
+        gender = gender.value
+    else:
+        gender = "m"
+    await insult_internal(interaction, member, gender)
 
-async def insult_internal(interaction, member):
+async def insult_internal(interaction, member, gender):
     try:
         currentguildid = get_current_guild_id(interaction.guild.id)
         if utils.get_guild_nsfw(currentguildid) == 0:
@@ -902,12 +908,12 @@ async def insult_internal(interaction, member):
                 if member:
                     name = None
                     if member.nick is not None:
-                        str(member.nick)
+                        name = str(member.nick)
                     else:
-                        str(member.name)
-                    insulturl=insulturl +"?text="+urllib.parse.quote(name) + "&chatid="+urllib.parse.quote(get_current_guild_id(interaction.guild.id)) + "&lang=" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+                        name = str(member.name)
+                    insulturl=insulturl +"?text="+urllib.parse.quote(name) + "&chatid="+urllib.parse.quote(get_current_guild_id(interaction.guild.id)) + "&gender=" + urllib.parse.quote(gender)
                 else:
-                    insulturl=insulturl +"?chatid="+urllib.parse.quote(get_current_guild_id(interaction.guild.id)) + "&lang=" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+                    insulturl=insulturl +"?chatid="+urllib.parse.quote(get_current_guild_id(interaction.guild.id)) + "&lang=" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "&gender=" + urllib.parse.quote(gender)
                 await do_play(voice_client, insulturl, interaction, currentguildid)
             else:
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment or use stop command"), ephemeral = True)
