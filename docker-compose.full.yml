@@ -1,6 +1,12 @@
 ---
 version: "3.3"
 services:
+  jerky-tts-bot-redis:
+    image: redis
+    container_name: jerky-tts-bot-redis
+    ports:
+      - "63799:6379"
+    restart: "no"
   jerky-tts-bot-api:
     build:
       context: ./api
@@ -11,8 +17,6 @@ services:
       - PGID=1000
       - TZ=Europe/Rome
     image: "blastbeng/jerky-tts-bot-api:1.0.0"
-    ports:
-      - "5080:5080"
     restart: "no"
     volumes:
       - ".env:/app/.env"
@@ -28,14 +32,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 12
-    networks:
-      - caching
-  redis:
-    image: redis
-    container_name: jerky-tts-bot-redis
-    networks:
-      - caching
-    restart: "no"
+    network_mode: host
   jerky-tts-bot-client:
     build:
       context: ./client
@@ -71,21 +68,3 @@ services:
       - ".env:/app/.env"
     image: "blastbeng/jerky-tts-bot-telegram:1.0.0"
     restart: "no"
-  jerky-tts-bot-website:
-    build:
-      context: ./website
-      dockerfile: Dockerfile.website
-    container_name: jerky-tts-bot-website
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Rome
-    ports:
-      - '192.168.1.160:7391:80'
-    image: "blastbeng/jerky-tts-bot-website:1.0.0"
-    restart: "no"
-    networks:
-      - caching
-networks:
-  caching:
-    driver: bridge
