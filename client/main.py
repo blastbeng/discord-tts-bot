@@ -66,9 +66,9 @@ class SoundBoardButton(discord.ui.Button["InteractionRoles"]):
             if interaction.user.voice and interaction.user.voice.channel:
                 voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
                 await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
-                if not hasattr(voice_client, 'play') or not voice_client.is_connected():
+                if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                     await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-                elif not voice_client.is_playing():
+                elif voice_client and not voice_client.is_playing():
                     currentguildid = get_current_guild_id(interaction.guild.id)
                     await do_play(voice_client, self.audiourl, interaction, currentguildid, name = self.name)
                 else:
@@ -384,7 +384,7 @@ async def do_play(voice_client, url: str, interaction: discord.Interaction, curr
             message = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
         elif name is not None:
             message = name
-        if (response is not None and response.status_code == 200 and response.content and not voice_client.is_playing()):
+        if (response is not None and response.status_code == 200 and response.content and voice_client and not voice_client.is_playing()):
                 
             voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info("do_play - " + message))
             view = discord.ui.View()
@@ -454,7 +454,7 @@ class PlayAudioLoop:
                 channelfound = voice_client.channel
             if channelfound is not None and channeluserfound is not None:
                 await connect_bot_by_voice_client(voice_client, channelfound, None)
-                if hasattr(voice_client, 'play') and voice_client.is_connected() and not voice_client.is_playing():
+                if voice_client and hasattr(voice_client, 'play') and voice_client.is_connected() and not voice_client.is_playing():
                     response = requests.get(os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/" + currentguildid + "/" + utils.get_guild_language(currentguildid), timeout=20)
                     if (response is not None and response.status_code == 200 and response.content):
                         text = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
@@ -571,7 +571,8 @@ async def on_guild_available(guild):
         currentguildid = get_current_guild_id(str(guild.id))
         
         loops_dict[guild.id] = PlayAudioLoop(guild.id)
-        loops_dict[guild.id].play_audio_loop.start()
+        if currentguildid == "000000":
+            loops_dict[guild.id].play_audio_loop.start()
 
         populator_loops_dict[guild.id] = PopulatorLoop(guild.id)
         populator_loops_dict[guild.id].populator_loop.start()
@@ -711,9 +712,9 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "googl
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
-            if not hasattr(voice_client, 'play') and voice_client.is_connected():
+            if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-            elif not voice_client.is_playing():
+            elif voice_client and not voice_client.is_playing():
 
                 currentguildid = get_current_guild_id(interaction.guild.id)
 
@@ -750,9 +751,9 @@ async def wikipedia(interaction: discord.Interaction, text: str):
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
-            if not hasattr(voice_client, 'play') and voice_client.is_connected():
+            if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-            elif not voice_client.is_playing():
+            elif voice_client and not voice_client.is_playing():
 
                 currentguildid = get_current_guild_id(interaction.guild.id)
                 url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"search/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
@@ -778,9 +779,9 @@ async def ask(interaction: discord.Interaction, text: str):
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
             
-            if not hasattr(voice_client, 'play') and voice_client.is_connected():
+            if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-            elif not voice_client.is_playing():
+            elif voice_client and not voice_client.is_playing():
                 currentguildid = get_current_guild_id(interaction.guild.id)
                 
                 url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/1/random/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
@@ -810,9 +811,9 @@ async def generate_internal(interaction):
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
             
-            if not hasattr(voice_client, 'play') and voice_client.is_connected():
+            if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-            elif not voice_client.is_playing():
+            elif voice_client and not voice_client.is_playing():
                 currentguildid = get_current_guild_id(interaction.guild.id)
 
                 await interaction.response.defer(thinking=True, ephemeral=True)
@@ -847,9 +848,9 @@ async def story_internal(interaction):
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
             
-            if not hasattr(voice_client, 'play') and voice_client.is_connected():
+            if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-            elif not voice_client.is_playing():
+            elif voice_client and not voice_client.is_playing():
                 currentguildid = get_current_guild_id(interaction.guild.id)
                 await interaction.response.defer(thinking=True, ephemeral=True)
                 is_deferred=True
@@ -901,9 +902,9 @@ async def insult_internal(interaction, member, gender):
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
-            if not hasattr(voice_client, 'play') or not voice_client.is_connected():
+            if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-            elif not voice_client.is_playing():
+            elif voice_client and not voice_client.is_playing():
                 insulturl=os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"insult"
                 if member:
                     name = None
@@ -945,9 +946,9 @@ async def random_internal(interaction, voice):
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
-            if not hasattr(voice_client, 'play') or not voice_client.is_connected():
+            if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-            elif not voice_client.is_playing():
+            elif voice_client and not voice_client.is_playing():
                 
                 currentguildid = get_current_guild_id(interaction.guild.id)                
 
@@ -984,9 +985,9 @@ async def curse_internal(interaction):
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
-            if not hasattr(voice_client, 'play') or not voice_client.is_connected():
+            if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-            elif not voice_client.is_playing():
+            elif voice_client and not voice_client.is_playing():
                 
 
                 url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"curse/google/"+urllib.parse.quote(currentguildid)+ "/" + utils.get_guild_language(currentguildid)
@@ -1195,9 +1196,9 @@ async def translate(interaction: discord.Interaction, text: str, language_to: ap
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
-            if not hasattr(voice_client, 'play') or not voice_client.is_connected():
+            if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-            elif not voice_client.is_playing():
+            elif voice_client and not voice_client.is_playing():
 
                 currentguildid = get_current_guild_id(interaction.guild.id)
 
@@ -1240,9 +1241,9 @@ async def youtube(interaction: discord.Interaction, url: str):
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
             
-            if not hasattr(voice_client, 'play') or not voice_client.is_connected():
+            if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-            elif not voice_client.is_playing():
+            elif voice_client and not voice_client.is_playing():
 
                 if "watch?v=" in url:
                     currentguildid = get_current_guild_id(interaction.guild.id)
@@ -1352,9 +1353,9 @@ async def soundrandom_internal(interaction: discord.Interaction, text: Optional[
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
             
-            if not hasattr(voice_client, 'play') or not voice_client.is_connected():
+            if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                 await interaction.response.send_message(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-            elif not voice_client.is_playing():
+            elif voice_client and not voice_client.is_playing():
                 currentguildid = get_current_guild_id(interaction.guild.id)
 
                 await interaction.response.defer(thinking=True, ephemeral=True)
