@@ -773,8 +773,6 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
 
     try:
 
-      audiodb.clean_old_limited_audios(chatid, int(os.environ.get("MAX_TTS_DURATION")))
-
       file = chatid + "-db.sqlite3"
 
       dbfile=os.path.join('./config/', file)

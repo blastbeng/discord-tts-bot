@@ -122,7 +122,7 @@ class TextRepeatClass(Resource):
 @nstext.route('/curse/<string:chatid>/')
 @nstext.route('/curse/<string:chatid>/<string:lang>')
 class TextCurseClass(Resource):
-  @cache.cached(timeout=3, query_string=True)
+  @cache.cached(timeout=20, query_string=True)
   def get (self, chatid = "000000", lang="it"):
     cursez = Bestemmie().random().lower()
     if lang == "it":
@@ -1011,6 +1011,10 @@ def clean_audio_zip():
 @scheduler.task('interval', id='delete_tts', hours=12)
 def delete_tts():
   utils.delete_tts(limit=100)
+
+@scheduler.task('interval', id='clean_old_limited_audios', hours=24)
+def clean_old_limited_audios():
+  audiodb.clean_old_limited_audios(int(os.environ.get("MAX_TTS_DURATION")))
 
 @scheduler.task('interval', id='vacuum', hours=13)
 def vacuum():

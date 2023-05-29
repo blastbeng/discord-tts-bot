@@ -592,17 +592,16 @@ def delete_by_name(name: str, chatid: str):
 
 
 
-def clean_old_limited_audios(chatid: str, limit: int):
+def clean_old_limited_audios(limit: int):
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
     cursor = sqliteConnection.cursor()
 
-    sqlite_insert_audio_query = """DELETE from audio where chatid = ? and data is null and duration > 0 and duration < ?"""
+    sqlite_delete_audio_query = """DELETE from audio where data is null and duration > 0 and duration < ?"""
 
-    data_audio_tuple = (chatid, 
-                        limit,)
+    data_audio_tuple = (limit,)
 
-    cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
+    cursor.execute(sqlite_delete_audio_query, data_audio_tuple)
 
 
     sqliteConnection.commit()
