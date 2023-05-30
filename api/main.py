@@ -22,6 +22,7 @@ from threading import Thread
 from bestemmie import Bestemmie
 from libretranslator import LibreTranslator
 from exceptions import AudioLimitException
+from time import strftime
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -68,6 +69,23 @@ def block_by_filters():
       if word.lower() in (str(request_args)).lower():
         return get_response_filters_error(word)
     
+@app.after_request
+def after_request(response):
+  timestamp = strftime('[%Y-%b-%d %H:%M]')
+  logging.info('%s %s %s %s %s %s', timestamp, request.remote_addr, request.method, request.scheme, request.full_path, response.status)
+  if request.path.startswith('/chatbot_audio/repeat/learn/'):
+    text = request.view_args['text']
+    chatbot = get_chatbot_by_id(chatid=request.view_args['chatid'], lang=request.view_args['lang'])
+    daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
+    daemon.start()
+  return response
+
+@app.errorhandler(Exception)
+def exceptions(e):
+  tb = traceback.format_exc()
+  timestamp = strftime('[%Y-%b-%d %H:%M]')
+  logger.error('%s %s %s %s %s 5xx INTERNAL SERVER ERROR\n%s', timestamp, request.remote_addr, request.method, request.scheme, request.full_path, tb)
+  return e.status_code
 
 cache = Cache(app)
 api = Api(app)
@@ -441,9 +459,6 @@ class AudioRepeatLearnClass(Resource):
       tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-        daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
-        daemon.start()
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
         return response
       else:
