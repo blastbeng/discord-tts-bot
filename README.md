@@ -1,4 +1,4 @@
-# jerky-tts-bot
+# discord-tts-bot
 
 A fully functional discord and telegram bot with various functions
 
