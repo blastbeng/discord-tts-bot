@@ -33,6 +33,7 @@ from discord.ext.commands import Greedy, Context
 from discord.errors import ClientException
 from requests.exceptions import ReadTimeout
 from datetime import datetime
+from typing import List
 
 from io import BytesIO
 from utils import FFmpegPCMAudioBytesIO
@@ -293,7 +294,8 @@ voices["pt"] = listvoices_api(language="pt")
 
 async def rps_autocomplete(interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
     currentguildid=get_current_guild_id(interaction.guild.id)
-    choices = voices[utils.get_guild_language(currentguildid)]
+    #choices = voices[utils.get_guild_language(currentguildid)]
+    choices = listvoices_api(language=utils.get_guild_language(currentguildid))
     choices = [app_commands.Choice(name=choice, value=choice) for choice in choices if current.lower() in choice.lower()][:25]
     return choices
 
