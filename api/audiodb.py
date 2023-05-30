@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 from os.path import dirname
 from os.path import join
 from pathlib import Path
-from datetime import datetime
 from exceptions import AudioLimitException
 
 dotenv_path = join(dirname(__file__), '.env')

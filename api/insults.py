@@ -1,11 +1,9 @@
 import random
 import logging
 import os
-from datetime import datetime
 from dotenv import load_dotenv
 from os.path import dirname
 from os.path import join
-from pathlib import Path
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -17,194 +15,8 @@ logging.basicConfig(
 log = logging.getLogger('werkzeug')
 log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
-def change_gender(string):
-    dictionary = { 
-    "aborto":"aborto",
-    "alcolizzato":"alcolizzato",
-    "analfabeta":"analfabeta",
-    "autoinculati":"autoinculati",
-    "baciacazzi":"baciacazzi",
-    "baciaculi":"baciaculi",
-    "baciami il culo":"baciami il culo",
-    "baciami il cazzo":"baciami il cazzo",
-    "baciami la minchia":"baciami la minchia",
-    "bagascia":"bagascia",
-    "bastardo":"bastarda",
-    "battone":"battona",
-    "bestia di satana":"bestia di satana",
-    "bestia":"bestia",
-    "bimbominkia":"bimbominkia",
-    "bitume":"bitume",
-    "blatta":"blatta",
-    "bocchinaro" :"bocchinara" ,
-    "brutto":"brutta",
-    "buzzurro":"buzzurra",
-    "cafone":"cafona",
-    "cagata bianca":"cagata bianca",
-    "cagacazzi":"cagacazzi",
-    "cagaminchia":"cagaminchia",
-    "cannato":"cannata",
-    "capezzolo":"capezzolo",
-    "carciofo":"carciofo",
-    "carogna":"carogna",
-    "cattivo":"cattiva",
-    "cazzone":"cazzona",
-    "cimice":"cimice",
-    "ciucciami la minchia":"ciucciami la minchia",
-    "ciucciami lo scroto":"ciucciami lo scroto",
-    "cocainomane":"cocainomane",
-    "coglionazzo":"coglionazza",
-    "coglione":"cogliona",
-    "colata di sborra":"colata di sborra",
-    "colata di merda":"colata di merda",
-    "crucco":"crucca",
-    "culattone":"culattona",
-    "culo sfondato":"culo sfondato",
-    "deficiente":"deficiente",
-    "disagio":"disagio",
-    "disagiato":"disagiata",
-    "drogato":"drogata",
-    "ebete":"ebete",
-    "energumeno":"energumena",
-    "eroinomane":"eroinomane",
-    "fancazzista":"fancazzista",
-    "fammi un bocchino":"fammi un bocchino",
-    "fammi una sega":"fammi una sega",
-    "farabutto":"farabutta",
-    "fetido":"fetida",
-    "ficcati un dito in culo":"ficcati un dito in culo",
-    "fogna" :"fogna",
-    "frocio":"frocia",
-    "fuso":"fusa",
-    "fuso mentale":"fusa mentale",
-    "gallinaio":"gallinaia",
-    "gay":"gay",
-    "iena":"iena",
-    "ignobile":"ignobile",
-    "ignorante":"ignorante",
-    "imbecille":"imbecille",
-    "immondizia":"immondizia",
-    "impazzito":"impazzita",
-    "impertinente":"impertinente",
-    "incapace":"incapace",
-    "infame":"infame",
-    "infetto":"infetta",
-    "inginocchiati e baciami":"inginocchiati e baciami",
-    "larva":"larva",
-    "latrina" :"latrina",
-    "lavativo" :"lavativa",
-    "leccaculo":"leccaculo",
-    "leccafighe":"leccafighe",
-    "leccami il cazzo":"leccami il cazzo",
-    "lecchino":"lecchina",
-    "lesbica":"lesbica",
-    "lestofante":"lestofante",
-    "liquame":"liquame",
-    "lo sai cosa sei vero? brutto":"lo sai cosa sei vero? brutta",
-    "lombrico" :"lombrica",
-    "lurido":"lurida",
-    "microcefalo":"microcefala",
-    "maiale":"maiale",
-    "malandrino":"malandrina",
-    "melanzana":"melanzana",
-    "merda":"merda",
-    "merdaccia":"merdaccia",
-    "mi fai ribrezzo":"mi fai ribrezzo",
-    "mi fai schifo":"mi fai schifo",
-    "mi fai venire voglia di suicidarmi":"mi fai venire voglia di suicidarmi",
-    "mignotta":"mignotta",
-    "mignottone":"mignottona",
-    "minchione":"minchiona",
-    "mongoloide":"mongoloide",
-    "muori":"muori",
-    "muori male":"muori male",
-    "nababbo":"nababba",
-    "ninfomane":"ninfomane",
-    "nutria":"nutria",
-    "omosessuale":"omosessuale",
-    "pantofolaio":"pantofolaia",
-    "pazzo":"pazza",
-    "pezzente":"pezzente",
-    "pezzo di merda":"pezza di merda",
-    "pezzo di culo":"pezza di culo",
-    "prostituta":"prostituta",
-    "pulisciti il culo":"pulisciti il culo",
-    "pulisciti la bocca":"pulisciti la bocca",
-    "pulisciti la figa":"pulisciti la figa",
-    "pusillanime":"pusillanime",
-    "puttaniere":"puttaniera",
-    "quaquaraqua":"quaquaraqua",
-    "ratto":"ratto",
-    "reietto":"reietta",
-    "rompicazzo":"rompicazzo",
-    "rompicoglioni":"rompicoglioni",
-    "sacco di merda" :"sacco di merda",
-    "sadomasochista":"sadomasochista",
-    "scarafaggio":"scarafaggia",
-    "scassacazzi":"scassacazzi",
-    "scemo":"scema",
-    "schifo" :"schifo",
-    "schifezza" :"schifezza", 
-    "schifoso":"schifosa",
-    "secchione":"secchiona",
-    "segaiolo":"segaiola",
-    "sessodipendente":"sessodipendente",
-    "spacciatore" :"spacciatrice",
-    "spazzatura":"spazzatura",
-    "spruzzata di merda":"spruzzata di merda",
-    "stercorario":"stercorario",
-    "stronzo":"stronza",
-    "stronzone":"stronzona",
-    "stupido":"stupida",
-    "succhiacazzi" :"succhiacazzi",
-    "succhiami la minchia" :"succhiami la minchia",
-    "tamarro":"tamarra",
-    "terrone":"terrona",
-    "testa di cazzo":"testa di cazzo",
-    "testa di culo":"testa di culo",
-    "testa di figa":"testa di figa",
-    "testa di minchia":"testa di minchia",
-    "truzzo":"truzza",
-    "topo":"topa",
-    "topo di fogna":"topa di fogna",
-    "usuraio":"usuraia",
-    "vaffanculo":"vaffanculo",
-    "vai a cagare":"vai a cagare",
-    "vai a fare in culo":"vai a fare in culo",
-    "vai a dare via il culo":"vai a dare via il culo",
-    "vai a morire male":"vai a morire male",
-    "vegetale" :"vegetale",
-    "verme":"verme",
-    "villano":"villana",
-    "viscido":"viscida",
-    "vucumpra":"vucumpra",
-    "zucchina":"zucchina",                                 
-    }
- 
-    string += ' '  # Append a space at the end
- 
-    n = len(string)
- 
-    # 'temp' string will hold the intermediate words
-    # and 'ans' string will be our result
-    temp = ""
-    ans = ""
- 
-    for i in range(n):
-        if string[i] != ' ':
-            temp += string[i]
-        else:
-            # If this is a 'male' or a 'female' word then
-            # swap this with its counterpart
-            if temp in dictionary:
-                temp = dictionary[temp]
- 
-            ans += temp + ' '
-            temp = ""
- 
-    return ans
 
-def get_insults(gender=True):
+def get_insults():
     try:
 
         words = [ 
@@ -386,13 +198,9 @@ def get_insults(gender=True):
         sentence3 = words3[n3]
 
         insult = sentence + " " + sentence2 + " " + sentence3
-        if gender:
-            insult_female = change_gender(insult)
-            return insult_female
-        else:
-            return insult
+        return insult
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-      return "stronzo mi sono spaccato male, blast deve sistemarmi"
+      raise Exception(e)

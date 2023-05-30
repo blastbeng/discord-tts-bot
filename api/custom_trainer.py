@@ -1,15 +1,12 @@
-import io
 import logging
 import os
 import random
-import filtersdb
 
 from chatterbot.conversation import Statement
 from chatterbot.trainers import Trainer
 #from google_translate_py import Translator
 #from googletrans import Translator
 from chatterbot import utils
-from chatterbot.exceptions import OptionalDependencyImportError
 from libretranslator import LibreTranslator
 
 

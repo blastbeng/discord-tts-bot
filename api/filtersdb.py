@@ -2,7 +2,6 @@ import os
 import sqlite3
 import logging
 
-from io import BytesIO
 from dotenv import load_dotenv
 from os.path import dirname
 from os.path import join

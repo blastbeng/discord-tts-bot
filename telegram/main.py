@@ -1,5 +1,3 @@
-import asyncio
-import json
 import logging
 import os
 import base64
@@ -7,22 +5,16 @@ import random
 import requests
 import string
 import sys
-import telegram
-import time
 import urllib
 from PIL import Image
 
 from datetime import datetime
-from datetime import timedelta
 from dotenv import load_dotenv
 from io import BytesIO
-from os.path import dirname
-from os.path import join
 from pytz import timezone
 from telegram import Update
 from telegram.ext import CallbackContext
 from telegram.ext import CommandHandler
-from telegram.ext import Dispatcher
 from telegram.ext import Filters
 from telegram.ext import MessageHandler
 from telegram.ext import Updater

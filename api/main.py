@@ -7,30 +7,21 @@ import utils
 import insults
 import audiodb
 import filtersdb
-import requests
-import json
 import threading
-import random
 import sys
-import shutil
 from io import BytesIO
-from datetime import datetime
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask import Flask, request, send_file, Response, jsonify, render_template, make_response, after_this_request, g
+from flask import Flask, request, send_file, Response, jsonify, make_response, after_this_request, g
 from flask_restx import Api, Resource, reqparse
 from flask_apscheduler import APScheduler
-from chatterbot.conversation import Statement
 from flask_caching import Cache
-from pathlib import Path
 from os.path import join, dirname
 from dotenv import load_dotenv
 from threading import Thread
 from bestemmie import Bestemmie
 from libretranslator import LibreTranslator
-from chatterbot import languages
 from exceptions import AudioLimitException
-from exceptions import BlockedWordException
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -84,7 +75,6 @@ api = Api(app)
 nstext = api.namespace('chatbot_text', 'Accumulators Chatbot Text APIs')
 
 parserinsult = reqparse.RequestParser()
-parserinsult.add_argument("gender", type=str)
 parserinsult.add_argument("lang", type=str)
 parserinsult.add_argument("text", type=str)
 parserinsult.add_argument("chatid", type=str)
@@ -258,13 +248,8 @@ class TextTranslateClass(Resource):
 class TextInsultClass(Resource):
   @api.expect(parserinsult)
   def get (self):
-    gender = request.args.get("gender")
-    if gender is None:
-      gender = False
-    elif gender == "f":
-      gender = True
 
-    sentence = insults.get_insults(gender)
+    sentence = insults.get_insults()
 
     lang = request.args.get("lang")
     if lang is None:
@@ -587,13 +572,8 @@ class AudioInsultClass(Resource):
   def get (self):
     sentence = ""
     try:
-      gender = request.args.get("gender")
-      if gender is None:
-        gender = False
-      elif gender == "f":
-        gender = True
 
-      sentence = insults.get_insults(gender)
+      sentence = insults.get_insults()
       lang = request.args.get("lang")
       if lang is None:
         lang = "it"  

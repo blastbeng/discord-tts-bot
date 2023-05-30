@@ -1,34 +1,24 @@
 import re
 import shutil
-import chatterbot
-import spacy
-import zipfile
 import random
 import wikipedia
 import sqlite3
 import json
-import insults
 import requests
 import sys
 import os
-import io
 import urllib
 import yt_dlp
 from functools import lru_cache
-from datetime import datetime
 import string
 import fakeyou
 import time
-import wave
-import audioop
 import logging
 import audiodb
-from uuid import uuid4
 from chatterbot import ChatBot
 from chatterbot import languages
 from chatterbot.conversation import Statement
 from custom_trainer import CustomListTrainer
-from custom_trainer import TranslatedListTrainer
 from custom_trainer import CustomTrainer
 from chatterbot.comparisons import LevenshteinDistance
 #from chatterbot.comparisons import SpacySimilarity
@@ -44,13 +34,9 @@ from os.path import join, dirname
 from dotenv import load_dotenv
 from fakeyou.objects import *
 from fakeyou.exception import *
-from sqlitedict import SqliteDict
 from pydub import AudioSegment
 from essential_generators import DocumentGenerator, MarkovTextGenerator, MarkovWordGenerator
-from libretranslator import LibreTranslator
 from bs4 import BeautifulSoup
-from glob import glob
-from zipfile import ZipFile
 from exceptions import AudioLimitException
 from exceptions import TimeExceededException
 import multiprocessing

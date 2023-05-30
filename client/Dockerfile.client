@@ -24,6 +24,7 @@ COPY utils.py .
 COPY database.py .
 COPY constants.py .
 COPY entrypoint.sh .
+COPY loading.gif .
 RUN chmod +x entrypoint.sh
 
 CMD ["./entrypoint.sh"]

@@ -1,6 +1,5 @@
 class AudioLimitException(Exception):
     "Generated TTS length is longer than max limit"
-    pass
 
 class BlockedWordException(Exception):
     def __init__(self, word):
@@ -10,4 +9,3 @@ class BlockedWordException(Exception):
 
 class TimeExceededException(Exception):
     "Max execution time exceeded"
-    pass

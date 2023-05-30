@@ -47,7 +47,7 @@ def create_db_tables(self):
 
 def insert_guildconfig(self, guildid: str, language: str, nsfw: int):
   try:
-    stmt = insert(self.guildconfig).values(guildid=guildid, language=language).prefix_with('OR IGNORE')
+    stmt = insert(self.guildconfig).values(guildid=guildid, language=language, nsfw=0).prefix_with('OR IGNORE')
     compiled = stmt.compile()
     with self.db_engine.connect() as conn:
       result = conn.execute(stmt)

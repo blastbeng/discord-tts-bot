@@ -1,14 +1,11 @@
 import enchant
 import os
 import requests
-import sys
 
 from dotenv import load_dotenv
-from flask import send_file
 from io import BytesIO
 from os.path import dirname
 from os.path import join
-from pathlib import Path
 from random import choice
 
 dotenv_path = join(dirname(__file__), '.env')
