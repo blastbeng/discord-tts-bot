@@ -33,25 +33,6 @@ services:
       timeout: 5s
       retries: 12
     network_mode: host
-  discord-tts-bot-client:
-    build:
-      context: ./client
-      dockerfile: Dockerfile.client
-    container_name: discord-tts-bot-client
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Rome
-    depends_on:
-      discord-tts-bot-api:
-        condition: service_healthy
-    volumes:
-      - ".env:/app/.env"
-      - "./config:/app/config"
-      - "/tmp/discord-tts-bot-api:/tmp/discord-tts-bot-api"
-      - "/tmp/discord-tts-bot-discord:/tmp/discord-tts-bot-discord"
-    image: "blastbeng/discord-tts-bot-client:1.0.0"
-    restart: "no"
   discord-tts-bot-telegram:
     build:
       context: ./telegram

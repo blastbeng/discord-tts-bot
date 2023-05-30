@@ -169,6 +169,23 @@ class AdminCommandButton(discord.ui.Button["InteractionRoles"]):
         except Exception as e:
             await send_error(e, interaction, from_generic=False)
 
+class SaveButton(discord.ui.Button["InteractionRoles"]):
+
+    def __init__(self, message):
+        super().__init__(style=discord.ButtonStyle.primary, label="Save")
+        self.message = message
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True, ephemeral = True)
+        currentguildid = get_current_guild_id(interaction.guild.id)
+        url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "repeat/learn/" + urllib.parse.quote(self.message) + "/" + currentguildid + "/" + utils.get_guild_language(currentguildid)
+        response = requests.get(url)
+        if (response.status_code == 200 and response.text != "Internal Server Error"):
+            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),'This sentence has been saved.'), ephemeral = True)  
+        else:
+            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),'Error detected while saving this sentence.'), ephemeral = True)     
+            
+        
 class PlayButton(discord.ui.Button["InteractionRoles"]):
 
     def __init__(self, content, message):
@@ -265,6 +282,20 @@ def listvoices_api(language="it", filter=None):
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
         return None
+
+voices = {}
+voices["it"] = listvoices_api(language="it")
+voices["en"] = listvoices_api(language="en")
+voices["fr"] = listvoices_api(language="fr")
+voices["de"] = listvoices_api(language="de")
+voices["es"] = listvoices_api(language="es")
+voices["pt"] = listvoices_api(language="pt")
+
+async def rps_autocomplete(interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+    currentguildid=get_current_guild_id(interaction.guild.id)
+    choices = voices[utils.get_guild_language(currentguildid)]
+    choices = [app_commands.Choice(name=choice, value=choice) for choice in choices if current.lower() in choice.lower()][:25]
+    return choices
 
 def check_image_with_pil(path):
     try:
@@ -379,7 +410,7 @@ def get_current_guild_id(guildid):
         return str(guildid)
 
 
-async def do_play(voice_client, url: str, interaction: discord.Interaction, currentguildid: str, ephermeal = True, defer = True, name = None):
+async def do_play(voice_client, url: str, interaction: discord.Interaction, currentguildid: str, ephermeal = True, defer = True, name = None, show_save=False):
     try:
         if defer:
             await interaction.response.defer(thinking=True, ephemeral = ephermeal)
@@ -396,6 +427,8 @@ async def do_play(voice_client, url: str, interaction: discord.Interaction, curr
             view = discord.ui.View()
             view.add_item(PlayButton(response.content, message))
             view.add_item(StopButton())
+            if show_save:
+                view.add_item(SaveButton(message))
             await interaction.followup.send(message, view = view, ephemeral = ephermeal)
         elif response.status_code == 400:
             logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
@@ -664,6 +697,7 @@ async def on_guild_remove(guild):
 
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def join(interaction: discord.Interaction):
     """Join channel."""
     await join_internal(interaction)
@@ -682,6 +716,7 @@ async def join_internal(interaction):
 
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def leave(interaction: discord.Interaction):
     """Leave channel"""
     await leave_internal(interaction)
@@ -706,10 +741,12 @@ async def leave_internal(interaction):
 @app_commands.describe(text="The sentence to repeat")
 @app_commands.rename(voice='voice')
 @app_commands.describe(voice="The voice to use")
+@app_commands.autocomplete(voice=rps_autocomplete)
 @app_commands.rename(language='language')
 @app_commands.describe(language="The language to use")
 @app_commands.choices(language=optionslanguages)
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def speak(interaction: discord.Interaction, text: str, voice: str = "google", language: app_commands.Choice[str] = "Italian"):
     """Repeat a sentence"""
     try:
@@ -749,6 +786,7 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "googl
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def wikipedia(interaction: discord.Interaction, text: str):
     """Search something on wikipedia"""
     try:
@@ -776,6 +814,7 @@ async def wikipedia(interaction: discord.Interaction, text: str):
 @app_commands.rename(text='text')
 @app_commands.describe(text="the sentence to ask")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def ask(interaction: discord.Interaction, text: str):
     """Ask something."""
     try:
@@ -804,6 +843,7 @@ async def ask(interaction: discord.Interaction, text: str):
 
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def generate(interaction: discord.Interaction):
     """Generate a random sentence."""
     await generate_internal(interaction)
@@ -827,7 +867,7 @@ async def generate_internal(interaction):
                 response = requests.get(url)
                 if (response.status_code == 200 and response.text != "Internal Server Error"):
                     url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(response.text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
-                    await do_play(voice_client, url, interaction, currentguildid, defer=False)
+                    await do_play(voice_client, url, interaction, currentguildid, defer=False, show_save=True)
                 else:
                     logging.error("[GUILDID : %s] generate - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)), exc_info=1)
                     await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),'Error. The generator database is still empty, try again later.\nNOTE: If you just invited the bot, this feature will be available in 12 hours if you continue to use the "speak" command.'), ephemeral = True)     
@@ -841,6 +881,7 @@ async def generate_internal(interaction):
 
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def story(interaction: discord.Interaction):
     """Generate a random story."""
     await story_internal(interaction)
@@ -879,6 +920,7 @@ async def story_internal(interaction):
 
 @client.tree.context_menu(name="Insult")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def insult_tree(interaction: discord.Interaction, member: discord.Member):
     await insult_internal(interaction, member, "m")
 
@@ -933,12 +975,14 @@ async def insult_internal(interaction, member, gender):
 
 @client.tree.context_menu(name="Random")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def random_tree(interaction: discord.Interaction, member: discord.Member):
     await random_internal(interaction, "random")
 
 @client.tree.command()
 @app_commands.rename(voice='voice')
 @app_commands.describe(voice="The voice to use")
+@app_commands.autocomplete(voice=rps_autocomplete)
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def random(interaction: discord.Interaction, voice: str = "random"):
     """Say a random sentence"""
@@ -977,6 +1021,7 @@ async def random_internal(interaction, voice):
 
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def curse(interaction: discord.Interaction):
     """Curse."""
     await curse_internal(interaction)
@@ -1558,6 +1603,7 @@ async def text2image(interaction: discord.Interaction, text: str):
 
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def accept(interaction: discord.Interaction):
     """Accept or Decline NSFW content."""
     try:
@@ -1594,6 +1640,7 @@ async def disclaimer_internal(interaction):
 @app_commands.rename(file='file')
 @app_commands.describe(file="The sentences file")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def train(interaction: discord.Interaction, file: discord.Attachment):
     """Train the Bot using a sentences file."""
     is_deferred=False
@@ -1647,6 +1694,7 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
 @app_commands.rename(word='word')
 @app_commands.describe(word="The word to block")
 @app_commands.checks.cooldown(1, 10.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def block(interaction: discord.Interaction, word: str):
     """Add a word to the blacklist"""
     try:
@@ -1670,6 +1718,7 @@ async def block(interaction: discord.Interaction, word: str):
 @app_commands.rename(word='word')
 @app_commands.describe(word="The word to unblock")
 @app_commands.checks.cooldown(1, 10.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def unblock(interaction: discord.Interaction, word: str):
     """Remove a word from the blacklist"""
     try:
@@ -1692,6 +1741,7 @@ async def unblock(interaction: discord.Interaction, word: str):
 @client.tree.command()
 @app_commands.checks.has_permissions(administrator=True)
 @app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def unblockall(interaction: discord.Interaction):
     """Remove all the words from the blacklist"""
     try:
@@ -1715,6 +1765,7 @@ async def unblockall(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.checks.has_permissions(administrator=True)
 @app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def reset(interaction: discord.Interaction):
     """Resets the bot database"""
     try:
@@ -1739,6 +1790,7 @@ async def reset(interaction: discord.Interaction):
 @app_commands.describe(language="The language to use")
 @app_commands.choices(language=optionslanguages)
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def listvoices(interaction: discord.Interaction, language: app_commands.Choice[str] = "Italian"):
     """List available voices"""
     await listvoices_internal(interaction, language)

@@ -9,6 +9,6 @@ server {
         uwsgi_read_timeout 300;
         uwsgi_send_timeout 300;
         uwsgi_request_buffering off;
-        uwsgi_pass unix:/tmp/jerky-tts-bot-api/uwsgi.sock;
+        uwsgi_pass unix:/tmp/discord-tts-bot-api/uwsgi.sock;
     }
 }

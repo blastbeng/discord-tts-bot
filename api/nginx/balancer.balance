@@ -1,6 +1,6 @@
 upstream loadbalancer {
-    server unix:/tmp/jerky-tts-bot-api/uwsgi1.sock; weight=6;
-    server unix:/tmp/jerky-tts-bot-api/uwsgi2.sock; weight=4;
+    server unix:/tmp/discord-tts-bot-api/uwsgi1.sock; weight=6;
+    server unix:/tmp/discord-tts-bot-api/uwsgi2.sock; weight=4;
 }
 server {
     listen 5080;
