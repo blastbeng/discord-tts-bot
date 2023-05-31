@@ -4,7 +4,7 @@ import subprocess
 import shlex
 import urllib
 import io
-import requests
+import requests_async as requests_async
 import random
 from discord.opus import Encoder
 import discord
@@ -62,7 +62,7 @@ def translate(guildid: str, text: str):
     return cached
   else:
     url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "translate/" + urllib.parse.quote(fromlang) + "/" + urllib.parse.quote(tolang) + "/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(guildid)
-    translation = requests.get(url)
+    translation = requests_async.get(url)
     if (translation.text != "Internal Server Error" and translation.status_code == 200 and translation.text != text):
       database.insert_translation(dbms, fromlang, tolang, text, translation.text)
       return translation.text

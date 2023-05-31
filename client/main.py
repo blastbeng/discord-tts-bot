@@ -83,9 +83,7 @@ class SlashCommandButton(discord.ui.Button["InteractionRoles"]):
         is_deferred=True
         try:
             await interaction.response.defer(thinking=True, ephemeral=True)
-            if self.name == constants.ASK:
-                await interaction.followup.send("/ask <text> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"The bot answers to your questions"), ephemeral = True)
-            elif self.name == constants.CURSE:
+            if self.name == constants.CURSE:
                 await interaction.followup.send("/curse -> curse.", ephemeral = True)
             elif self.name == constants.INSULT:
                 await interaction.followup.send("/insult <member> -> " + utils.translate(get_current_guild_id(interaction.guild.id),"Insult someone"), ephemeral = True)
@@ -720,7 +718,7 @@ async def join(interaction: discord.Interaction):
     load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
+        #load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         if interaction.user.voice and interaction.user.voice.channel:
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
@@ -728,7 +726,7 @@ async def join(interaction: discord.Interaction):
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"I'm joining the voice channel"), ephemeral = True)
         else:
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
-        await load_message.delete()
+        #await load_message.delete()
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
 
@@ -741,7 +739,7 @@ async def leave(interaction: discord.Interaction):
     load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
+        #load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         if interaction.user.voice and interaction.user.voice.channel:
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             if voice_client and voice_client.channel.id == interaction.user.voice.channel.id:
@@ -751,7 +749,7 @@ async def leave(interaction: discord.Interaction):
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"I'm not connected to any voice channel"), ephemeral = True)       
         else:
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
-        await load_message.delete()
+        #await load_message.delete()
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
 
@@ -837,41 +835,48 @@ async def wikipedia(interaction: discord.Interaction, text: str):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
 
 
-@client.tree.command()
-@app_commands.rename(text='text')
-@app_commands.describe(text="the sentence to ask")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
-@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
-async def ask(interaction: discord.Interaction, text: str):
-    """Ask something."""
-    is_deferred=True
-    load_message = None
-    try:
-        await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
-        if interaction.user.voice and interaction.user.voice.channel:
-            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
-            await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
-
-            
-            if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
-                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-            elif voice_client:
-                if voice_client.is_playing():
-                    voice_client.stop()
-                currentguildid = get_current_guild_id(interaction.guild.id)
-                
-                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/1/random/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
-                await do_play(url, interaction, currentguildid)
-            else:
-                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
-
-            
-        else:
-            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
-        await load_message.delete()
-    except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
+#@client.tree.command()
+#@app_commands.rename(text='text')
+#@app_commands.describe(text="the sentence to ask")
+#@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+#@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
+#async def ask(interaction: discord.Interaction, text: str):
+#    """Ask something."""
+#    is_deferred=True
+#    load_message = None
+#    try:
+#        await interaction.response.defer(thinking=True, ephemeral=True)
+#        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
+#        if interaction.user.voice and interaction.user.voice.channel:
+#            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+#            await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
+#
+#            
+#            if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
+#                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
+#            elif voice_client:
+#                if voice_client.is_playing():
+#                    voice_client.stop()
+#                currentguildid = get_current_guild_id(interaction.guild.id)
+#                
+#                url = os.environ.get("API_URL")+os.environ.get("API_PATH_TEXT")+"ask/"+urllib.parse.quote(str(text))+"/1/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+#                response = await requests_async.get(url)
+#
+#                if (response.status_code == 200 and response.text != "Internal Server Error"):
+#                    url_speak = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(response.text))+"/random/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+#                    await do_play(url_speak, interaction, currentguildid)
+#                else:
+#                    logging.error("[GUILDID : %s] translate - Received bad response from APIs", str(currentguildid))
+#                    await interaction.followup.send("API Timeout, " + utils.translate(currentguildid,"please try again later"), ephemeral = True)
+#            else:
+#                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+#
+#            
+#        else:
+#            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+#        await load_message.delete()
+#    except Exception as e:
+#        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
 
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
@@ -1091,10 +1096,8 @@ async def curse(interaction: discord.Interaction):
 async def restart(interaction: discord.Interaction):
     """Restart bot."""
     is_deferred=True
-    load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")) and str(interaction.user.id) == str(os.environ.get("ADMIN_ID")):
             if interaction.user.guild_permissions.administrator:
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Restarting bot."), ephemeral = True)
@@ -1103,9 +1106,8 @@ async def restart(interaction: discord.Interaction):
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
         else:
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"This is a private command and can only be used by members with specific permissions on the main Bot Server"), ephemeral = True)
-        await load_message.delete()
     except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=None)
 
 @client.tree.command()
 @app_commands.rename(text='text')
@@ -1115,7 +1117,6 @@ async def restart(interaction: discord.Interaction):
 async def delete(interaction: discord.Interaction, text: str):
     """Delete sentences by text."""
     is_deferred=True
-    load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
         load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
@@ -1129,9 +1130,8 @@ async def delete(interaction: discord.Interaction, text: str):
                 await interaction.followup.send(utils.translate(currentguildid,"Error."), ephemeral = True)     
         else:
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
-        await load_message.delete()
     except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=None)
 
 @client.tree.command()
 @app_commands.checks.has_permissions(administrator=True)
@@ -1176,10 +1176,8 @@ async def download(interaction: discord.Interaction):
 async def stop(interaction: discord.Interaction):
     """Stop playback."""
     is_deferred=True
-    load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         if interaction.user.voice and interaction.user.voice.channel:
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
@@ -1190,9 +1188,8 @@ async def stop(interaction: discord.Interaction):
             
         else:
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
-        await load_message.delete()
     except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=None)
 
     
 
@@ -1203,10 +1200,9 @@ async def stop(interaction: discord.Interaction):
 async def rename(interaction: discord.Interaction, name: str):
     """Rename bot."""
     is_deferred=True
-    load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
+        #load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         if len(name) < 32:
             currentguildid = get_current_guild_id(interaction.guild.id)
             
@@ -1216,9 +1212,8 @@ async def rename(interaction: discord.Interaction, name: str):
             await interaction.followup.send(message, ephemeral = True)
         else:
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"My name cannot be longer than 32 characters"), ephemeral = True)
-        await load_message.delete()
     except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=None)
 
 @client.tree.command()
 @app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
@@ -1229,10 +1224,8 @@ async def rename(interaction: discord.Interaction, name: str):
 async def avatar(interaction: discord.Interaction, image: discord.Attachment):
     """Change bot avatar."""
     is_deferred=True
-    load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")) and str(interaction.user.id) == str(os.environ.get("ADMIN_ID")):
             if interaction.user.guild_permissions.administrator:
                 imgfile=await image.to_file()
@@ -1251,9 +1244,8 @@ async def avatar(interaction: discord.Interaction, image: discord.Attachment):
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Only the bot owner can use this command"), ephemeral = True)
         else:
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"This is a private command and can only be used by members with specific permissions on the main Bot Server"), ephemeral = True)
-        await load_message.delete()
     except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=None)
 
 @client.tree.command()
 @app_commands.checks.has_permissions(administrator=True)
@@ -1264,7 +1256,6 @@ async def avatar(interaction: discord.Interaction, image: discord.Attachment):
 async def language(interaction: discord.Interaction, language: app_commands.Choice[str]):
     """Change bot language."""
     is_deferred=True
-    load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
         load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
@@ -1276,9 +1267,8 @@ async def language(interaction: discord.Interaction, language: app_commands.Choi
             await interaction.followup.send(utils.translate(currentguildid,"Bot language changed to ") + ' "'+language.name+'"', ephemeral = True)
         else:
             await interaction.followup.send(utils.translate(currentguildid,"Only administrators can use this command"), ephemeral = True)
-        await load_message.delete()
     except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=None)
 
 @client.tree.command()
 @app_commands.rename(text='text')
@@ -1552,7 +1542,6 @@ async def commands(interaction: discord.Interaction):
         view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.LEAVE))
         
 
-        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.ASK))
         
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.SPEAK))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRANSLATE))
@@ -1619,10 +1608,8 @@ async def admin(interaction: discord.Interaction):
 async def accept(interaction: discord.Interaction):
     """Accept or Decline NSFW content."""
     is_deferred=True
-    load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         if interaction.user.guild_permissions.administrator:
             view = discord.ui.View()
             view.add_item(AcceptButton())
@@ -1634,23 +1621,19 @@ async def accept(interaction: discord.Interaction):
             await interaction.followup.send(message, view = view,  ephemeral = True)   
         else:
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
-        await load_message.delete()
     except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=None)
 
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def disclaimer(interaction: discord.Interaction):
     """Show DISCLAIMER."""
     is_deferred=True
-    load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=False)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         await interaction.followup.send(get_disclaimer(get_current_guild_id(interaction.guild.id)), ephemeral = True)   
-        await load_message.delete()
     except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=None)
 
 
 @client.tree.command()
@@ -1825,7 +1808,6 @@ async def reset(interaction: discord.Interaction):
 
 @admin.error
 @accept.error
-@ask.error
 @avatar.error
 @block.error
 @commands.error
