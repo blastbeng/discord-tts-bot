@@ -23,6 +23,7 @@ from bestemmie import Bestemmie
 from libretranslator import LibreTranslator
 from exceptions import AudioLimitException
 from time import strftime
+from utils import SentenceToLearn
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -71,21 +72,17 @@ def block_by_filters():
     
 @app.after_request
 def after_request(response):
-  timestamp = strftime('[%Y-%b-%d %H:%M]')
-  logging.info('%s %s %s %s %s %s', timestamp, request.remote_addr, request.method, request.scheme, request.full_path, response.status)
-  if request.path.startswith('/chatbot_audio/repeat/learn/'):
-    text = request.view_args['text']
-    chatbot = get_chatbot_by_id(chatid=request.view_args['chatid'], lang=request.view_args['lang'])
-    daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
-    daemon.start()
+  if not request.path.startswith('/utils/healthcheck'):
+    timestamp = strftime('[%Y-%b-%d %H:%M]')
+    logging.info('%s %s %s %s %s %s', timestamp, request.remote_addr, request.method, request.scheme, request.full_path, response.status)
+  #if request.path.startswith('/chatbot_audio/repeat/learn/'):
+  #  request_args = {**request.view_args, **request.args} if request.view_args else {**request.args}
+  #  if "text" in request_args and "chatid" in request_args "lang" in request_args:
+  #    text = request.view_args['text']
+  #    chatbot = get_chatbot_by_id(chatid=request.view_args['chatid'], lang=request.view_args['lang'])
+  #    daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
+  #    daemon.start()
   return response
-
-@app.errorhandler(Exception)
-def exceptions(e):
-  tb = traceback.format_exc()
-  timestamp = strftime('[%Y-%b-%d %H:%M]')
-  logger.error('%s %s %s %s %s 5xx INTERNAL SERVER ERROR\n%s', timestamp, request.remote_addr, request.method, request.scheme, request.full_path, tb)
-  return e.status_code
 
 cache = Cache(app)
 api = Api(app)
@@ -460,6 +457,9 @@ class AudioRepeatLearnClass(Resource):
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+        chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
+        daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
+        daemon.start()
         return response
       else:
         @after_this_request
@@ -989,7 +989,7 @@ class AdminForceDeleteByText(Resource):
     return get_response_str(utils.delete_by_text(chatid, text, force=True))
 
 def get_chatbot_by_id(chatid = "000000", lang = "it"):
-  if chatid not in chatbots_dict:
+  if chatid + "_" + lang not in chatbots_dict:
     chatbots_dict[chatid + "_" + lang] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True", lang = lang)
   return chatbots_dict[chatid + "_" + lang]
   

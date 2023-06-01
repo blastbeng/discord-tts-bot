@@ -4,7 +4,7 @@ import subprocess
 import shlex
 import urllib
 import io
-import requests_async as requests_async
+import requests
 import random
 from discord.opus import Encoder
 import discord
@@ -17,8 +17,9 @@ class FFmpegPCMAudioBytesIO(discord.AudioSource):
             args.extend(shlex.split(before_options))
         args.append('-i')
         args.append('-' if pipe else source)
+        args.extend(('-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'warning'))
         #args.extend(('-af', 'loudnorm=I=-14:LRA=11:TP=-1', '-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'error'))
-        args.extend(('-af', 'dynaudnorm=p=1/sqrt(2):m=100:s=12:g=15', '-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'error'))
+        #args.extend(('-af', 'dynaudnorm=p=1/sqrt(2):m=100:s=12:g=15', '-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'error'))
         if isinstance(options, str):
             args.extend(shlex.split(options))
         args.append('pipe:1')
@@ -62,7 +63,7 @@ def translate(guildid: str, text: str):
     return cached
   else:
     url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "translate/" + urllib.parse.quote(fromlang) + "/" + urllib.parse.quote(tolang) + "/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(guildid)
-    translation = requests_async.get(url)
+    translation = requests.get(url)
     if (translation.text != "Internal Server Error" and translation.status_code == 200 and translation.text != text):
       database.insert_translation(dbms, fromlang, tolang, text, translation.text)
       return translation.text

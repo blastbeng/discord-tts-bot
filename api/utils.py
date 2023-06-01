@@ -71,6 +71,12 @@ except Exception as e:
 
 fake = Faker()
 
+class SentenceToLearn():
+  def __init__(self, chatid, language, text):
+        self.chatid = chatid
+        self.language = language
+        self.text = text
+
 class TrainJson():
   def __init__(self, info, language, sentences):
         self.info = info
@@ -642,7 +648,7 @@ def get_random_voice(lang="it"):
   title, token = random.choice(list(localvoices.items()))
   return token
 
-@lru_cache(maxsize=7200)
+@lru_cache(maxsize=128)
 def list_fakeyou_voices(lang:str):
   foundvoices = None
   try:
@@ -666,9 +672,27 @@ def list_fakeyou_voices(lang:str):
     if voices is not None:
       foundvoices = {}
 
-      for langTag,voiceJson in zip(voices.langTag,voices.json):
-        if lang.lower() in langTag.lower():
-          foundvoices[voiceJson["title"]] = voiceJson["model_token"]
+
+      inclusion_file_path = "./config/voices_inclusions_"+lang+".json"
+
+      if os.path.exists(inclusion_file_path):
+        with open(inclusion_file_path) as inclusion_file:
+          inclusion_file_content = inclusion_file.read()
+          inclusion_file_content_parsed = json.loads(inclusion_file_content)
+          for langTag,voiceJson in zip(voices.langTag,voices.json):
+            if lang.lower() in langTag.lower():
+              skip = True
+              for inclusion in inclusion_file_content_parsed:
+                if inclusion == voiceJson["title"]:
+                  skip = False
+                  break
+              if not skip:
+                foundvoices[voiceJson["title"]] = voiceJson["model_token"]
+      else:
+        for langTag,voiceJson in zip(voices.langTag,voices.json):
+          if lang.lower() in langTag.lower():
+            foundvoices[voiceJson["title"]] = voiceJson["model_token"]
+
 
       
       foundvoices["google"] = "google"

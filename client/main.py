@@ -278,6 +278,7 @@ loops_dict = {}
 populator_loops_dict = {}
 generator_loops_dict = {}
 cvc_loops_dict = {}
+fakeyou_voices = {}
 
 async def display_loader(interaction, currentguildid):
     with open('loading.gif', 'rb') as f:
@@ -290,18 +291,25 @@ async def display_loader(interaction, currentguildid):
 
 async def listvoices_api(language="it", filter=None):
     try:
-        voice = None
-        url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/fakeyou/listvoices/" + language
-        response = await requests_async.get(url)
-        if (response.status_code == 200):
+        global fakeyou_voices
+        if fakeyou_voices is None or len(fakeyou_voices) == 0 or len(fakeyou_voices) == 1:
+            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/fakeyou/listvoices/" + language
+            response = await requests_async.get(url)
+            if (response.status_code == 200):
+                fakeyou_voices = response.json()
+        if (fakeyou_voices is not None and len(fakeyou_voices) > 0):
             if filter is not None:
                 voice = None
-                for key in response.json():
+                for key in fakeyou_voices:
                     if filter.lower() in key.lower():
-                        voice = response.json()[key]
+                        voice = fakeyou_voices[key]
                 return voice
             else:
-                return response.json()
+                return fakeyou_voices
+        else:
+            fakeyou_voices = {}
+            fakeyou_voices ["google"] = "google"
+            return fakeyou_voices
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -637,19 +645,26 @@ async def on_guild_available(guild):
         cvc_loops_dict[guild.id].check_voice_connection_loop.start()
 
 
-        utils.check_exists_guild(currentguildid)
-        client.tree.copy_global_to(guild=guild)
-        await client.tree.sync(guild=guild)
-        logging.info(f'Syncing commands to Guild (ID: {guild.id}) (NAME: {guild.name})')
-
-        
-        url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/init/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid)
+        utils.check_exists_guild(currentguildid)        
+        lang = utils.get_guild_language(currentguildid)
+        url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/init/" + urllib.parse.quote(currentguildid) + "/" + urllib.parse.quote(lang)
         response = await requests_async.get(url)
         if (response.status_code != 200):
             logging.error("Initializing chatterbot on chatid " + currentguildid + " failed")
         else:
             logging.info(response.text)
 
+        await listvoices_api(language=lang, filter=None)
+
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+    try:
+        client.tree.copy_global_to(guild=guild)
+        await client.tree.sync(guild=guild)
+        logging.info(f'Syncing commands to Guild (ID: {guild.id}) (NAME: {guild.name})')
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -701,7 +716,7 @@ async def on_guild_remove(guild):
         if str(interaction.guild.id) != str(os.environ.get("GUILD_ID")):
             utils.delete_guild(str(guild.id))
             url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/reset/" +urllib.parse.quote(str(guild.id))
-            response = await requests_async.get(url)
+            response = await requests.get(url)
             if (response.status_code != 200):
                 logging.error("[GUILDID : %s] on_guild_remove -> reset - Received bad response from APIs", str(guild.id))
     except Exception as e:
@@ -790,7 +805,7 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "googl
                     url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use)
                     await do_play(url, interaction, currentguildid)
                 else:
-                    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Voice not found. To list all available voices, use:") + " /listvoices", ephemeral = True)      
+                    await interaction.followup.send("Discord API Error, " + utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)      
             else:
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)            
         else:
@@ -839,8 +854,12 @@ async def wikipedia(interaction: discord.Interaction, text: str):
 #@app_commands.rename(text='text')
 #@app_commands.describe(text="the sentence to ask")
 #@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+#@app_commands.rename(voice='voice')
+#@app_commands.describe(voice="The voice to use")
+#@app_commands.autocomplete(voice=rps_autocomplete)
+#@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 #@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
-#async def ask(interaction: discord.Interaction, text: str):
+#async def ask(interaction: discord.Interaction, text: str, voice: str = "google"):
 #    """Ask something."""
 #    is_deferred=True
 #    load_message = None
@@ -858,16 +877,18 @@ async def wikipedia(interaction: discord.Interaction, text: str):
 #                if voice_client.is_playing():
 #                    voice_client.stop()
 #                currentguildid = get_current_guild_id(interaction.guild.id)
-#                
-#                url = os.environ.get("API_URL")+os.environ.get("API_PATH_TEXT")+"ask/"+urllib.parse.quote(str(text))+"/1/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
-#                response = await requests_async.get(url)
 #
-#                if (response.status_code == 200 and response.text != "Internal Server Error"):
-#                    url_speak = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(response.text))+"/random/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
-#                    await do_play(url_speak, interaction, currentguildid)
+#                if voice != "google":
+#                    voice = await listvoices_api(language=lang_to_use, filter=voice)
+#
+#                if voice is not None:
+#                    url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+#                    await do_play(url, interaction, currentguildid)
 #                else:
-#                    logging.error("[GUILDID : %s] translate - Received bad response from APIs", str(currentguildid))
-#                    await interaction.followup.send("API Timeout, " + utils.translate(currentguildid,"please try again later"), ephemeral = True)
+#                    await interaction.followup.send("Discord API Error, " + utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True) 
+#                
+#                
+#                await do_play(URL, interaction, currentguildid)
 #            else:
 #                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
 #
@@ -1033,7 +1054,7 @@ async def random(interaction: discord.Interaction, voice: str = "random"):
                     url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + utils.get_guild_language(currentguildid)
                     await do_play(url, interaction, currentguildid)
                 else:
-                    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Voice not found. To list all available voices, use:") + " /listvoices", ephemeral = True) 
+                    await interaction.followup.send("Discord API Error, " + utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)
             else:
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
 
@@ -1112,7 +1133,6 @@ async def restart(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
-@app_commands.checks.has_permissions(administrator=True)
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def delete(interaction: discord.Interaction, text: str):
     """Delete sentences by text."""
@@ -1134,7 +1154,6 @@ async def delete(interaction: discord.Interaction, text: str):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=None)
 
 @client.tree.command()
-@app_commands.checks.has_permissions(administrator=True)
 @app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
 async def download(interaction: discord.Interaction):
     """Delete sentences by text."""
@@ -1219,7 +1238,6 @@ async def rename(interaction: discord.Interaction, name: str):
 @app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 @app_commands.rename(image='image')
 @app_commands.describe(image="New bot avatar")
-@app_commands.checks.has_permissions(administrator=True)
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def avatar(interaction: discord.Interaction, image: discord.Attachment):
     """Change bot avatar."""
@@ -1248,7 +1266,6 @@ async def avatar(interaction: discord.Interaction, image: discord.Attachment):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=None)
 
 @client.tree.command()
-@app_commands.checks.has_permissions(administrator=True)
 @app_commands.rename(language='language')
 @app_commands.describe(language="New bot language")
 @app_commands.choices(language=optionslanguages)
@@ -1569,7 +1586,6 @@ async def commands(interaction: discord.Interaction):
 
 
 @client.tree.command()
-@app_commands.checks.has_permissions(administrator=True)
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def admin(interaction: discord.Interaction):
     """Show Admin bot commands."""
@@ -1646,7 +1662,7 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
     is_deferred=True
     load_message = None
     try:
-        await interaction.response.defer(thinking=True, ephemeral=False)
+        await interaction.response.defer(thinking=True, ephemeral=True)
         load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         currentguildid = get_current_guild_id(interaction.guild.id)
         if not utils.allowed_file(file.filename):
@@ -1749,7 +1765,6 @@ async def unblock(interaction: discord.Interaction, word: str):
 
 
 @client.tree.command()
-@app_commands.checks.has_permissions(administrator=True)
 @app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
 @app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def unblockall(interaction: discord.Interaction):
@@ -1778,7 +1793,6 @@ async def unblockall(interaction: discord.Interaction):
 
 
 @client.tree.command()
-@app_commands.checks.has_permissions(administrator=True)
 @app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
 @app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def reset(interaction: discord.Interaction):
