@@ -4,10 +4,10 @@ import subprocess
 import shlex
 import urllib
 import io
-import requests
 import random
 from discord.opus import Encoder
 import discord
+import aiohttp
 
 class FFmpegPCMAudioBytesIO(discord.AudioSource):
     def __init__(self, source, *, executable='ffmpeg', pipe=False, stderr=None, before_options=None, options=None):
@@ -53,22 +53,24 @@ class FFmpegPCMAudioBytesIO(discord.AudioSource):
 dbms = database.Database(database.SQLITE, dbname='client.sqlite3')
 database.create_db_tables(dbms)
 
-def translate(guildid: str, text: str):
-  tolang=database.select_guildconfig_lang(dbms, guildid, value = "it")
-  fromlang='en'
-  if tolang == fromlang:
-    return text
-  cached = database.select_translation(dbms, fromlang, tolang, text)
-  if cached is not None:
-    return cached
-  else:
-    url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "translate/" + urllib.parse.quote(fromlang) + "/" + urllib.parse.quote(tolang) + "/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(guildid)
-    translation = requests.get(url)
-    if (translation.text != "Internal Server Error" and translation.status_code == 200 and translation.text != text):
-      database.insert_translation(dbms, fromlang, tolang, text, translation.text)
-      return translation.text
+async def translate(guildid: str, text: str):
+    tolang=database.select_guildconfig_lang(dbms, guildid, value = "it")
+    fromlang='en'
+    if tolang == fromlang:
+        return text
+    cached = database.select_translation(dbms, fromlang, tolang, text)
+    if cached is not None:
+        return cached
     else:
-      return text
+        url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "translate/" + urllib.parse.quote(fromlang) + "/" + urllib.parse.quote(tolang) + "/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(guildid)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if (response.status == 200):
+                    translation_text = await response.text()
+                    database.insert_translation(dbms, fromlang, tolang, text, translation_text)
+                    return translation_text
+                else:
+                    return text
 
 def insert_new_guild(guildid: str, language: str):
     database.insert_guildconfig(dbms, guildid, language, 0)

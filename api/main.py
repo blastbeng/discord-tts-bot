@@ -529,12 +529,13 @@ class AudioAskClass(Resource):
       if voice is None or voice == "null" or voice == "random":
         voice = audiodb.select_voice_by_name_chatid_language(chatbot_resp.strip(), chatid, lang)
       if voice is not None:
-        tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=lang)
+        tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice=voice, language=lang)
       else:
-        tts_out = utils.get_tts(text, chatid=chatid, voice="google", language=lang)
+        tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice="google", language=lang)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.headers['X-Generated-Text'] = chatbot_resp.encode('utf-8').decode('latin-1')
+        response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+        response.headers['X-Generated-Response-Text'] = chatbot_resp.encode('utf-8').decode('latin-1')
         return response
       else:
         threading.Thread(target=lambda: utils.populate_tts(chatbot_resp, chatid=chatid, voice=voice, language=lang)).start()
