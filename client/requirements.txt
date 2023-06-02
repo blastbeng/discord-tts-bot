@@ -1,6 +1,7 @@
 discord.py[voice]
 python-dotenv
-requests-async
+requests
+aiohttp
 pytz
 psutil
 sqlalchemy==2.0.7

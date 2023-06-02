@@ -1,6 +1,7 @@
 
 import os
 import sys
+import json
 import time
 import utils
 import random
@@ -23,8 +24,8 @@ from datetime import datetime
 from typing import List
 import asyncio
 import threading
-import requests_async as requests_async
 import requests
+import aiohttp
 
 from utils import FFmpegPCMAudioBytesIO
 
@@ -62,8 +63,6 @@ class SoundBoardButton(discord.ui.Button["InteractionRoles"]):
                 if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                     await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
                 elif voice_client:
-                    if voice_client.is_playing():
-                        voice_client.stop()
                     currentguildid = get_current_guild_id(interaction.guild.id)
                     await do_play(self.audiourl, interaction, currentguildid, name = self.name)
                 else:
@@ -173,11 +172,12 @@ class SaveButton(discord.ui.Button["InteractionRoles"]):
             await interaction.response.defer(thinking=True, ephemeral=True)
             currentguildid = get_current_guild_id(interaction.guild.id)
             url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "repeat/learn/" + urllib.parse.quote(self.message) + "/" + currentguildid + "/" + utils.get_guild_language(currentguildid)
-            response = await requests_async.get(url)
-            if (response.status_code == 200 and response.text != "Internal Server Error"):
-                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),'This sentence has been saved.'), ephemeral = True)  
-            else:
-                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),'Error detected while saving this sentence.'), ephemeral = True)    
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if (response.status == 200):
+                        await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),'This sentence has been saved.'), ephemeral = True)  
+                    else:
+                        await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),'Error detected while saving this sentence.'), ephemeral = True)    
         except Exception as e:
             await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message) 
             
@@ -294,9 +294,11 @@ async def listvoices_api(language="it", filter=None):
         global fakeyou_voices
         if fakeyou_voices is None or len(fakeyou_voices) == 0 or len(fakeyou_voices) == 1:
             url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/fakeyou/listvoices/" + language
-            response = await requests_async.get(url)
-            if (response.status_code == 200):
-                fakeyou_voices = response.json()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if (response.status == 200):
+                        text = await response.text()
+                        fakeyou_voices = json.loads(text)
         if (fakeyou_voices is not None and len(fakeyou_voices) > 0):
             if filter is not None:
                 voice = None
@@ -432,37 +434,42 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
         #if defer:
         #    await interaction.response.defer(thinking=True, ephemeral = ephermeal)
             
-        response = await requests_async.get(url, timeout=60)
-        message = url
-        if "X-Generated-Text" in response.headers:
-            message = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
-        elif name is not None:
-            message = name
-        if (response is not None and response.status_code == 200 and response.content):
-            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
-            if not voice_client:
-                raise ClientException("voice_client is None")
-            if voice_client.is_playing():
-                voice_client.stop()
-                
-            voice_client.play(FFmpegPCMAudioBytesIO(response.content, pipe=True), after=lambda e: logging.info("do_play - " + message))
-            view = discord.ui.View()
-            view.add_item(PlayButton(response.content, message))
-            view.add_item(StopButton())
-            if show_save:
-                view.add_item(SaveButton(message))
-            await interaction.followup.send(message, view = view, ephemeral = ephermeal)
-        elif response.status_code == 400:
-            logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(get_current_guild_id(interaction.guild.id)))
-            message = message + "\n\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Error. Can't reproduce audio.\nThe Generated TTS is longer than the maximum limit. ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
-            await interaction.followup.send(message, ephemeral = True)
-        elif response.status_code == 406:
-            logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(get_current_guild_id(interaction.guild.id)))
-            message = utils.translate(get_current_guild_id(interaction.guild.id),"Error. The sentence contains a word that is blocked by filters.") + " ["+ str(message) +"]"
-            await interaction.followup.send(message, ephemeral = True)
-        else:
-            logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(get_current_guild_id(interaction.guild.id)))
-            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if (response.status != 200):
+                    logging.error("Initializing chatterbot on chatid " + currentguildid + " failed")
+                else:
+                    message = url
+                    if "X-Generated-Text" in response.headers:
+                        message = response.headers["X-Generated-Text"]
+                    elif name is not None:
+                        message = name
+                    if (response is not None and response.status == 200):
+                        content = await response.content.read()
+                        voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+                        if not voice_client:
+                            raise ClientException("voice_client is None")
+                        if voice_client.is_playing():
+                            voice_client.stop()
+                            
+                        voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info("do_play - " + message))
+                        view = discord.ui.View()
+                        view.add_item(PlayButton(content, message))
+                        view.add_item(StopButton())
+                        if show_save:
+                            view.add_item(SaveButton(message))
+                        await interaction.followup.send(message, view = view, ephemeral = ephermeal)
+                    elif response.status == 400:
+                        logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(get_current_guild_id(interaction.guild.id)))
+                        message = message + "\n\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Error. Can't reproduce audio.\nThe Generated TTS is longer than the maximum limit. ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
+                        await interaction.followup.send(message, ephemeral = True)
+                    elif response.status == 406:
+                        logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(get_current_guild_id(interaction.guild.id)))
+                        message = utils.translate(get_current_guild_id(interaction.guild.id),"Error. The sentence contains a word that is blocked by filters.") + " ["+ str(message) +"]"
+                        await interaction.followup.send(message, ephemeral = True)
+                    else:
+                        logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(get_current_guild_id(interaction.guild.id)))
+                        await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
     except ReadTimeout as te:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -648,11 +655,13 @@ async def on_guild_available(guild):
         utils.check_exists_guild(currentguildid)        
         lang = utils.get_guild_language(currentguildid)
         url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/init/" + urllib.parse.quote(currentguildid) + "/" + urllib.parse.quote(lang)
-        response = await requests_async.get(url)
-        if (response.status_code != 200):
-            logging.error("Initializing chatterbot on chatid " + currentguildid + " failed")
-        else:
-            logging.info(response.text)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if (response.status != 200):
+                    logging.error("Initializing chatterbot on chatid " + currentguildid + " failed")
+                else:
+                    text = await response.text()
+                    logging.info(text)
 
         await listvoices_api(language=lang, filter=None)
 
@@ -791,8 +800,6 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "googl
             if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
             elif voice_client:
-                if voice_client.is_playing():
-                    voice_client.stop()
 
                 currentguildid = get_current_guild_id(interaction.guild.id)
                 
@@ -834,8 +841,6 @@ async def wikipedia(interaction: discord.Interaction, text: str):
             if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
             elif voice_client:
-                if voice_client.is_playing():
-                    voice_client.stop()
 
                 currentguildid = get_current_guild_id(interaction.guild.id)
                 url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"search/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
@@ -850,54 +855,52 @@ async def wikipedia(interaction: discord.Interaction, text: str):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
 
 
-#@client.tree.command()
-#@app_commands.rename(text='text')
-#@app_commands.describe(text="the sentence to ask")
-#@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
-#@app_commands.rename(voice='voice')
-#@app_commands.describe(voice="The voice to use")
-#@app_commands.autocomplete(voice=rps_autocomplete)
-#@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
-#@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
-#async def ask(interaction: discord.Interaction, text: str, voice: str = "google"):
-#    """Ask something."""
-#    is_deferred=True
-#    load_message = None
-#    try:
-#        await interaction.response.defer(thinking=True, ephemeral=True)
-#        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
-#        if interaction.user.voice and interaction.user.voice.channel:
-#            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
-#            await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
-#
-#            
-#            if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
-#                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-#            elif voice_client:
-#                if voice_client.is_playing():
-#                    voice_client.stop()
-#                currentguildid = get_current_guild_id(interaction.guild.id)
-#
-#                if voice != "google":
-#                    voice = await listvoices_api(language=lang_to_use, filter=voice)
-#
-#                if voice is not None:
-#                    url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
-#                    await do_play(url, interaction, currentguildid)
-#                else:
-#                    await interaction.followup.send("Discord API Error, " + utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True) 
-#                
-#                
-#                await do_play(URL, interaction, currentguildid)
-#            else:
-#                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
-#
-#            
-#        else:
-#            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
-#        await load_message.delete()
-#    except Exception as e:
-#        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
+@client.tree.command()
+@app_commands.rename(text='text')
+@app_commands.describe(text="the sentence to ask")
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.rename(voice='voice')
+@app_commands.describe(voice="The voice to use")
+@app_commands.autocomplete(voice=rps_autocomplete)
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
+async def ask(interaction: discord.Interaction, text: str, voice: str = "google"):
+    """Ask something."""
+    is_deferred=True
+    load_message = None
+    try:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
+        if interaction.user.voice and interaction.user.voice.channel:
+            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+            await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
+
+            
+            if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
+                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
+            elif voice_client:
+                currentguildid = get_current_guild_id(interaction.guild.id)
+
+                if voice != "google":
+                    voice = await listvoices_api(language=lang_to_use, filter=voice)
+
+                if voice is not None:
+                    url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+                    await do_play(url, interaction, currentguildid)
+                else:
+                    await interaction.followup.send("Discord API Error, " + utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True) 
+                
+                
+                await do_play(URL, interaction, currentguildid)
+            else:
+                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+
+            
+        else:
+            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+        await load_message.delete()
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
 
 @client.tree.command()
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
@@ -918,17 +921,17 @@ async def generate(interaction: discord.Interaction):
             if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
             elif voice_client:
-                if voice_client.is_playing():
-                    voice_client.stop()
                 currentguildid = get_current_guild_id(interaction.guild.id)
                 url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/sentences/generate/" + urllib.parse.quote(currentguildid) + "/0"
-                response = await requests_async.get(url)
-                if (response.status_code == 200 and response.text != "Internal Server Error"):
-                    url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(response.text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
-                    await do_play(url, interaction, currentguildid, show_save=True)
-                else:
-                    logging.error("[GUILDID : %s] generate - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)))
-                    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),'Error. The generator database is still empty, try again later.\nNOTE: If you just invited the bot, this feature will be available in 12 hours if you continue to use the "speak" command.'), ephemeral = True)     
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url) as response:
+                        if (response.status == 200):
+                            text = await response.text()
+                            url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+                            await do_play(url, interaction, currentguildid, show_save=True)
+                        else:
+                            logging.error("[GUILDID : %s] generate - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)))
+                            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),'Error. The generator database is still empty, try again later.\nNOTE: If you just invited the bot, this feature will be available in 12 hours if you continue to use the "speak" command.'), ephemeral = True)     
             else:
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
         else:
@@ -956,17 +959,17 @@ async def story(interaction: discord.Interaction):
             if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
             elif voice_client:
-                if voice_client.is_playing():
-                    voice_client.stop()
                 currentguildid = get_current_guild_id(interaction.guild.id)
                 url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/paragraph/generate/" + urllib.parse.quote(currentguildid)
-                response = await requests_async.get(url)
-                if (response.status_code == 200 and response.text != "Internal Server Error"):
-                    url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(response.text))+"/google/"+urllib.parse.quote(currentguildid)
-                    await do_play(url, interaction, currentguildid)
-                else:
-                    logging.error("[GUILDID : %s] story - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)))
-                    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),'Error. The generator database is still empty, try again later.\nNOTE: If you just invited the bot, this feature will be available in 12 hours if you continue to use the "speak" command.'), ephemeral = True)         
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url) as response:
+                        if (response.status == 200):
+                            text = await response.text()
+                            url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)
+                            await do_play(url, interaction, currentguildid)
+                        else:
+                            logging.error("[GUILDID : %s] story - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)))
+                            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),'Error. The generator database is still empty, try again later.\nNOTE: If you just invited the bot, this feature will be available in 12 hours if you continue to use the "speak" command.'), ephemeral = True)         
 
             else:
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
@@ -999,8 +1002,6 @@ async def insult(interaction: discord.Interaction, member: Optional[discord.Memb
             if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
             elif voice_client:
-                if voice_client.is_playing():
-                    voice_client.stop()
                 insulturl=os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"insult"
                 if member:
                     name = None
@@ -1042,8 +1043,6 @@ async def random(interaction: discord.Interaction, voice: str = "random"):
             if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
             elif voice_client:
-                if voice_client.is_playing():
-                    voice_client.stop()
                 
                 currentguildid = get_current_guild_id(interaction.guild.id)                
 
@@ -1076,34 +1075,33 @@ async def curse(interaction: discord.Interaction):
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
         load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
-        respapi = await requests_async.get(f'http://bestemmie.org', verify=False, timeout=10)
-        if respapi.status_code != 200:
-            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Impossible to use this command") + ": API 'http://bestemmie.org' Status = OFFLINE", ephemeral = True)
-        else:
-            try:
-                currentguildid = get_current_guild_id(interaction.guild.id)
-                if utils.get_guild_nsfw(currentguildid) == 0:
-                    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"An Administrator must approve NSFW content on this server. Ask him to use the command:") + " /accept", ephemeral = True)
-                elif interaction.user.voice and interaction.user.voice.channel:
-                    voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
-                    await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
-
-                    if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
-                        await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-                    elif voice_client:
-                        if voice_client.is_playing():
-                            voice_client.stop()
-                        
-
-                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"curse/"+urllib.parse.quote(currentguildid)+ "/" + utils.get_guild_language(currentguildid)
-                        await do_play(url, interaction, currentguildid)
-                    else:
-                        await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
-
+        async with aiohttp.ClientSession() as session:
+            async with session.get('https://bestemmie.org') as response:
+                if (response.status != 200):
+                    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Impossible to use this command") + ": API 'http://bestemmie.org' Status = OFFLINE", ephemeral = True)
                 else:
-                    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
-            except Exception as e:
-                await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
+                    try:
+                        currentguildid = get_current_guild_id(interaction.guild.id)
+                        if utils.get_guild_nsfw(currentguildid) == 0:
+                            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"An Administrator must approve NSFW content on this server. Ask him to use the command:") + " /accept", ephemeral = True)
+                        elif interaction.user.voice and interaction.user.voice.channel:
+                            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+                            await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
+
+                            if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
+                                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
+                            elif voice_client:
+                                
+
+                                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"curse/"+urllib.parse.quote(currentguildid)+ "/" + utils.get_guild_language(currentguildid)
+                                await do_play(url, interaction, currentguildid)
+                            else:
+                                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+
+                        else:
+                            await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
+                    except Exception as e:
+                        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
         if load_message:
             await load_message.delete()  
     except Exception as e:
@@ -1142,14 +1140,17 @@ async def delete(interaction: discord.Interaction, text: str):
         load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         if interaction.user.guild_permissions.administrator:
             currentguildid = get_current_guild_id(interaction.guild.id)
-            response = await requests_async.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/forcedelete/bytext/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid))
-            if (response.status_code == 200):
-                await interaction.followup.send(response.text, ephemeral = True) 
-            else:
-                logging.error("[GUILDID : %s] forcedelete/bytext - Received bad response from APIs", str(currentguildid))
-                await interaction.followup.send(utils.translate(currentguildid,"Error."), ephemeral = True)     
+            async with aiohttp.ClientSession() as session:
+                async with session.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/forcedelete/bytext/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid)) as response:
+                    if (response.status == 200):
+                        text = await response.text()
+                        await interaction.followup.send(text, ephemeral = True) 
+                    else:
+                        logging.error("[GUILDID : %s] forcedelete/bytext - Received bad response from APIs", str(currentguildid))
+                        await interaction.followup.send(utils.translate(currentguildid,"Error."), ephemeral = True)     
         else:
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
+        await load_message.delete()
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=None)
 
@@ -1164,26 +1165,29 @@ async def download(interaction: discord.Interaction):
         load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         if interaction.user.guild_permissions.administrator:
             currentguildid = get_current_guild_id(interaction.guild.id)
-            response = await requests_async.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/download/sentences/" + urllib.parse.quote(currentguildid))
 
-            if (response.status_code == 200):
+            async with aiohttp.ClientSession() as session:
+                async with session.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/download/sentences/" + urllib.parse.quote(currentguildid)) as response:
+                    if (response.status == 200):
 
-                nameout = str(interaction.guild.name) + "_" + str(client.user.name)  + "_Backup_"  + datetime.now().strftime("%d%m%Y_%H%M%S") + ".txt"
+                        text = await response.text()
 
-                filepath = os.environ.get("TMP_DIR") + nameout
-                with open(filepath, 'w') as filewrite:
-                    filewrite.write(response.text)            
-                    #for line in response.text.splitlines():
-                    #    filewrite.write(line)            
-                    #    filewrite.write("\n")            
+                        nameout = str(interaction.guild.name) + "_" + str(client.user.name)  + "_Backup_"  + datetime.now().strftime("%d%m%Y_%H%M%S") + ".txt"
+
+                        filepath = os.environ.get("TMP_DIR") + nameout
+                        with open(filepath, 'w') as filewrite:
+                            filewrite.write(text)            
+                            #for line in response.text.splitlines():
+                            #    filewrite.write(line)            
+                            #    filewrite.write("\n")            
 
 
-                await interaction.followup.send("Bot Backup.", file=discord.File(filename=nameout, fp=open(filepath, "rb")), ephemeral = True) 
+                        await interaction.followup.send("Bot Backup.", file=discord.File(filename=nameout, fp=open(filepath, "rb")), ephemeral = True) 
 
-                os.remove(filepath)
-            else:
-                logging.error("[GUILDID : %s] download/sentences - Received bad response from APIs", str(currentguildid))
-                await interaction.followup.send(utils.translate(currentguildid,"Error."), ephemeral = True)     
+                        os.remove(filepath)
+                    else:
+                        logging.error("[GUILDID : %s] download/sentences - Received bad response from APIs", str(currentguildid))
+                        await interaction.followup.send(utils.translate(currentguildid,"Error."), ephemeral = True)     
         else:
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
         await load_message.delete()
@@ -1275,7 +1279,6 @@ async def language(interaction: discord.Interaction, language: app_commands.Choi
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         currentguildid = get_current_guild_id(interaction.guild.id)
         if interaction.user.guild_permissions.administrator:
 
@@ -1311,8 +1314,6 @@ async def translate(interaction: discord.Interaction, text: str, language_to: ap
             if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
             elif voice_client:
-                if voice_client.is_playing():
-                    voice_client.stop()
 
                 currentguildid = get_current_guild_id(interaction.guild.id)
 
@@ -1322,14 +1323,17 @@ async def translate(interaction: discord.Interaction, text: str, language_to: ap
                 else:
                     lang_to_use_from = utils.get_guild_language(currentguildid)
 
-                translation = await requests_async.get(os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "translate/" + urllib.parse.quote(lang_to_use_from) + "/" + urllib.parse.quote(language_to.value) + "/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid))
-                if (translation.text != "Internal Server Error" and translation.status_code == 200):
-                    translated_text = translation.text
-                    url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(translated_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(language_to.value)
-                    await do_play(url, interaction, currentguildid)
-                else:
-                    logging.error("[GUILDID : %s] translate - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)))
-                    await interaction.followup.send("API Timeout, " + utils.translate(currentguildid,"please try again later"), ephemeral = True)
+                
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "translate/" + urllib.parse.quote(lang_to_use_from) + "/" + urllib.parse.quote(language_to.value) + "/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid)) as response:
+                        if (response.status == 200):
+                            translated_text = await response.text()
+                            url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(translated_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(language_to.value)
+                            await do_play(url, interaction, currentguildid)
+                        else:
+                            logging.error("[GUILDID : %s] translate - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)))
+                            await interaction.followup.send("API Timeout, " + utils.translate(currentguildid,"please try again later"), ephemeral = True)
                 
                     
                 
@@ -1361,8 +1365,6 @@ async def youtube(interaction: discord.Interaction, url: str):
             if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
             elif voice_client:
-                if voice_client.is_playing():
-                    voice_client.stop()
 
                 if "watch?v=" in url:
                     currentguildid = get_current_guild_id(interaction.guild.id)
@@ -1466,21 +1468,22 @@ async def soundrandom(interaction: discord.Interaction, text: Optional[str] = "r
             if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
             elif voice_client:
-                if voice_client.is_playing():
-                    voice_client.stop()
                 currentguildid = get_current_guild_id(interaction.guild.id)
 
                 url = os.environ.get("API_URL") + os.environ.get("API_PATH_SOUNDBOARD") + "/random/" + urllib.parse.quote(str(text)) + "/" + urllib.parse.quote(currentguildid)
-                response = await requests_async.get(url)
-                if (response.status_code == 200 and response.json()):
-                    name = response.json()['name']
-                    url = response.json()['url']
-                    await do_play(url, interaction, currentguildid, name=name)
-                else:
-                    if text == "random":
-                        await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results "), ephemeral = True)   
-                    else:
-                        await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results ") + " [" + text + "]", ephemeral = True)     
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url) as response:
+                        if (response.status == 200):
+                            text = await response.text()
+                            json_object = json.loads(text)
+                            name = json_object['name']
+                            url = json_object['url']
+                            await do_play(url, interaction, currentguildid, name=name)
+                        else:
+                            if text == "random":
+                                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results "), ephemeral = True)   
+                            else:
+                                await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results ") + " [" + text + "]", ephemeral = True)     
             else:
                 await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
         else:
@@ -1510,23 +1513,24 @@ async def soundsearch(interaction: discord.Interaction, text: Optional[str] = "r
             #    await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
             #elif not voice_client.is_playing():
             currentguildid = get_current_guild_id(interaction.guild.id)
-
-            await interaction.response.defer(thinking=True, ephemeral = True)
             is_deferred=True            
             url = os.environ.get("API_URL") + os.environ.get("API_PATH_SOUNDBOARD") + "/query/" + urllib.parse.quote(str(text)) + "/" + urllib.parse.quote(currentguildid)
-            response = await requests_async.get(url)
-            if (response.status_code == 200 and response.text != "Internal Server Error"):
-                view = discord.ui.View()
-                for element in response.json():
-                    button = SoundBoardButton(element['name'], element['url'])
-                    view.add_item(button)
-                await interaction.followup.send(text, view=view, ephemeral = True)   
-            else:
-                logging.error("[GUILDID : %s] soundboard - Received bad response from APIs", currentguildid)
-                if text == "random":
-                    await interaction.followup.send(utils.translate(currentguildid,"I haven't found any results "), ephemeral = True)   
-                else:
-                    await interaction.followup.send(utils.translate(currentguildid,"I haven't found any results ") + " [" + text + "]", ephemeral = True)   
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if (response.status == 200):
+                        text_resp = await response.text()
+                        json_object = json.loads(text_resp)
+                        view = discord.ui.View()
+                        for element in json_object:
+                            button = SoundBoardButton(element['name'], element['url'])
+                            view.add_item(button)
+                        await interaction.followup.send(text, view=view, ephemeral = True)   
+                    else:
+                        logging.error("[GUILDID : %s] soundboard - Received bad response from APIs", currentguildid)
+                        if text == "random":
+                            await interaction.followup.send(utils.translate(currentguildid,"I haven't found any results "), ephemeral = True)   
+                        else:
+                            await interaction.followup.send(utils.translate(currentguildid,"I haven't found any results ") + " [" + text + "]", ephemeral = True)   
         else:
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"You must be connected to a voice channel to use this command"), ephemeral = True)
         await load_message.delete()
@@ -1542,7 +1546,6 @@ async def commands(interaction: discord.Interaction):
     load_message = None
     try:     
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         view = discord.ui.View()
         view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.DISCLAIMER))
         view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.CURSE))
@@ -1580,7 +1583,6 @@ async def commands(interaction: discord.Interaction):
         message = utils.translate(get_current_guild_id(interaction.guild.id),"To show the bot's admin commands use") + "  /admin"
 
         await interaction.followup.send(message, view = view, ephemeral = False)
-        await load_message.delete()
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
 
@@ -1593,7 +1595,6 @@ async def admin(interaction: discord.Interaction):
     load_message = None
     try:     
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         if interaction.user.guild_permissions.administrator:
 
             view = discord.ui.View()
@@ -1612,7 +1613,6 @@ async def admin(interaction: discord.Interaction):
      
         else:
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)    
-        await load_message.delete()
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
 
@@ -1660,10 +1660,8 @@ async def disclaimer(interaction: discord.Interaction):
 async def train(interaction: discord.Interaction, file: discord.Attachment):
     """Train the Bot using a sentences file."""
     is_deferred=True
-    load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         currentguildid = get_current_guild_id(interaction.guild.id)
         if not utils.allowed_file(file.filename):
             await interaction.followup.send(utils.translate(currentguildid,"Please upload a valid text file.") + " (.txt)", ephemeral = True)     
@@ -1683,7 +1681,7 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
                     for l in f:
                         logging.info("[GUILDID : %s] upload/trainfile/txt - Found line: " + l)
 
-                response = await requests_async.post(url, data=form_data, files={"trainfile": open(filepath, "rb")})
+                response = requests.post(url, data=form_data, files={"trainfile": open(filepath, "rb")})
 
                 if (response.status_code == 200):
                     await interaction.followup.send(utils.translate(currentguildid,"Done."), ephemeral = True) 
@@ -1701,7 +1699,6 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
                 await interaction.followup.send(utils.translate(currentguildid,"Please upload a valid text file.") + " (.txt)", ephemeral = True)   
 
             os.remove(filepath)   
-        await load_message.delete()
 
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
@@ -1719,18 +1716,18 @@ async def block(interaction: discord.Interaction, word: str):
     load_message = None
     try:        
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         currentguildid = get_current_guild_id(interaction.guild.id)
         url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/filters/addword/" + urllib.parse.quote(word) +"/"+urllib.parse.quote(currentguildid)
 
-        response = await requests_async.get(url)
-        if (response.status_code == 200):
-            await interaction.followup.send(utils.translate(currentguildid,"Word added to the blacklist") + " ["+word+"]", ephemeral = True)
-        else:
-            logging.error("[GUILDID : %s] block - Received bad response from APIs [word:%s]", str(currentguildid), word)
-            await interaction.followup.send("API Timeout, " + utils.translate(currentguildid,"please try again later"), ephemeral = True)
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if (response.status == 200):
+                    await interaction.followup.send(utils.translate(currentguildid,"Word added to the blacklist") + " ["+word+"]", ephemeral = True)
+                else:
+                    logging.error("[GUILDID : %s] block - Received bad response from APIs [word:%s]", str(currentguildid), word)
+                    await interaction.followup.send("API Timeout, " + utils.translate(currentguildid,"please try again later"), ephemeral = True)
 
-        await load_message.delete()
             
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
@@ -1747,18 +1744,18 @@ async def unblock(interaction: discord.Interaction, word: str):
     load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         currentguildid = get_current_guild_id(interaction.guild.id)
         url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/filters/deleteword/" + urllib.parse.quote(word) +"/"+urllib.parse.quote(currentguildid)
 
-        response = await requests_async.get(url)
-        if (response.status_code == 200):
-            await interaction.followup.send(utils.translate(currentguildid,"Word removed from blacklist") + " ["+word+"]", ephemeral = True)
-        else:
-            logging.error("[GUILDID : %s] unblock - Received bad response from APIs [word:%s]", str(currentguildid), word)
-            await interaction.followup.send("API Timeout, " + utils.translate(currentguildid,"please try again later"), ephemeral = True)
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if (response.status == 200):
+                    await interaction.followup.send(utils.translate(currentguildid,"Word removed from blacklist") + " ["+word+"]", ephemeral = True)
+                else:
+                    logging.error("[GUILDID : %s] unblock - Received bad response from APIs [word:%s]", str(currentguildid), word)
+                    await interaction.followup.send("API Timeout, " + utils.translate(currentguildid,"please try again later"), ephemeral = True)
 
-        await load_message.delete()
             
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
@@ -1770,24 +1767,22 @@ async def unblock(interaction: discord.Interaction, word: str):
 async def unblockall(interaction: discord.Interaction):
     """Remove all the words from the blacklist"""
     is_deferred=True
-    load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
         if interaction.user.guild_permissions.administrator:
             currentguildid = get_current_guild_id(interaction.guild.id)
             url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/filters/deleteall/" +urllib.parse.quote(currentguildid)
 
-            response = await requests_async.get(url)
-            if (response.status_code == 200):
-                await interaction.followup.send(utils.translate(currentguildid,"All the words removed from blacklist"), ephemeral = True)
-            else:
-                logging.error("[GUILDID : %s] unblockall - Received bad response from APIs", str(currentguildid))
-                await interaction.followup.send("API Timeout, " + utils.translate(currentguildid,"please try again later"), ephemeral = True)
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if (response.status == 200):
+                        await interaction.followup.send(utils.translate(currentguildid,"All the words removed from blacklist"), ephemeral = True)
+                    else:
+                        logging.error("[GUILDID : %s] unblockall - Received bad response from APIs", str(currentguildid))
+                        await interaction.followup.send("API Timeout, " + utils.translate(currentguildid,"please try again later"), ephemeral = True)
         else:        
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
             
-        await load_message.delete()
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
 
@@ -1798,7 +1793,6 @@ async def unblockall(interaction: discord.Interaction):
 async def reset(interaction: discord.Interaction):
     """Resets the bot database"""
     is_deferred=True
-    load_message = None
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
         load_message = await display_loader(interaction, get_current_guild_id(interaction.guild.id))
@@ -1806,16 +1800,16 @@ async def reset(interaction: discord.Interaction):
             currentguildid = get_current_guild_id(interaction.guild.id)
             url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/reset/" +urllib.parse.quote(currentguildid)
 
-            response = await requests_async.get(url)
-            if (response.status_code == 200):
-                await interaction.followup.send(utils.translate(currentguildid,"All the sentences saved in the bot's database have been deleted"), ephemeral = True)
-            else:
-                logging.error("[GUILDID : %s] reset - Received bad response from APIs", str(currentguildid))
-                await interaction.followup.send("API Timeout, " + utils.translate(currentguildid,"please try again later"), ephemeral = True)
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if (response.status == 200):
+                        await interaction.followup.send(utils.translate(currentguildid,"All the sentences saved in the bot's database have been deleted"), ephemeral = True)
+                    else:
+                        logging.error("[GUILDID : %s] reset - Received bad response from APIs", str(currentguildid))
+                        await interaction.followup.send("API Timeout, " + utils.translate(currentguildid,"please try again later"), ephemeral = True)
         else:        
             await interaction.followup.send(utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
             
-        await load_message.delete()
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred, load_message=load_message)
 
