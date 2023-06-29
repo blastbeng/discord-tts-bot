@@ -146,3 +146,4 @@ config_old/
 rclone.conf.sample
 backups/
 backups
+rclone/rclone.conf

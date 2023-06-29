@@ -451,7 +451,9 @@ def clean_duplicates(chatid: str):
     sqlite_delete_query = """DELETE FROM statement
                              WHERE EXISTS (
                                SELECT 1 FROM statement s2
-                               WHERE statement.text = s2.text
+                               WHERE (statement.text = s2.text 
+                                  OR statement.text = SUBSTR(s2.text, 1,LENGTH(s2.text)-1)
+                                  OR s2.text = SUBSTR(statement.text, 1,LENGTH(statement.text)-1))
                                AND statement.id > s2.id
                              );"""
     
@@ -673,7 +675,7 @@ def list_fakeyou_voices(lang:str):
       foundvoices = {}
 
 
-      inclusion_file_path = "./config/voices_inclusions_"+lang+".json"
+      inclusion_file_path = "./config-external/voices_inclusions_"+lang+".json"
 
       if os.path.exists(inclusion_file_path):
         with open(inclusion_file_path) as inclusion_file:

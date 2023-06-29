@@ -401,7 +401,6 @@ class AudioCurseClass(Resource):
 
 @nsaudio.route('/download/<int:id>')
 class AudioDownloadClass(Resource):
-  @cache.cached(timeout=7200, query_string=True)
   def get (self, id: int):
     try:
       tts_out = utils.download_tts(id)

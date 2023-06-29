@@ -22,7 +22,7 @@ services:
     restart: "no"
     volumes:
       - ".env:/app/.env"
-      - "./config:/app/config"
+      - "config:/app/config"
       - "./backups:/app/backups"
       - "./config:/app/config-external"
       - "/tmp/discord-tts-bot-api:/tmp/discord-tts-bot-api"
@@ -50,11 +50,25 @@ services:
         condition: service_healthy
     volumes:
       - ".env:/app/.env"
-      - "./config:/app/config"
+      - "config:/app/config"
       - "/tmp/discord-tts-bot-api:/tmp/discord-tts-bot-api"
       - "/tmp/discord-tts-bot-discord:/tmp/discord-tts-bot-discord"
     image: "blastbeng/discord-tts-bot-client:1.0.0"
     restart: "no"
 
 volumes:
+  config:
+    driver: rclone:latest
+    driver_opts:
+      type: 'crypt'
+      crypt_remote: 'configs:/'
+      crypt_password: '1VUs3LgZMGn0inTE2tE_5w'
+      allow_other: 'true'
+      vfs-cache-mode: 'writes'
+      vfs-cache-max-age: '1m'
+      vfs-cache-poll-interval: '10s'
+      vfs-write-back: '1s'
+      dir-cache-time: '1m'
+      buffer-size: '32M'
+      poll_interval: '10s'
   redisdata:

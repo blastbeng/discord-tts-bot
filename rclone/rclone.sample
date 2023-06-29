@@ -1,0 +1,7 @@
+[local]
+type = local
+
+[configs]
+type = crypt
+remote = local:/opt/docker/compose/discord-tts-bot/config_crypted
+password = PASSWORD_TEMPLATE
