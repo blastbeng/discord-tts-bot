@@ -424,13 +424,17 @@ class AudioDownloadClass(Resource):
 @nsaudio.route('/random/<string:voice>/<string:chatid>/<string:lang>/')
 @nsaudio.route('/random/<string:voice>/<string:chatid>/<string:lang>/<string:text>')
 class AudioRandomClass(Resource):
-  @cache.cached(timeout=5, query_string=True)
+  @cache.cached(timeout=1, query_string=True)
   def get (self, voice = "random", chatid = "000000", lang = "it", text = None):
     try:
-      tts_out, text = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang,text)
-      if tts_out is not None:
+      tts_out, text_response = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang,text)
+      if not text_response:
+          response = make_response("Audio not found", 204)
+          response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+          return response
+      elif tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+        response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
         return response
       if tts_out is None:
         @after_this_request

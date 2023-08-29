@@ -466,7 +466,7 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
         connector = aiohttp.TCPConnector(force_close=True)
         async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(url) as response:
-                message = url
+                message = ""
                 if "X-Generated-Text" in response.headers:
                     message = response.headers["X-Generated-Text"]
                 elif name is not None:
@@ -491,6 +491,10 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
                     if "X-Generated-Response-Text" in response.headers:
                         message = "*/ask " + message + "*" + "\n\n" + response.headers["X-Generated-Response-Text"]
                     await interaction.followup.send(message, view = view, ephemeral = ephermeal)
+                elif response.status == 204:
+                    logging.error("[GUILDID : %s] do_play - Audio not found", str(get_current_guild_id(interaction.guild.id)))
+                    message = message + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Nothing found for the selected text. Please try to search something else.")
+                    await interaction.followup.send(message, ephemeral = True)
                 elif response.status == 400:
                     logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(get_current_guild_id(interaction.guild.id)))
                     message = message + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Error. Can't reproduce audio.\nThe Generated TTS is longer than the maximum limit. ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")

@@ -425,6 +425,8 @@ def select_by_chatid_voice_language_random(chatid: str, voice:str, language:str,
       cursor.execute(sqlite_select_query, params)
       records = cursor.fetchall()
 
+      name = False
+
       for row in records:
         data = row[0]
         duration = row[2]
