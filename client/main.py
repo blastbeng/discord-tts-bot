@@ -492,8 +492,8 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
                         message = "*/ask " + message + "*" + "\n\n" + response.headers["X-Generated-Response-Text"]
                     await interaction.followup.send(message, view = view, ephemeral = ephermeal)
                 elif response.status == 204:
-                    logging.error("[GUILDID : %s] do_play - Audio not found", str(get_current_guild_id(interaction.guild.id)))
-                    message = message + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Nothing found for the selected text. Please try to search something else.")
+                    logging.info("[GUILDID : %s] do_play - Audio not found", str(get_current_guild_id(interaction.guild.id)))
+                    message = await utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any audio for this text: " + message + ".")
                     await interaction.followup.send(message, ephemeral = True)
                 elif response.status == 400:
                     logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(get_current_guild_id(interaction.guild.id)))
