@@ -399,7 +399,7 @@ def select_distinct_language_by_name_chatid(name: str, chatid: str):
         sqliteConnection.close()
     return lang
 
-def select_by_chatid_voice_language_random(chatid: str, voice:str, language:str):
+def select_by_chatid_voice_language_random(chatid: str, voice:str, language:str, text:str):
   if chatid == "X":
     return None
   else:
@@ -409,15 +409,18 @@ def select_by_chatid_voice_language_random(chatid: str, voice:str, language:str)
       sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
       cursor = sqliteConnection.cursor()
 
-      sqlite_select_query=""
+      sqlite_select_query="SELECT data, name, duration from Audio WHERE chatid = ? AND language = ? AND is_correct = 1 AND counter > 0 and data is not null"
       params=None
+      params=(chatid,language,)
 
-      if voice == "random":
-        sqlite_select_query = """SELECT data, name, duration from Audio WHERE chatid = ? AND language = ? AND is_correct = 1 AND counter > 0 and data is not null ORDER BY RANDOM() LIMIT 1; """
-        params=(chatid,language,)
-      else:
-        sqlite_select_query = """SELECT data, name, duration from Audio WHERE chatid = ? AND language = ? and voice = ? AND is_correct = 1 AND counter > 0 and data is not null ORDER BY RANDOM() LIMIT 1; """
+      if voice != "random":
+        sqlite_select_query = sqlite_select_query + " and voice = ?"
         params=(chatid,language,voice,)
+
+      if text is None:
+        sqlite_select_query = sqlite_select_query + " ORDER BY RANDOM() LIMIT 1;"
+      elif text is not None:
+        sqlite_select_query = sqlite_select_query + " and (name like '" + text + "%' OR name like '%" + text + "' OR name LIKE '%" + text + "%' OR name = '" + text + "') COLLATE NOCASE ORDER BY RANDOM() LIMIT 1;"
 
       cursor.execute(sqlite_select_query, params)
       records = cursor.fetchall()

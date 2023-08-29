@@ -6,6 +6,6 @@ RUN apt-get update && \
 ENV NGINX_MAX_UPLOAD 0
 ENV NGINX_WORKER_PROCESSES 1
 
-COPY nginx/balancer /etc/nginx/sites-available/default
+COPY exposer/exposer /etc/nginx/sites-available/default
 
 CMD ["nginx", "-g", "daemon off;"]

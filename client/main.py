@@ -679,8 +679,8 @@ async def on_guild_available(guild):
         currentguildid = get_current_guild_id(str(guild.id))
         
         loops_dict[guild.id] = PlayAudioLoop(guild.id)
-        #if currentguildid == "000000":
-        #    loops_dict[guild.id].play_audio_loop.start()
+        if currentguildid == "000000":
+            loops_dict[guild.id].play_audio_loop.start()
 
         populator_loops_dict[guild.id] = PopulatorLoop(guild.id)
         populator_loops_dict[guild.id].populator_loop.start()
@@ -1040,8 +1040,10 @@ async def insult(interaction: discord.Interaction, member: Optional[discord.Memb
 @app_commands.rename(voice='voice')
 @app_commands.describe(voice="The voice to use")
 @app_commands.autocomplete(voice=rps_autocomplete)
+@app_commands.rename(text='text')
+@app_commands.describe(text="The text to searcg")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
-async def random(interaction: discord.Interaction, voice: str = "random"):
+async def random(interaction: discord.Interaction, voice: str = "random", text: str = ""):
     """Say a random sentence"""
     is_deferred=True
     try:
@@ -1061,7 +1063,9 @@ async def random(interaction: discord.Interaction, voice: str = "random"):
                 voice = await listvoices_api(language=utils.get_guild_language(currentguildid), filter=voice)
 
             if voice is not None:
-                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + utils.get_guild_language(currentguildid)
+                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid)
+                if text != "":
+                    url = url + "/" + text
                 await do_play(url, interaction, currentguildid)
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)

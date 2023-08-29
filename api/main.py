@@ -136,11 +136,10 @@ class TextCurseClass(Resource):
       return get_response_str(LibreTranslator(from_lang="it", to_lang=lang, base_url=os.environ.get("TRANSLATOR_BASEURL")).translate(cursez))
 
 
-
+@limiter.limit("1/second")
 @nstext.route('/random/')
 @nstext.route('/random/<string:chatid>')
 class TextRandomClass(Resource):
-  @cache.cached(timeout=2, query_string=True)
   def get (self, chatid = "000000"):
     response = get_response_str(utils.get_random_from_bot(chatid))
     return response
@@ -422,12 +421,13 @@ class AudioDownloadClass(Resource):
 @nsaudio.route('/random/')
 @nsaudio.route('/random/<string:voice>/')
 @nsaudio.route('/random/<string:voice>/<string:chatid>/')
-@nsaudio.route('/random/<string:voice>/<string:chatid>/<string:lang>')
+@nsaudio.route('/random/<string:voice>/<string:chatid>/<string:lang>/')
+@nsaudio.route('/random/<string:voice>/<string:chatid>/<string:lang>/<string:text>')
 class AudioRandomClass(Resource):
   @cache.cached(timeout=5, query_string=True)
-  def get (self, voice = "random", chatid = "000000", lang = "it"):
+  def get (self, voice = "random", chatid = "000000", lang = "it", text = None):
     try:
-      tts_out, text = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang)
+      tts_out, text = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang,text)
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
