@@ -1045,7 +1045,7 @@ async def insult(interaction: discord.Interaction, member: Optional[discord.Memb
 @app_commands.describe(voice="The voice to use")
 @app_commands.autocomplete(voice=rps_autocomplete)
 @app_commands.rename(text='text')
-@app_commands.describe(text="The text to searcg")
+@app_commands.describe(text="The text to search")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def random(interaction: discord.Interaction, voice: str = "random", text: str = ""):
     """Say a random sentence"""
