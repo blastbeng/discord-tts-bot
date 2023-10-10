@@ -138,11 +138,17 @@ class TextCurseClass(Resource):
 
 @limiter.limit("1/second")
 @nstext.route('/random/')
-@nstext.route('/random/<string:chatid>')
+@nstext.route('/random/<string:chatid>/')
+@nstext.route('/random/<string:chatid>/<string:text>')
 class TextRandomClass(Resource):
-  def get (self, chatid = "000000"):
-    response = get_response_str(utils.get_random_from_bot(chatid))
-    return response
+  def get (self, chatid = "000000", text = None):
+    sentence = utils.get_random_from_bot(chatid, text)
+    if sentence is not None:
+      return get_response_str(sentence)
+    else:
+      response = make_response("Text not found", 204)
+      response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+      return response
 
 @nstext.route('/repeat/learn/<string:text>/')
 @nstext.route('/repeat/learn/<string:text>/<string:chatid>/')
@@ -451,14 +457,15 @@ class AudioRandomClass(Resource):
 
 @nsaudio.route('/repeat/learn/<string:text>/<string:voice>/')
 @nsaudio.route('/repeat/learn/<string:text>/<string:voice>/<string:chatid>/')
-@nsaudio.route('/repeat/learn/<string:text>/<string:voice>/<string:chatid>/<string:lang>')
+@nsaudio.route('/repeat/learn/<string:text>/<string:voice>/<string:chatid>/<string:lang>/')
+@nsaudio.route('/repeat/learn/<string:text>/<string:voice>/<string:chatid>/<string:lang>/<string:filename>')
 class AudioRepeatLearnClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, text: str, voice: str, chatid = "000000", lang = "it"):
+  def get (self, text: str, voice: str, chatid = "000000", lang = "it", filename = "audio.mp3"):
     try:
       tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=lang)
       if tts_out is not None:
-        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        response = send_file(tts_out, attachment_filename=filename, mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
         chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
         daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))

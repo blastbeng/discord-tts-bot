@@ -723,14 +723,17 @@ def list_fakeyou_voices(lang:str):
     list_fakeyou_voices.cache_clear()
     raise Exception(e)
 
-def get_random_from_bot(chatid: str):
+def get_random_from_bot(chatid: str, text: str):
   try:
     dbfile=chatid+"-db.sqlite3"
     sqliteConnection = sqlite3.connect('./config/'+dbfile)
     cursor = sqliteConnection.cursor()
 
     
-    sqlite_select_sentences_query = """SELECT text FROM statement ORDER BY RANDOM() LIMIT 1;"""
+    sqlite_select_sentences_query = "SELECT text FROM statement "
+    if text is not None:
+      sqlite_select_sentences_query = sqlite_select_sentences_query + " where (text like '" + text + "%' OR text like '%" + text + "' OR text LIKE '%" + text + "%' OR text = '" + text + "') COLLATE NOCASE "
+    sqlite_select_sentences_query = sqlite_select_sentences_query + " ORDER BY RANDOM() LIMIT 1;"
 
     data = ()
 
@@ -738,6 +741,8 @@ def get_random_from_bot(chatid: str):
     records = cursor.fetchall()
 
     count = 0
+
+    sentence = None
 
     for row in records:
       sentence = row[0]

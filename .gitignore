@@ -147,3 +147,4 @@ rclone.conf.sample
 backups/
 backups
 rclone/rclone.conf
+wwebjs_auth
