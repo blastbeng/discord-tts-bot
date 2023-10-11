@@ -86,7 +86,7 @@ services:
     volumes:
       - "/tmp/discord-tts-bot-api:/tmp/discord-tts-bot-api"
       - "./config.json:/usr/src/app/config.json"
-      - "./config/whatsapp:/app/config/whatsapp"
+      - "./config/wacache:/app/config/wacache"
     image: "blastbeng/discord-tts-bot-whatsapp:1.0.0"
     restart: "no"
     depends_on:
