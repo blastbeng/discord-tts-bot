@@ -36,25 +36,45 @@ services:
       timeout: 5s
       retries: 12
     network_mode: host
-  discord-tts-bot-client:
+  discord-tts-bot-webapp:
     build:
-      context: ./client
-      dockerfile: Dockerfile.client
-    container_name: discord-tts-bot-client
+      context: ./webapp
+      dockerfile: Dockerfile.webapp
+    container_name: discord-tts-bot-webapp
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Rome
+    ports:
+      - "5084:5084"
     depends_on:
       discord-tts-bot-api:
         condition: service_healthy
     volumes:
       - ".env:/app/.env"
       - "./config:/app/config"
-      - "/tmp/discord-tts-bot-api:/tmp/discord-tts-bot-api"
-      - "/tmp/discord-tts-bot-discord:/tmp/discord-tts-bot-discord"
-    image: "blastbeng/discord-tts-bot-client:1.0.0"
+    image: "blastbeng/discord-tts-bot-webapp:1.0.0"
     restart: "no"
+  discord-tts-bot-whatsapp:
+    build:
+      context: ./whatsapp
+      dockerfile: Dockerfile
+    container_name: discord-tts-bot-whatsapp
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Rome
+    ports:
+      - "8967:8967"
+    volumes:
+      - "/tmp/discord-tts-bot-api:/tmp/discord-tts-bot-api"
+      - "./config.json:/usr/src/app/config.json"
+      - "./config/wacache:/usr/src/app/config/wacache"
+    image: "blastbeng/discord-tts-bot-whatsapp:1.0.0"
+    restart: "no"
+    depends_on:
+      discord-tts-bot-api:
+        condition: service_healthy
 
 volumes:
   redisdata:

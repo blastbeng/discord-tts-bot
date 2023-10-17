@@ -32,6 +32,12 @@ load_dotenv(dotenv_path)
 
 GUILD_ID = discord.Object(id=os.environ.get("GUILD_ID"))
 
+class TrackUser:
+    def __init__(self, name, guildid, whatsapp):
+        self.name = name
+        self.guildid = guildid
+        self.whatsapp = whatsapp
+
 class MyClient(discord.AutoShardedClient):
     def __init__(self, *, intents: discord.Intents):
         super().__init__(intents=intents)
@@ -123,8 +129,10 @@ class SlashCommandButton(discord.ui.Button["InteractionRoles"]):
                 await interaction.followup.send("/disclaimer -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"Show disclaimer"), ephemeral = True)
             elif self.name == constants.TRAIN:
                 await interaction.followup.send("/train <file> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot inserts in its database the sentencess present in the TXT file"), ephemeral = True)
-            #elif self.name == constants.VOLUME:
-            #    await interaction.followup.send("/volume <volume> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot changes its audio volume"), ephemeral = True)
+            elif self.name == constants.TRACKUSER:
+                await interaction.followup.send("/trackuser <member> <notify_whatsapp?> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot tracks a user"), ephemeral = True)
+            elif self.name == constants.UNTRACKALL:
+                await interaction.followup.send("/untrackall -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"Untrack all users"), ephemeral = True)
             elif self.name == constants.WIKIPEDIA:
                 await interaction.followup.send("/wikipedia <text> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot searches something on wikipedia"), ephemeral = True)
             elif self.name == constants.BLOCK:
@@ -204,7 +212,7 @@ class PlayButton(discord.ui.Button["InteractionRoles"]):
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
             voice_client.play(FFmpegPCMAudioBytesIO(self.content, pipe=True), after=lambda e: logging.info("do_play - " + self.message))
-            voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
+            #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
             await interaction.followup.send(self.message, ephemeral = True)
                 
         except Exception as e:
@@ -259,7 +267,7 @@ class DeclineButton(discord.ui.Button["InteractionRoles"]):
             await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 
-intents = discord.Intents.default()
+intents = discord.Intents.all()
 client = MyClient(intents=intents)
 
 
@@ -282,6 +290,8 @@ populator_loops_dict = {}
 generator_loops_dict = {}
 cvc_loops_dict = {}
 fakeyou_voices = {}
+
+track_users_dict = {}
 
 #async def display_loader(interaction, currentguildid, additional_msg=None):
 #    with open('loading.gif', 'rb') as f:
@@ -352,6 +362,16 @@ def get_languages_menu():
 
 optionslanguages = get_languages_menu()
 
+def get_true_false_menu():
+
+    options = []    
+    options.append(app_commands.Choice(name="False", value="0"))
+    options.append(app_commands.Choice(name="True",  value="1"))
+
+    return options
+
+truefalsemenu = get_true_false_menu()
+
 async def send_error(e, interaction, from_generic=False, is_deferred=False):
     currentguildid=get_current_guild_id(interaction.guild.id)
     if isinstance(e, app_commands.CommandOnCooldown):
@@ -413,6 +433,14 @@ def get_voice_client_by_guildid(voice_clients, guildid):
         if vc.guild.id == guildid:
             return vc
     return None
+
+def check_permissions_nochannel(interaction):
+    if not interaction.user.voice or not interaction.user.voice.channel:
+        raise NoChannelError("NO CHANNEL ERROR - User [" + str(interaction.user.name) + "] tried to use a command without being connected to a voice channel")
+
+    perms = interaction.user.voice.channel.permissions_for(interaction.user.voice.channel.guild.me)
+    if (not perms.speak):
+        raise PermissionError("PERMISSION ERROR - User [" + str(interaction.user.name) + "] tried to use a command in a disabled voice channel")
 
 def check_permissions(interaction):
     if not interaction.user.voice or not interaction.user.voice.channel:
@@ -480,7 +508,7 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
                         voice_client.stop()
                         
                     voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info("do_play - " + message))
-                    voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
+                    #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
 
                     view = discord.ui.View()
                     view.add_item(PlayButton(content, message))
@@ -532,7 +560,7 @@ class PlayAudioLoop:
             if guild.id == guildid:
                 self.guild = guild
 
-    @tasks.loop(seconds=600)
+    @tasks.loop(seconds=180)
     async def play_audio_loop(self):
         try:
             currentguildid = get_current_guild_id(str(self.guild.id))
@@ -562,7 +590,7 @@ class PlayAudioLoop:
                                 text = response.headers["X-Generated-Text"]
                                 message = 'play_audio_loop - random - ' + text
                                 voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info(message))
-                                voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
+                                #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
                         await session.close()  
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -719,6 +747,43 @@ async def on_guild_available(guild):
         client.tree.copy_global_to(guild=guild)
         await client.tree.sync(guild=guild)
         logging.info(f'Syncing commands to Guild (ID: {guild.id}) (NAME: {guild.name})')
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+@client.event
+async def on_presence_update(before, after):
+    try:
+        currentguildid = get_current_guild_id(str(after.guild.id))
+        #logging.info("[GUILDID : %s] on_presence_update -> member [ " + str(after.name) + "]", str(currentguildid))
+        #logging.info("[GUILDID : %s] on_presence_update -> status [ from " + str(before.status) + " to " + str(after.status)  + "]", str(currentguildid))
+        if after.id in track_users_dict:
+            if before is not None and after is not None and before.status is not None and after.status is not None and str(before.status).lower() == "offline" and str(after.status).lower() != str(before.status).lower():
+                tracked_user = track_users_dict[after.id]
+                if tracked_user.guildid == "000000":
+                    name = ""   
+                    if after.nick is not None:
+                        name = str(after.nick)
+                    else:
+                        name = str(after.name)      
+                    updatemessage = name + " ha appena cambiato stato da " + str(before.status) + " a " + str(after.status) + "." 
+
+                    channel = client.get_channel(int(os.environ.get("MAIN_CHANNEL_ID")))
+                    await channel.send(updatemessage)
+
+                    updatemessage_wapp = "Discord Tracking: " + updatemessage    
+                    if tracked_user.whatsapp == "1":     
+                        url = "http://" + os.environ.get("WHATSAPP_HOST") + ":" + os.environ.get("WHATSAPP_PORT") + "/message/" + os.environ.get("WHATSAPP_CHATID") + "/" + urllib.parse.quote(updatemessage_wapp)
+
+                        connector = aiohttp.TCPConnector(force_close=True)
+
+                        async with aiohttp.ClientSession(connector=connector) as session:
+                            async with session.get(url) as response:
+                                if (response.status != 200):
+                                    logging.error("[GUILDID : %s] on_presence_update -> reset - Received bad response from APIs", str(guild.id))
+                            await session.close()  
+
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -1129,10 +1194,10 @@ async def restart(interaction: discord.Interaction):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        check_permissions_nochannel(interaction)
         if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")) and str(interaction.user.id) == str(os.environ.get("ADMIN_ID")):
             if interaction.user.guild_permissions.administrator:
-                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Restarting bot."), ephemeral = True)
+                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I am restarting the bot."), ephemeral = True)
                 os.execv(sys.executable, ['python'] + sys.argv)
             else:
                 await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
@@ -1305,6 +1370,49 @@ async def language(interaction: discord.Interaction, language: app_commands.Choi
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
+
+@client.tree.command()
+@app_commands.rename(member='member')
+@app_commands.describe(member="The user to track")
+@app_commands.rename(whatsapp='whatsapp')
+@app_commands.describe(whatsapp="Notify user tracking on whatsapp?")
+@app_commands.choices(whatsapp=truefalsemenu)
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+async def trackuser(interaction: discord.Interaction, member: discord.Member, whatsapp: app_commands.Choice[str]):
+    """Track a user."""
+    is_deferred=True
+    try:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        currentguildid = get_current_guild_id(interaction.guild.id)
+        global track_users_dict
+
+        name = ""   
+        if member.nick is not None:
+            name = str(member.nick)
+        else:
+            name = str(member.name)  
+        track_users_dict[member.id] = TrackUser(name, currentguildid, whatsapp.value)
+
+
+
+        await interaction.followup.send(await utils.translate(currentguildid,"I am starting to monitor the user:") + " " + name + ".", ephemeral = True)
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+
+@client.tree.command()
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+async def untrackall(interaction: discord.Interaction):
+    """Untrack all users."""
+    is_deferred=True
+    try:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        currentguildid = get_current_guild_id(interaction.guild.id)
+        global track_users_dict
+        track_users_dict = {}
+        await interaction.followup.send(await utils.translate(currentguildid,"I am not monitoring anyone anymore."), ephemeral = True)
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="The sentence to convert")
@@ -1435,7 +1543,7 @@ async def disable(interaction: discord.Interaction):
 
 @client.tree.command()
 @app_commands.rename(seconds='seconds')
-@app_commands.describe(seconds="Timeout seconds (Min 20 - Max 600)")
+@app_commands.describe(seconds="Timeout seconds (Min 60 - Max 180)")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def timer(interaction: discord.Interaction, seconds: int):
     """Change the timer for the auto talking feature."""
@@ -1444,8 +1552,8 @@ async def timer(interaction: discord.Interaction, seconds: int):
         await interaction.response.defer(thinking=True, ephemeral=True)
         check_permissions(interaction)
         currentguildid = get_current_guild_id(interaction.guild.id)
-        if seconds < 20 or seconds > 600:
-            await interaction.followup.send(await utils.translate(currentguildid,"Seconds must be greater than 20 and lower than 600"), ephemeral = True)
+        if seconds < 60 or seconds > 180:
+            await interaction.followup.send(await utils.translate(currentguildid,"Seconds must be greater than 60 and lower than 180"), ephemeral = True)
         else:
             loops_dict[interaction.guild.id].play_audio_loop.change_interval(seconds=seconds)
             logging.info("timer - play_audio_loop.change_interval(seconds="+str(seconds)+")")
@@ -1454,30 +1562,6 @@ async def timer(interaction: discord.Interaction, seconds: int):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 
-@client.tree.command()
-@app_commands.rename(volume='volume')
-@app_commands.describe(volume="Volume (Min 1 - Max 10)")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
-async def volume(interaction: discord.Interaction, volume: int):
-    """Change the timer for the auto talking feature."""
-    is_deferred=True
-    try:
-        await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
-        currentguildid = get_current_guild_id(interaction.guild.id)
-        if volume < 1 or volume > 10:
-            await interaction.followup.send(await utils.translate(currentguildid,"Volume must be greater than 1 and lower than 10"), ephemeral = True)
-        else:
-            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
-            await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
-            #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float_volume)
-            strvolume = str(volume/10) 
-            os.environ["BOT_VOLUME"] = strvolume
-            set_key(dotenv_path, "BOT_VOLUME", strvolume)
-            #voice_client.source.volume = float_volume
-            await interaction.followup.send(await utils.translate(currentguildid,"Audio volume changed to " + str(volume)), ephemeral = True)
-    except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 
 @client.tree.command()
@@ -1595,9 +1679,10 @@ async def commands(interaction: discord.Interaction):
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRANSLATE))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.RENAME))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TIMER))  
-        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.VOLUME))  
 
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.DOWNLOAD))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRACKUSER))
+        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.UNTRACKALL))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRAIN))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.BLOCK))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.UNBLOCK))
@@ -1868,11 +1953,12 @@ async def reset(interaction: discord.Interaction):
 @story.error
 @timer.error
 @train.error
+@trackuser.error
 @translate.error
 @stop.error
 @unblock.error
 @unblockall.error
-@volume.error
+@untrackall.error
 @youtube.error
 @wikipedia.error
 async def on_generic_error(interaction: discord.Interaction, e: app_commands.AppCommandError):
