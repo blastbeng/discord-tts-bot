@@ -3,8 +3,13 @@ const express = require('express');
 const qrcode = require('qrcode-terminal');
 const config = require("./config.json");
 const axios = require('axios');
+const log = require('loglevel');
 const fs = require('fs');
 const ERROR_MSG = "Schifo, bestemmia e disagio.\nSi é verificato un errore stronzo.\nExternal API Error? Bug Brutti? Chi lo sa!\nChiedere a blast di controllare.\nSe ha voglia lo farà."
+
+
+console.log("Logging - Setting log level to: " + config.LOG_LEVEL)
+log.setLevel(config.LOG_LEVEL);
 
 client = new Client({
     authStrategy: new LocalAuth({ dataPath: `${process.cwd()}/config/wacache` }),
@@ -72,7 +77,7 @@ client.on('ready', () => {
                 res.status(404).send('Chat non trovata.');
             }
         } catch (error) {
-            console.error("ERRORE!", "["+ error + "]");
+            log.error("ERRORE!", "["+ error + "]");
             res.status(404).send('ERRORE!');
         }
     });
@@ -110,7 +115,7 @@ client.on('message', async msg => {
 
             if (canReply) { 
                 await chat.sendSeen();
-                console.log("CHATID: [ "+ chat.id.user + " ], COMMAND: [ "+ msg.body + " ], ");
+                log.info("CHATID: [ "+ chat.id.user + " ], COMMAND: [ "+ msg.body + " ], ");
                 if (msg.body.toLowerCase() == '/help' || msg.body.toLowerCase().startsWith('/help')) {
                     await chat.sendStateTyping();
                     let message = msg.body.slice(5);
@@ -170,7 +175,7 @@ client.on('message', async msg => {
             }
         }
     } catch (error) {
-        console.error("ERRORE!", "["+ error + "]");
+        log.error("ERRORE!", "["+ error + "]");
         await msg.reply(ERROR_MSG);
         await chat.clearState();
     }
@@ -213,13 +218,13 @@ async function replyMedia(url, msg, chat){
                     await chat.clearState(); 
                 }); 
             } else {
-                console.error("ERRORE!", "["+ error + "]");
+                log.error("ERRORE!", "["+ error + "]");
                 await msg.reply(ERROR_MSG);
                 await chat.clearState();
             }
           });
     }).catch(async function(error) {
-        console.error("ERRORE!", "["+ error + "]");
+        log.error("ERRORE!", "["+ error + "]");
         await msg.reply(ERROR_MSG);
         await chat.clearState();
     });
@@ -239,7 +244,7 @@ async function replyMsg(url, msg, chat){
         }
         await chat.clearState();
     }).catch(async function(error) {
-        console.error("ERRORE!", "["+ error + "]");
+        log.error("ERRORE!", "["+ error + "]");
         await msg.reply(ERROR_MSG);
         await chat.clearState();
     });
