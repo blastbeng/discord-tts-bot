@@ -83,8 +83,7 @@ client.on('ready', () => {
 client.on('message', async msg => {
     try {
         let chat = await msg.getChat();
-        if (msg.body.toLowerCase() == '/help' 
-            || msg.body.toLowerCase() == '/random' 
+        if (msg.body.toLowerCase().startsWith('/help') 
             || msg.body.toLowerCase().startsWith('/random')
             || msg.body.toLowerCase().startsWith('/ask')
             || msg.body.toLowerCase().startsWith('/generate')
