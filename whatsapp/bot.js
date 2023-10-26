@@ -123,62 +123,51 @@ client.on('message', async msg => {
                     }
 
                 } else if (msg.body.toLowerCase() == '/random' || msg.body.toLowerCase().startsWith('/random')) {
-                    await chat.sendStateTyping();
                     let url = config.API_URL + "chatbot_text/random/000000/"
                     let message = msg.body.slice(7);
                     if ( message.length !== 0 ) {
                         url = config.API_URL + "chatbot_text/random/000000/" + encodeURI(message.trim())
                     } 
-                    await replyMsg(url, msg)    
+                    await replyMsg(url, msg, chat)    
                 } else if (msg.body.toLowerCase().startsWith('/ask')) {
-                    await chat.sendStateTyping();
                     let message = msg.body.slice(4);
                     if ( message.length !== 0 ) {
-                        await replyMsg(config.API_URL + "chatbot_text/ask/" + encodeURI(message.trim()) + "/000000/it", msg)
+                        await replyMsg(config.API_URL + "chatbot_text/ask/" + encodeURI(message.trim()) + "/000000/it", msg, chat)
                     } else {
                         await msg.reply("Sei stronzo?\nMangi le pietre o sei scemo?\nSe devi chiedermi qualcosa devi scrivere un testo dopo /ask.");
                     }
                 } else if (msg.body.toLowerCase().startsWith('/generate')) {
-                    await chat.sendStateTyping();
                     let message = msg.body.slice(9);
                     if ( message.length === 0 ) {
-                        await replyMsg(config.API_URL + "utils/sentences/generate/000000/0", msg)
+                        await replyMsg(config.API_URL + "utils/sentences/generate/000000/0", msg, chat)
                     } else {
                         await msg.reply("Sei stronzo?\nMangi le pietre o sei scemo?\nNon é necessario scrivere niente dopo /generate.");
                     }
                 } else if (msg.body.toLowerCase().startsWith('/curse')) {
-                    await chat.sendStateTyping();
                     let message = msg.body.slice(6);
                     if ( message.length === 0 ) {
-                        await replyMsg(config.API_URL + "chatbot_text/curse/000000/it", msg)
+                        await replyMsg(config.API_URL + "chatbot_text/curse/000000/it", msg, chat)
                     } else {
                         await msg.reply("Sei stronzo?\nMangi le pietre o sei scemo?\nNon é necessario scrivere niente dopo /curse.");
                     }
                 } else if (msg.body.toLowerCase() == '/insult' || msg.body.toLowerCase().startsWith('/insult')) {
-                    await chat.sendStateTyping();
                     let url = config.API_URL + "chatbot_text/insult?chatid=000000&lang=it"
                     let message = msg.body.slice(7);
                     if ( message.length !== 0 ) {
                         url = config.API_URL + "chatbot_text/insult?chatid=000000&lang=it&text=" + encodeURI(message.trim())
                     } 
-                    await replyMsg(url, msg)    
+                    await replyMsg(url, msg, chat)    
                 } else if (msg.body.toLowerCase().startsWith('/speak')) {
-                    await chat.sendStateRecording();
-                    await repeat(msg.body.slice(0, 6).toLowerCase(), msg.body.slice(6), "google", msg)
+                    await repeat(msg.body.slice(0, 6).toLowerCase(), msg.body.slice(6), "google", msg, chat)
                 } else if (msg.body.toLowerCase().startsWith('/papa')) {
-                    await chat.sendStateRecording();
-                    await repeat(msg.body.slice(0, 5).toLowerCase(), msg.body.slice(5), "TM:8bqjb9x51vz3", msg)
+                    await repeat(msg.body.slice(0, 5).toLowerCase(), msg.body.slice(5), "TM:8bqjb9x51vz3", msg, chat)
                 } else if (msg.body.toLowerCase().startsWith('/berlusca')) {
-                    await chat.sendStateRecording();
-                    await repeat(msg.body.slice(0, 9).toLowerCase(), msg.body.slice(9), "TM:22e5sxvt2dvk", msg)
+                    await repeat(msg.body.slice(0, 9).toLowerCase(), msg.body.slice(9), "TM:22e5sxvt2dvk", msg, chat)
                 } else if (msg.body.toLowerCase().startsWith('/goku')) {
-                    await chat.sendStateRecording();
-                    await repeat(msg.body.slice(0, 5).toLowerCase(), msg.body.slice(5), "TM:eb0rmkq6fxtj", msg)
+                    await repeat(msg.body.slice(0, 5).toLowerCase(), msg.body.slice(5), "TM:eb0rmkq6fxtj", msg, chat)
                 }else if (msg.body.toLowerCase().startsWith('/gerry')) {
-                    await chat.sendStateRecording();
-                    await repeat(msg.body.slice(0, 6).toLowerCase(), msg.body.slice(6), "TM:5ggf3m5w2mhq", msg)
+                    await repeat(msg.body.slice(0, 6).toLowerCase(), msg.body.slice(6), "TM:5ggf3m5w2mhq", msg, chat)
                 }
-                await chat.clearState();
             }
         }
     } catch (error) {
@@ -188,16 +177,17 @@ client.on('message', async msg => {
     }
 });
 
-async function repeat(command, message, voice, msg){
+async function repeat(command, message, voice, msg, chat){
     
     if ( message.length !== 0 ) {
-        await replyMedia(config.API_URL + "chatbot_audio/repeat/learn/" + encodeURI(message.trim()) + "/" + encodeURI(voice) + "/000000/it/audio.mp3", msg)
+        await replyMedia(config.API_URL + "chatbot_audio/repeat/learn/" + encodeURI(message.trim()) + "/" + encodeURI(voice) + "/000000/it/audio.mp3", msg, chat)
     } else {
         await msg.reply("Sei stronzo?\nMangi le pietre o sei scemo?\nSe vuoi farmi parlare devi scrivere un testo dopo " + command + ".");
     }
 }
 
-async function replyMedia(url, msg){
+async function replyMedia(url, msg, chat){
+    await chat.sendStateRecording();
     await axios({
         timeout: 180000,
         url: url,
@@ -220,20 +210,24 @@ async function replyMedia(url, msg){
                 }
                 });
                 writer.on('finish', async function(){      
-                    await msg.reply(MessageMedia.fromFilePath("/tmp/discord-tts-bot-api/watmpaudio.mp3"), null, { sendAudioAsVoice: true })  
+                    await msg.reply(MessageMedia.fromFilePath("/tmp/discord-tts-bot-api/watmpaudio.mp3"), null, { sendAudioAsVoice: true }) 
+                    await chat.clearState(); 
                 }); 
             } else {
                 console.error("ERRORE!", "["+ error + "]");
                 await msg.reply(ERROR_MSG);
+                await chat.clearState();
             }
           });
     }).catch(async function(error) {
         console.error("ERRORE!", "["+ error + "]");
         await msg.reply(ERROR_MSG);
+        await chat.clearState();
     });
 }   
 
-async function replyMsg(url, msg){
+async function replyMsg(url, msg, chat){
+    await chat.sendStateTyping();
     await axios.get(url).then(async function(response) {
         if(response.status === 204) {
             await msg.reply("Non ho trovato nessun testo contenente queste parole.");
@@ -244,8 +238,10 @@ async function replyMsg(url, msg){
         } else {
             await msg.reply(ERROR_MSG);
         }
+        await chat.clearState();
     }).catch(async function(error) {
         console.error("ERRORE!", "["+ error + "]");
         await msg.reply(ERROR_MSG);
+        await chat.clearState();
     });
 }
