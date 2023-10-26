@@ -111,7 +111,7 @@ class SlashCommandButton(discord.ui.Button["InteractionRoles"]):
                 await interaction.followup.send("/enable -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"Enable auto talking feature"), ephemeral = True)
             elif self.name == constants.DISABLE:
                 await interaction.followup.send("/disable -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"Disable auto talking feature"), ephemeral = True)
-            elif self.name == constants.JOIN:
+            elif self.name == constantfs.JOIN:
                 await interaction.followup.send("/join -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot joins the voice channel"), ephemeral = True)
             elif self.name == constants.LEAVE:
                 await interaction.followup.send("/leave -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot leaves the voice channel"), ephemeral = True)
@@ -434,14 +434,6 @@ def get_voice_client_by_guildid(voice_clients, guildid):
             return vc
     return None
 
-def check_permissions_nochannel(interaction):
-    if not interaction.user.voice or not interaction.user.voice.channel:
-        raise NoChannelError("NO CHANNEL ERROR - User [" + str(interaction.user.name) + "] tried to use a command without being connected to a voice channel")
-
-    perms = interaction.user.voice.channel.permissions_for(interaction.user.voice.channel.guild.me)
-    if (not perms.speak):
-        raise PermissionError("PERMISSION ERROR - User [" + str(interaction.user.name) + "] tried to use a command in a disabled voice channel")
-
 def check_permissions(interaction):
     if not interaction.user.voice or not interaction.user.voice.channel:
         raise NoChannelError("NO CHANNEL ERROR - User [" + str(interaction.user.name) + "] tried to use a command without being connected to a voice channel")
@@ -723,6 +715,17 @@ async def on_guild_available(guild):
         cvc_loops_dict[guild.id] = CheckVoiceConnectionLoop(guild.id)
         cvc_loops_dict[guild.id].check_voice_connection_loop.start()
 
+        
+        url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/backup/chatbot/" + urllib.parse.quote(currentguildid)
+        
+        connector = aiohttp.TCPConnector(force_close=True)
+        async with aiohttp.ClientSession(connector=connector) as session:
+            async with session.get(url) as response:
+                if (response.status == 200):
+                    logging.info(response.text)
+                else:
+                    logging.error("Backup on chatid " + currentguildid + " failed")
+            await session.close()  
 
         utils.check_exists_guild(currentguildid)        
         lang = utils.get_guild_language(currentguildid)
@@ -756,17 +759,16 @@ async def on_guild_available(guild):
 async def on_presence_update(before, after):
     try:
         currentguildid = get_current_guild_id(str(after.guild.id))
-        #logging.info("[GUILDID : %s] on_presence_update -> member [ " + str(after.name) + "]", str(currentguildid))
-        #logging.info("[GUILDID : %s] on_presence_update -> status [ from " + str(before.status) + " to " + str(after.status)  + "]", str(currentguildid))
+        global track_users_dic
         if after.id in track_users_dict:
-            if before is not None and after is not None and before.status is not None and after.status is not None and str(before.status).lower() == "offline" and str(after.status).lower() != str(before.status).lower():
+            if str(before.status).lower() == "offline" and str(after.status).lower() != str(before.status).lower():
                 tracked_user = track_users_dict[after.id]
                 if tracked_user.guildid == "000000":
-                    name = ""   
-                    if after.nick is not None:
-                        name = str(after.nick)
-                    else:
-                        name = str(after.name)      
+                    name = str(after.name)   
+                    #if after.nick is not None:
+                    #    name = str(after.nick)
+                    #else:
+                    #    name = str(after.name)      
                     updatemessage = name + " ha appena cambiato stato da " + str(before.status) + " a " + str(after.status) + "." 
 
                     channel = client.get_channel(int(os.environ.get("MAIN_CHANNEL_ID")))
@@ -1194,7 +1196,7 @@ async def restart(interaction: discord.Interaction):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions_nochannel(interaction)
+        check_permissions(interaction)
         if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")) and str(interaction.user.id) == str(os.environ.get("ADMIN_ID")):
             if interaction.user.guild_permissions.administrator:
                 await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I am restarting the bot."), ephemeral = True)
@@ -1217,27 +1219,55 @@ async def delete(interaction: discord.Interaction, text: str):
         await interaction.response.defer(thinking=True, ephemeral=True)
         check_permissions(interaction)
         
-        if interaction.user.guild_permissions.administrator:
-            currentguildid = get_current_guild_id(interaction.guild.id)
-            async with aiohttp.ClientSession() as session:
-                async with session.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/forcedelete/bytext/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid)) as response:
-                    if (response.status == 200):
-                        text = await response.text()
-                        await interaction.followup.send(text, ephemeral = True) 
-                    else:
-                        logging.error("[GUILDID : %s] forcedelete/bytext - Received bad response from APIs", str(currentguildid))
-                        await interaction.followup.send(await utils.translate(currentguildid,"Error."), ephemeral = True)     
-                await session.close() 
-        else:
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
+        currentguildid = get_current_guild_id(interaction.guild.id)
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/download/sentences/" + urllib.parse.quote(currentguildid)) as response:
+                if (response.status == 200):
+
+                    textdl = await response.text()
+
+                    #nameout = str(interaction.guild.name) + "_" + str(client.user.name)  + "_Backup_"  + datetime.now().strftime("%d%m%Y_%H%M%S") + ".txt"
+                    nameout = "trainfile.txt"
+
+                    filepath = os.environ.get("TMP_DIR") + nameout
+                    with open(filepath, 'w') as filewrite:
+                        filewrite.write(textdl)            
+                        #for line in response.text.splitlines():
+                        #    filewrite.write(line)            
+                        #    filewrite.write("\n")            
+
+
+                    #await interaction.followup.send("Bot Backup.", file=discord.File(filename=nameout, fp=open(filepath, "rb")), ephemeral = True) 
+                    
+                    channel = client.get_channel(int(os.environ.get("BACKUP_CHANNEL_ID")))
+                    await channel.send(await utils.translate(currentguildid,"Someone deleted the word: " + text))
+                    await channel.send(await utils.translate(currentguildid,"Here's the backup."), file = discord.File(filename=nameout, fp=open(filepath, "rb")))
+
+                    os.remove(filepath)                    
+
+                    async with aiohttp.ClientSession() as session2:
+                        async with session2.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/forcedelete/bytext/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid)) as response:
+                            if (response.status == 200):
+                                text = await response.text()
+                                await interaction.followup.send(text, ephemeral = True) 
+                            else:
+                                logging.error("[GUILDID : %s] forcedelete/bytext - Received bad response from APIs", str(currentguildid))
+                                await interaction.followup.send(await utils.translate(currentguildid,"Error."), ephemeral = True)     
+                        await session.close() 
+                    
+                else:
+                    logging.error("[GUILDID : %s] download/sentences - Received bad response from APIs", str(currentguildid))
+                    await interaction.followup.send(await utils.translate(currentguildid,"Error."), ephemeral = True)     
+            await session.close() 
         
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def download(interaction: discord.Interaction):
-    """Delete sentences by text."""
+    """Download sentences."""
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
@@ -1251,7 +1281,8 @@ async def download(interaction: discord.Interaction):
 
                         text = await response.text()
 
-                        nameout = str(interaction.guild.name) + "_" + str(client.user.name)  + "_Backup_"  + datetime.now().strftime("%d%m%Y_%H%M%S") + ".txt"
+                        #nameout = str(interaction.guild.name) + "_" + str(client.user.name)  + "_Backup_"  + datetime.now().strftime("%d%m%Y_%H%M%S") + ".txt"
+                        nameout = "trainfile.txt"
 
                         filepath = os.environ.get("TMP_DIR") + nameout
                         with open(filepath, 'w') as filewrite:
@@ -1261,9 +1292,14 @@ async def download(interaction: discord.Interaction):
                             #    filewrite.write("\n")            
 
 
-                        await interaction.followup.send("Bot Backup.", file=discord.File(filename=nameout, fp=open(filepath, "rb")), ephemeral = True) 
+                        #await interaction.followup.send("Bot Backup.", file= 
+                        
+                        channel = client.get_channel(int(os.environ.get("BACKUP_CHANNEL_ID")))
+                        await channel.send(await utils.translate(currentguildid,"Someone generated a Backup."), file = discord.File(filename=nameout, fp=open(filepath, "rb")))
 
                         os.remove(filepath)
+                        
+                        await interaction.followup.send("Done.", ephemeral = True) 
                     else:
                         logging.error("[GUILDID : %s] download/sentences - Received bad response from APIs", str(currentguildid))
                         await interaction.followup.send(await utils.translate(currentguildid,"Error."), ephemeral = True)     
@@ -1762,7 +1798,7 @@ async def disclaimer(interaction: discord.Interaction):
     try:
         await interaction.response.defer(thinking=True, ephemeral=False)
         check_permissions(interaction)
-        await interaction.followup.send(get_disclaimer(get_current_guild_id(interaction.guild.id)), ephemeral = True)   
+        await interaction.followup.send(await get_disclaimer(get_current_guild_id(interaction.guild.id)), ephemeral = True)   
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
@@ -1770,7 +1806,7 @@ async def disclaimer(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(file='file')
 @app_commands.describe(file="The sentences file")
-@app_commands.checks.cooldown(1, 600.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 300.0, key=lambda i: (i.user.id))
 async def train(interaction: discord.Interaction, file: discord.Attachment):
     """Train the Bot using a sentences file."""
     is_deferred=True
@@ -1797,7 +1833,7 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
                 
                 response = requests.post(url, data=form_data, files={"trainfile": open(filepath, "rb")})
                 if (response.status_code == 200):
-                    await interaction.followup.send(await utils.translate(currentguildid,"Done."), ephemeral = True) 
+                    await interaction.followup.send(await utils.translate(currentguildid,"I am inserting the sentences into the bot. It could take a few minutes."), ephemeral = True) 
                 elif response.status_code == 406:
                     message = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
                     logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(get_current_guild_id(interaction.guild.id)))

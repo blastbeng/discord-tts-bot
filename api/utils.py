@@ -42,6 +42,7 @@ from exceptions import TimeExceededException
 import multiprocessing
 from functools import wraps
 
+
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 TMP_DIR = os.environ.get("TMP_DIR")
@@ -377,7 +378,7 @@ def extract_sentences_from_audiodb(filename, language="it", chatid="000000"):
   return True
 
 def extract_sentences_from_chatbot(filename, chatid="000000"):
-  try:
+  try:    
 
     sqliteConnection = sqlite3.connect('./config/' + chatid + '-db.sqlite3')
     cursor = sqliteConnection.cursor()
@@ -393,13 +394,20 @@ def extract_sentences_from_chatbot(filename, chatid="000000"):
     records_len = len(records)-1
 
 
-    with open(filename, 'w') as sentence_file:
+    with open(filename, 'a') as sentence_file:
       for row in records:
         logging.info('extract_sentences_from_chatbot - [chatid:' + chatid + '] - "' + row[0] + '"')
         sentence_file.write(row[0])
         sentence_file.write("\n")
 
     cursor.close()
+
+    lines = open(filename, 'r').readlines()
+    lines_set = set(lines)
+    out  = open(filename, 'w')
+    for line in lines_set:
+        out.write(line)
+
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -489,6 +497,11 @@ def vacuum_chatbot_db(chatid: str):
 
 def delete_by_text(chatid: str, text: str, force = False):
   try:
+    backupdb(chatid, "sqlite3")
+    filename = os.path.dirname(os.path.realpath(__file__)) + '/config/' + chatid + '-db.txt'
+    if extract_sentences_from_chatbot(filename, chatid=chatid):
+      backupdb(chatid, "txt")
+    
     dbfile='./config/'+chatid+"-db.sqlite3"
     sqliteConnection = sqlite3.connect(dbfile)
     cursor = sqliteConnection.cursor()
@@ -874,11 +887,27 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
 
 
 
-def backupdb(chatid: str):  
+def backupdb(chatid: str, extension: str):  
   try:
-    dbfile='./config/'+chatid+"-db.sqlite3"
-    dst="./backups/" + chatid + "-db_backup_" + str(time.time()) + ".sqlite3"
+    dbfile="./config/" + chatid + "-db." + extension
+    dst="./backups/" + chatid + "-db_backup_" + str(time.time()) + "." + extension
     shutil.copyfile(dbfile, dst)
+
+    current_time = time.time()
+
+    bakdir = "backups"
+    N = 30
+    os.chdir(os.path.join(os.getcwd(), bakdir)) 
+    list_of_files = os.listdir() 
+    current_time = time.time() 
+    day = 86400
+    for i in list_of_files: 
+      file_location = os.path.join(os.getcwd(), i) 
+      file_time = os.stat(file_location).st_mtime 
+      if(file_time < current_time - day*N): 
+        os.remove(file_location) 
+    
+    os.chdir("../")      
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -1112,7 +1141,7 @@ def reset(chatid: str):
     if sqliteConnection:
         sqliteConnection.close()
 
-  utils.vacuum_chatbot_db(chatid)
+  vacuum_chatbot_db(chatid)
 
   delete_from_audiodb(chatid, text)
   audiodb.vacuum()

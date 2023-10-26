@@ -87,6 +87,9 @@ client.on('message', async msg => {
             || msg.body.toLowerCase() == '/random' 
             || msg.body.toLowerCase().startsWith('/random')
             || msg.body.toLowerCase().startsWith('/ask')
+            || msg.body.toLowerCase().startsWith('/generate')
+            || msg.body.toLowerCase().startsWith('/curse')
+            || msg.body.toLowerCase().startsWith('/insult')
             || msg.body.toLowerCase().startsWith('/speak')
             || msg.body.toLowerCase().startsWith('/papa')
             || msg.body.toLowerCase().startsWith('/berlusca')
@@ -112,7 +115,7 @@ client.on('message', async msg => {
                 if (msg.body.toLowerCase() == '/help' || msg.body.toLowerCase().startsWith('/help')) {
                     await chat.sendStateTyping();
                     let message = msg.body.slice(5);
-                    helpmsg = "Lista Comandi: \n- /ask: chiedimi qualcosa\n- /speak: parla con la voce di google\n- /berlusca: parla con la voce di Silvio Berlusconi\n- /gerry: parla con la voce di Gerry Scotti\n- /goku: parla con la voce di Goku\n- /papa: parla con la voce di Papa Francesco\n- /random: frase casuale\n /random <testo>: frase casuale dato un testo"
+                    helpmsg = "Lista Comandi: \n- /ask: chiedimi qualcosa\n- /speak: parla con la voce di google\n- /generate: genera frasi idiote\n- /insult: genera insulti\n- /curse: curse\n- /berlusca: parla con la voce di Silvio Berlusconi\n- /gerry: parla con la voce di Gerry Scotti\n- /goku: parla con la voce di Goku\n- /papa: parla con la voce di Papa Francesco\n- /random: frase casuale\n /random <testo>: frase casuale dato un testo"
                     if ( message.length === 0 ) {
                         await msg.reply(helpmsg);
                     } else {
@@ -124,17 +127,41 @@ client.on('message', async msg => {
                     let url = config.API_URL + "chatbot_text/random/000000/"
                     let message = msg.body.slice(7);
                     if ( message.length !== 0 ) {
-                        url = config.API_URL + "chatbot_text/random/000000/" + encodeURI(message)
+                        url = config.API_URL + "chatbot_text/random/000000/" + encodeURI(message.trim())
                     } 
                     await replyMsg(url, msg)    
                 } else if (msg.body.toLowerCase().startsWith('/ask')) {
                     await chat.sendStateTyping();
                     let message = msg.body.slice(4);
                     if ( message.length !== 0 ) {
-                        await replyMsg(config.API_URL + "chatbot_text/ask/" + message + "/000000/it", msg)
+                        await replyMsg(config.API_URL + "chatbot_text/ask/" + encodeURI(message.trim()) + "/000000/it", msg)
                     } else {
                         await msg.reply("Sei stronzo?\nMangi le pietre o sei scemo?\nSe devi chiedermi qualcosa devi scrivere un testo dopo /ask.");
                     }
+                } else if (msg.body.toLowerCase().startsWith('/generate')) {
+                    await chat.sendStateTyping();
+                    let message = msg.body.slice(9);
+                    if ( message.length === 0 ) {
+                        await replyMsg(config.API_URL + "utils/sentences/generate/000000/0", msg)
+                    } else {
+                        await msg.reply("Sei stronzo?\nMangi le pietre o sei scemo?\nNon é necessario scrivere niente dopo /generate.");
+                    }
+                } else if (msg.body.toLowerCase().startsWith('/curse')) {
+                    await chat.sendStateTyping();
+                    let message = msg.body.slice(6);
+                    if ( message.length === 0 ) {
+                        await replyMsg(config.API_URL + "chatbot_text/curse/000000/it", msg)
+                    } else {
+                        await msg.reply("Sei stronzo?\nMangi le pietre o sei scemo?\nNon é necessario scrivere niente dopo /curse.");
+                    }
+                } else if (msg.body.toLowerCase() == '/insult' || msg.body.toLowerCase().startsWith('/insult')) {
+                    await chat.sendStateTyping();
+                    let url = config.API_URL + "chatbot_text/insult?chatid=000000&lang=it"
+                    let message = msg.body.slice(7);
+                    if ( message.length !== 0 ) {
+                        url = config.API_URL + "chatbot_text/insult?chatid=000000&lang=it&text=" + encodeURI(message.trim())
+                    } 
+                    await replyMsg(url, msg)    
                 } else if (msg.body.toLowerCase().startsWith('/speak')) {
                     await chat.sendStateRecording();
                     await repeat(msg.body.slice(0, 6).toLowerCase(), msg.body.slice(6), "google", msg)
@@ -212,6 +239,8 @@ async function replyMsg(url, msg){
             await msg.reply("Non ho trovato nessun testo contenente queste parole.");
         } else if(response.status === 200) {
             await msg.reply(response.data);
+        } else if(response.status === 406) {
+            await msg.reply("Questo testo contiene parole bloccate dai filtri.");
         } else {
             await msg.reply(ERROR_MSG);
         }

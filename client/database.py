@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, insert, select, update, Table, Column, Int
 SQLITE          = 'sqlite'
 GUILDCONFIG     = 'guildconfig'
 TRANSLATIONS    = 'translations'
+TRACKEDUSERS    = 'trackedusers'
 
 class Database:
   DB_ENGINE = {
@@ -36,6 +37,15 @@ class Database:
                 Column('key', String(500), nullable=False),
                 Column('value', String(500), nullable=False)
                 )
+
+  #trackedusers = Table(TRACKEDUSERS, metadata,
+  #             Column('id', Integer, primary_key=True),
+  #             Column('memberid', String(50), nullable=False),
+  #             Column('name', String(500), nullable=False),
+  #             Column('guildid', String(50), nullable=False),
+  #             Column('whatsapp', Integer, nullable=False),
+  #             Column('istracked', Integer, nullable=False)
+  #             )
 
 def create_db_tables(self):
   try:
@@ -152,3 +162,15 @@ def select_translation(self, from_lang: str, dest_lang: str, key: str):
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return None
+
+#def insert_trackedusers(self, memberid: str, name: str, guildid: str, whatsapp: str, istracked=istracked):
+#  try:
+#    stmt = insert(self.trackedusers).values(memberid=memberid, name=name, guildid=guildid, whatsapp=whatsapp, istracked=istracked).prefix_with('OR IGNORE')
+#    compiled = stmt.compile()
+#    with self.db_engine.connect() as conn:
+#      result = conn.execute(stmt)
+#      conn.commit()
+#  except Exception as e:
+#    exc_type, exc_obj, exc_tb = sys.exc_info()
+#    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+#    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)

@@ -142,9 +142,8 @@ docker-compose.yml
 battuteapi_data
 battuteapi_data/
 config
-config_old/
-rclone.conf.sample
-backups/
+config_old
 backups
+backups_old
 rclone/rclone.conf
 wwebjs_auth

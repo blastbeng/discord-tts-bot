@@ -9,6 +9,7 @@ import audiodb
 import filtersdb
 import threading
 import sys
+import glob
 from io import BytesIO
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -127,7 +128,7 @@ class TextRepeatClass(Resource):
 @nstext.route('/curse/<string:chatid>/')
 @nstext.route('/curse/<string:chatid>/<string:lang>')
 class TextCurseClass(Resource):
-  @cache.cached(timeout=20, query_string=True)
+  @cache.cached(timeout=1, query_string=True)
   def get (self, chatid = "000000", lang="it"):
     cursez = Bestemmie().random().lower()
     if lang == "it":
@@ -377,7 +378,7 @@ class AudioSaveRepeatClass(Resource):
 @nsaudio.route('/curse/<string:voice>/<string:chatid>/')
 @nsaudio.route('/curse/<string:voice>/<string:chatid>/<string:lang>')
 class AudioCurseClass(Resource):
-  @cache.cached(timeout=3, query_string=True)
+  @cache.cached(timeout=1, query_string=True)
   def get (self, voice = "google", chatid = "000000", lang = "it"):
     cursez = ""
     try:
@@ -824,12 +825,12 @@ nsdatabase = api.namespace('database', 'Accumulators Database APIs')
 @nsdatabase.route('/download/sentences/')
 @nsdatabase.route('/download/sentences/<string:chatid>')
 class DownloadSentencesDb(Resource):
-  @cache.cached(timeout=600, query_string=True)
   def get(self, chatid = "000000"):
-    try:
-      filename = os.path.dirname(os.path.realpath(__file__)) + '/config/download_sentences_'+chatid+'.txt'
-      if utils.extract_sentences_from_chatbot(filename, chatid=chatid):
-        return send_file(filename, attachment_filename='sentences.txt', mimetype="text/plain")
+    try:      
+      pattern = "./backups/" + chatid + "-db_backup_*.txt"
+      latest_bk = (max(glob.glob(pattern), key=os.path.getmtime)) 
+      if latest_bk is not None:
+        return send_file(latest_bk, attachment_filename='trainfile.txt', mimetype="text/plain")
       else:
         return make_response("Failed to download sentences.", 500)
     except Exception as e:
@@ -981,8 +982,11 @@ class FiltersDelete(Resource):
 @nsdatabase.route('/backup/chatbot/<string:chatid>')
 class BackupChatbot(Resource):
   def get (self, chatid = "000000"):
-    utils.backupdb(chatid)
-    return "Databases backed up!"
+    utils.backupdb(chatid, "sqlite3")
+    filename = os.path.dirname(os.path.realpath(__file__)) + '/config/' + chatid + '-db.txt'
+    if utils.extract_sentences_from_chatbot(filename, chatid=chatid):
+      utils.backupdb(chatid, "txt")
+    return "Databases for chatid "+chatid+" backed up!"
 
 @nsdatabase.route('/restore/chatbot/')
 @nsdatabase.route('/restore/chatbot/<string:text>/')
@@ -997,7 +1001,14 @@ class RestoreChatbot(Resource):
 @nsdatabase.route('/forcedelete/bytext/<string:text>/<string:chatid>')
 class AdminForceDeleteByText(Resource):
   def get (self, text: str, chatid = "000000"):
-    return get_response_str(utils.delete_by_text(chatid, text, force=True))
+    try:
+      response = get_response_str(utils.delete_by_text(chatid, text, force=True))
+      return response
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
 
 def get_chatbot_by_id(chatid = "000000", lang = "it"):
   if chatid + "_" + lang not in chatbots_dict:
@@ -1006,9 +1017,12 @@ def get_chatbot_by_id(chatid = "000000", lang = "it"):
   
  
   
-@scheduler.task('interval', id='backupdb', hours=11)
+@scheduler.task('interval', id='backupdb', hours=12)
 def backupdb():
-  utils.backupdb("000000")
+  utils.backupdb(chatid, "sqlite3")
+  filename = os.path.dirname(os.path.realpath(__file__)) + '/config/' + chatid + '-db.txt'
+  if utils.extract_sentences_from_chatbot(filename, chatid=chatid):
+    utils.backupdb(chatid, "txt")
   
 @scheduler.task('interval', id='clean_audio_zip', hours=28)
 def clean_audio_zip():
