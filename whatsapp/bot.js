@@ -130,13 +130,13 @@ client.on('message', async msg => {
                     let url = config.API_URL + "chatbot_text/random/000000/"
                     let message = msg.body.slice(7);
                     if ( message.length !== 0 ) {
-                        url = config.API_URL + "chatbot_text/random/000000/" + encodeURI(message.trim())
+                        url = config.API_URL + "chatbot_text/random/000000/" + encodeURIComponent(message.trim())
                     } 
                     await replyMsg(url, msg, chat)    
                 } else if (msg.body.toLowerCase().startsWith('/ask')) {
                     let message = msg.body.slice(4);
                     if ( message.length !== 0 ) {
-                        await replyMsg(config.API_URL + "chatbot_text/ask/" + encodeURI(message.trim()) + "/000000/it", msg, chat)
+                        await replyMsg(config.API_URL + "chatbot_text/ask/" + encodeURIComponent(message.trim()) + "/000000/it", msg, chat)
                     } else {
                         await msg.reply("Sei stronzo?\nMangi le pietre o sei scemo?\nSe devi chiedermi qualcosa devi scrivere un testo dopo /ask.");
                     }
@@ -158,7 +158,7 @@ client.on('message', async msg => {
                     let url = config.API_URL + "chatbot_text/insult?chatid=000000&lang=it"
                     let message = msg.body.slice(7);
                     if ( message.length !== 0 ) {
-                        url = config.API_URL + "chatbot_text/insult?chatid=000000&lang=it&text=" + encodeURI(message.trim())
+                        url = config.API_URL + "chatbot_text/insult?chatid=000000&lang=it&text=" + encodeURIComponent(message.trim())
                     } 
                     await replyMsg(url, msg, chat)    
                 } else if (msg.body.toLowerCase().startsWith('/speak')) {
@@ -184,7 +184,7 @@ client.on('message', async msg => {
 async function repeat(command, message, voice, msg, chat){
     
     if ( message.length !== 0 ) {
-        await replyMedia(config.API_URL + "chatbot_audio/repeat/learn/" + encodeURI(message.trim()) + "/" + encodeURI(voice) + "/000000/it/audio.mp3", msg, chat)
+        await replyMedia(config.API_URL + "chatbot_audio/repeat/learn/" + encodeURIComponent(message.trim()) + "/" + encodeURIComponent(voice) + "/000000/it/audio.mp3", msg, chat)
     } else {
         await msg.reply("Sei stronzo?\nMangi le pietre o sei scemo?\nSe vuoi farmi parlare devi scrivere un testo dopo " + command + ".");
     }

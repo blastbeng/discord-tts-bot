@@ -32,7 +32,7 @@ services:
     entrypoint: ./entrypoint.sh
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:5080/utils/healthcheck"]
-      interval: 30s
+      interval: 15s
       timeout: 5s
       retries: 12
     network_mode: host

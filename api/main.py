@@ -424,14 +424,13 @@ class AudioDownloadClass(Resource):
         cache.delete_memoized(AudioDownloadClass.get, self, int)
         return make_response(g.get('request_error'), 500)
 
-
+@limiter.limit("1/second")
 @nsaudio.route('/random/')
 @nsaudio.route('/random/<string:voice>/')
 @nsaudio.route('/random/<string:voice>/<string:chatid>/')
 @nsaudio.route('/random/<string:voice>/<string:chatid>/<string:lang>/')
 @nsaudio.route('/random/<string:voice>/<string:chatid>/<string:lang>/<string:text>')
 class AudioRandomClass(Resource):
-  @cache.cached(timeout=1, query_string=True)
   def get (self, voice = "random", chatid = "000000", lang = "it", text = None):
     try:
       tts_out, text_response = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang,text)
@@ -444,16 +443,9 @@ class AudioRandomClass(Resource):
         response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
         return response
       if tts_out is None:
-        @after_this_request
-        def clear_cache(response):
-          cache.delete_memoized(AudioRandomClass.get, self, str, str, str)
-          return make_response("TTS Generation Error!", 500)
+        return make_response("TTS Generation Error!", 500)
     except Exception as e:
-      g.request_error = str(e)
-      @after_this_request
-      def clear_cache(response):
-        cache.delete_memoized(AudioRandomClass.get, self, str, str, str)
-        return make_response(g.get('request_error'), 500)
+      return make_response(g.get('request_error'), 500)
       
 
 @nsaudio.route('/repeat/learn/<string:text>/<string:voice>/')
@@ -1019,7 +1011,7 @@ def get_chatbot_by_id(chatid = "000000", lang = "it"):
   
 @scheduler.task('interval', id='backupdb', hours=12)
 def backupdb():
-  utils.backupdb(chatid, "sqlite3")
+  utils.backupdb("000000", "sqlite3")
   filename = os.path.dirname(os.path.realpath(__file__)) + '/config/' + chatid + '-db.txt'
   if utils.extract_sentences_from_chatbot(filename, chatid=chatid):
     utils.backupdb(chatid, "txt")
