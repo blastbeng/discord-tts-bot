@@ -136,7 +136,7 @@ client.on('message', async msg => {
                 } else if (msg.body.toLowerCase().startsWith('/ask')) {
                     let message = msg.body.slice(4);
                     if ( message.length !== 0 ) {
-                        await replyMsg(config.API_URL + "chatbot_text/ask/" + encodeURIComponent(message.trim()) + "/000000/it", msg, chat)
+                        await replyMsg(config.API_URL + "chatbot_text/ask/user/" + encodeURIComponent(msg.author) + "/" + encodeURIComponent(message.trim()) + "/000000/it", msg, chat)
                     } else {
                         await msg.reply("Sei stronzo?\nMangi le pietre o sei scemo?\nSe devi chiedermi qualcosa devi scrivere un testo dopo /ask.");
                     }
@@ -162,15 +162,15 @@ client.on('message', async msg => {
                     } 
                     await replyMsg(url, msg, chat)    
                 } else if (msg.body.toLowerCase().startsWith('/speak')) {
-                    await repeat(msg.body.slice(0, 6).toLowerCase(), msg.body.slice(6), "google", msg, chat)
+                    await repeat(msg.body.slice(0, 6).toLowerCase(), msg.body.slice(6), "google", msg, chat, msg.author)
                 } else if (msg.body.toLowerCase().startsWith('/papa')) {
-                    await repeat(msg.body.slice(0, 5).toLowerCase(), msg.body.slice(5), "TM:8bqjb9x51vz3", msg, chat)
+                    await repeat(msg.body.slice(0, 5).toLowerCase(), msg.body.slice(5), "TM:8bqjb9x51vz3", msg, chat, msg.author)
                 } else if (msg.body.toLowerCase().startsWith('/berlusca')) {
-                    await repeat(msg.body.slice(0, 9).toLowerCase(), msg.body.slice(9), "TM:22e5sxvt2dvk", msg, chat)
+                    await repeat(msg.body.slice(0, 9).toLowerCase(), msg.body.slice(9), "TM:22e5sxvt2dvk", msg, chat, msg.author)
                 } else if (msg.body.toLowerCase().startsWith('/goku')) {
-                    await repeat(msg.body.slice(0, 5).toLowerCase(), msg.body.slice(5), "TM:eb0rmkq6fxtj", msg, chat)
+                    await repeat(msg.body.slice(0, 5).toLowerCase(), msg.body.slice(5), "TM:eb0rmkq6fxtj", msg, chat, msg.author)
                 }else if (msg.body.toLowerCase().startsWith('/gerry')) {
-                    await repeat(msg.body.slice(0, 6).toLowerCase(), msg.body.slice(6), "TM:5ggf3m5w2mhq", msg, chat)
+                    await repeat(msg.body.slice(0, 6).toLowerCase(), msg.body.slice(6), "TM:5ggf3m5w2mhq", msg, chat, msg.author)
                 }
             }
         }
@@ -181,10 +181,10 @@ client.on('message', async msg => {
     }
 });
 
-async function repeat(command, message, voice, msg, chat){
+async function repeat(command, message, voice, msg, chat, user){
     
     if ( message.length !== 0 ) {
-        await replyMedia(config.API_URL + "chatbot_audio/repeat/learn/" + encodeURIComponent(message.trim()) + "/" + encodeURIComponent(voice) + "/000000/it/audio.mp3", msg, chat)
+        await replyMedia(config.API_URL + "chatbot_audio/repeat/learn/user/" + encodeURIComponent(user) + "/" + encodeURIComponent(message.trim()) + "/" + encodeURIComponent(voice) + "/000000/it/audio.mp3", msg, chat)
     } else {
         await msg.reply("Sei stronzo?\nMangi le pietre o sei scemo?\nSe vuoi farmi parlare devi scrivere un testo dopo " + command + ".");
     }

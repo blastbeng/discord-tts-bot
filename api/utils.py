@@ -164,7 +164,7 @@ def generate(filename: str):
           yield data
           data = fmp3.read(1024)
 
-def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=True):
+def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=True, user=None):
   data = audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
   if data is not None:
     return data
@@ -176,7 +176,7 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=T
     sound = AudioSegment.from_mp3(fp)
     duration = (len(sound) / 1000.0)
     if limit and duration > int(os.environ.get("MAX_TTS_DURATION")):
-      audiodb.insert_or_update(text, chatid, None, "google", language, is_correct=0, duration=duration)
+      audiodb.insert_or_update(text, chatid, None, "google", language, is_correct=0, duration=duration, user=user)
       raise AudioLimitException
     else:
       #sound.duration_seconds == duration
@@ -185,7 +185,7 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=T
       memoryBuff.seek(0)
       #if chatid == "000000" and save:
       if save:
-        audiodb.insert_or_update(text, chatid, memoryBuff, "google", language, duration=duration)
+        audiodb.insert_or_update(text, chatid, memoryBuff, "google", language, duration=duration, user=user)
         return audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
       else:
         return memoryBuff
@@ -565,7 +565,7 @@ def delete_from_audiodb_by_text(chatid: str, text: str):
     if sqliteConnection:
         sqliteConnection.close()
 
-def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it", save=True, call_fy=True, limit=True):
+def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it", save=True, call_fy=True, limit=True, user=None):
   try:
     if voice is None or voice == "null" or voice == "random":
       voice_to_use = get_random_voice(lang=language)
@@ -582,7 +582,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
           duration = (len(sound) / 1000.0)
           if limit and duration > int(os.environ.get("MAX_TTS_DURATION")):
-            audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=0, duration=duration)
+            audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=0, duration=duration, user=user)
             raise AudioLimitException
           else:
             #sound.duration_seconds == duration
@@ -590,18 +590,18 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
             sound.export(out, format='mp3', bitrate="256")
             out.seek(0)
             if save:
-              audiodb.insert_or_update(text.strip(), chatid, out, voice_to_use, language, duration=duration)
+              audiodb.insert_or_update(text.strip(), chatid, out, voice_to_use, language, duration=duration, user=user)
               return audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
             else:
               return out
         elif voice == "random" or voice == "google":
-          return get_tts_google(text.strip(), chatid=chatid, language="it", save=save, limit=limit)
+          return get_tts_google(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
         else:
           return None
       else:
-        return get_tts_google(text.strip(), chatid=chatid, language="it", save=save, limit=limit)
+        return get_tts_google(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
     else:
-      return get_tts_google(text.strip(), chatid=chatid, language=language, save=save, limit=limit)
+      return get_tts_google(text.strip(), chatid=chatid, language=language, save=save, limit=limit, user=user)
   except AudioLimitException as el:
     raise(el)
   except Exception as e:
@@ -609,8 +609,9 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     if voice == "random" or israndom:
-      return get_tts_google(text.strip(), chatid=chatid, language=language, save=save, limit=limit)
+      return get_tts_google(text.strip(), chatid=chatid, language=language, save=save, limit=limit, user=user)
     else:
+      audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=1, user=user)
       raise Exception(e)
 
     

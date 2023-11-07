@@ -43,6 +43,7 @@ def create_empty_tables():
             language VARCHAR(2) NOT NULL,
             counter INTEGER DEFAULT 1 NOT NULL,
             duration INTEGER DEFAULT 0 NOT NULL,
+            user VARCHAR(500) NULL,
             tms_insert DATETIME DEFAULT CURRENT_TIMESTAMP,
             tms_update DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(name,chatid,voice,language)
@@ -86,7 +87,7 @@ def insert(name: str, chatid: str, data: BytesIO, voice: str, language: str, is_
     if sqliteConnection:
         sqliteConnection.close()
 
-def insert_or_update(name: str, chatid: str, data: BytesIO, voice: str, language: str, is_correct=1, duration=0):
+def insert_or_update(name: str, chatid: str, data: BytesIO, voice: str, language: str, is_correct=1, duration=0, user=None):
   try:
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
 
@@ -109,11 +110,11 @@ def insert_or_update(name: str, chatid: str, data: BytesIO, voice: str, language
 
       cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
     else:
-
+      
       sqlite_insert_audio_query = """INSERT INTO Audio
-                            (name, chatid, data, voice, is_correct, language, duration, tms_update) 
+                            (name, chatid, data, voice, is_correct, language, duration, user, tms_update) 
                             VALUES 
-                            (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"""
+                            (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"""
 
       data_audio_tuple = (name, 
                           chatid, 
@@ -121,7 +122,8 @@ def insert_or_update(name: str, chatid: str, data: BytesIO, voice: str, language
                           voice,
                           is_correct,
                           language,
-                          duration,)
+                          duration,
+                          user, )
 
       cursor.execute(sqlite_insert_audio_query, data_audio_tuple)
 
@@ -132,6 +134,7 @@ def insert_or_update(name: str, chatid: str, data: BytesIO, voice: str, language
 
   except sqlite3.Error as error:
     logging.error("Failed to Execute SQLITE Query", exc_info=1)
+    raise Exception(error)
   finally:
     if sqliteConnection:
         sqliteConnection.close()

@@ -205,15 +205,40 @@ class SaveButton(discord.ui.Button["InteractionRoles"]):
 class PlayButton(discord.ui.Button["InteractionRoles"]):
 
     def __init__(self, content, message):
-        super().__init__(style=discord.ButtonStyle.green, label="Play")
+        super().__init__(style=discord.ButtonStyle.green, label="Play", name="Play")
         self.content = content
         self.message = message
+        self.cd_mapping = commands.CooldownMapping.from_cooldown(5, 5, commands.BucketType.member)
     
     async def callback(self, interaction: discord.Interaction):
         is_deferred=True
         try:
             await interaction.response.defer(thinking=True, ephemeral=True)
+                    
             check_permissions(interaction)
+
+            view: CooldownView = self.view
+            bucket = view.cd_mapping.get_bucket(interaction.message)
+            retry_after = bucket.update_rate_limit()
+            if retry_after:
+                currentguildid=get_current_guild_id(interaction.guild.id)
+                dtc = "Spam " + await utils.translate(currentguildid,"detected.")
+                spamarray=[]
+                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"I am watching you."))
+                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"This doesn't make you a good person."))
+                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"I'm stupid but not annoying."))
+                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"Take your time."))
+                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"Keep calm."))
+                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"Do you also do this at your home?"))
+                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"Why are you so anxious?"))
+                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"I'll add you to the blacklist."))
+                command = str(interaction.data['name'])
+                #cooldown = command + ' -> Cooldown: ' + str(e.cooldown.per) + '[' + str(round(retry_after, 2)) + ']s'
+
+                #spaminteractionmsg = utils.get_random_from_array(spamarray) + '\n' + cooldown
+                spaminteractionmsg = utils.get_random_from_array(spamarray)
+                await interaction.followup.send(spaminteractionmsg, ephemeral = True)
+
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
 
@@ -271,7 +296,6 @@ class DeclineButton(discord.ui.Button["InteractionRoles"]):
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"You have disabled NSFW content."), ephemeral = True)
         except Exception as e:
             await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
-
 
 intents = discord.Intents.all()
 client = MyClient(intents=intents)
@@ -954,7 +978,7 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "googl
                 voice = await listvoices_api(language=lang_to_use, filter=voice)
 
             if voice is not None:
-                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
+                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/user/"+urllib.parse.quote(str(interaction.user.name))+"/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
                 await do_play(url, interaction, currentguildid)
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)      
@@ -1022,7 +1046,7 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
                 voice = await listvoices_api(language=lang_to_use, filter=voice)
 
             if voice is not None:
-                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
+                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/user/"+urllib.parse.quote(str(interaction.user.name))+"/"+urllib.parse.quote(str(text))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
                 await do_play(url, interaction, currentguildid)
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True) 

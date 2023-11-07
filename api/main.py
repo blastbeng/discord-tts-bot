@@ -170,9 +170,12 @@ class TextRepeatLearnClass(Resource):
 class AudioRepeatLearnUserClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, user: str, text: str, chatid = "000000", lang = "it"):
-    if user in previousMessages:
-      utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid=chatid, lang=lang))
-    previousMessages[user] = text
+    chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
+    daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
+    daemon.start()
+
+    audiodb.insert_or_update(text.strip(), chatid, None, "google", lang, is_correct=1, user=user)
+
     return get_response_str(text)
 
 
@@ -201,14 +204,9 @@ class TextAskNoLearnClass(Resource):
 class TextAskUserClass(Resource):
   @cache.cached(timeout=10, query_string=True)
   def get (self, user: str, text: str, chatid = "000000", lang = "it"):
-    dolearn = False;
-    if user not in previousMessages:
-      dolearn=True
-    chatbot_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=dolearn).text
-    
-    if user in previousMessages:
-      utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid=chatid, lang=lang))
-    previousMessages[user] = chatbot_response
+    chatbot_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=True).text
+    audiodb.insert_or_update(text.strip(), chatid, None, "google", lang, is_correct=1, user=user)
+
     return get_response_str(chatbot_response)
 
 
@@ -484,21 +482,19 @@ class AudioRepeatLearnClass(Resource):
 
 @nsaudio.route('/repeat/learn/user/<string:user>/<string:text>/<string:voice>/')
 @nsaudio.route('/repeat/learn/user/<string:user>/<string:text>/<string:voice>/<string:chatid>/')
-@nsaudio.route('/repeat/learn/user/<string:user>/<string:text>/<string:voice>/<string:chatid>/<string:lang>')
+@nsaudio.route('/repeat/learn/user/<string:user>/<string:text>/<string:voice>/<string:chatid>/<string:lang>/')
+@nsaudio.route('/repeat/learn/user/<string:user>/<string:text>/<string:voice>/<string:chatid>/<string:lang>/<string:filename>')
 class AudioRepeatLearnUserClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
-  def get (self, user: str, text: str, voice: str, chatid = "000000", lang = "it"):
+  def get (self, user: str, text: str, voice: str, chatid = "000000", lang = "it", filename = "audio.mp3"):
     try:
-      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=lang)
+      tts_out = utils.get_tts(text, chatid=chatid, voice=voice, language=lang, user=user)
       if tts_out is not None:     
-        def learnthis(user: str, text: str):
-          if user in previousMessages:
-            utils.learn(previousMessages[user], text, get_chatbot_by_id(chatid=chatid, lang=lang))
-          previousMessages[user] = text  
-        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-        daemon = Thread(target=learnthis, args=(user,text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
-        daemon.start()
+        response = send_file(tts_out, attachment_filename=filename, mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+        chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
+        daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
+        daemon.start()
         return response
       else:
         @after_this_request
@@ -553,6 +549,44 @@ class AudioAskClass(Resource):
       @after_this_request
       def clear_cache(response):
         cache.delete_memoized(AudioAskClass.get, self, str, int, str, str, str)
+        return make_response(g.get('request_error'), 500)
+
+@nsaudio.route('/ask/user/<string:text>/<string:user>/')
+@nsaudio.route('/ask/user/<string:text>/<string:user>/<int:learn>/')
+@nsaudio.route('/ask/user/<string:text>/<string:user>/<int:learn>/<string:voice>/')
+@nsaudio.route('/ask/user/<string:text>/<string:user>/<int:learn>/<string:voice>/<string:chatid>/')
+@nsaudio.route('/ask/user/<string:text>/<string:user>/<int:learn>/<string:voice>/<string:chatid>/<string:lang>/')
+class AudioAskUserClass(Resource):
+  @cache.cached(timeout=30, query_string=True)
+  def get (self, text: str, user: str, learn = 1, voice = "random", chatid = "000000", lang= "it"):
+    try:
+      tts_out = None
+      dolearn = True if learn == 1 else False
+      chatbot_resp = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=dolearn).text
+      if voice is None or voice == "null" or voice == "random":
+        voice = audiodb.select_voice_by_name_chatid_language(chatbot_resp.strip(), chatid, lang)
+      if voice is not None:
+        tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice=voice, language=lang, user=user)
+      else:
+        tts_out = utils.get_tts(chatbot_resp, chatid=chatid, voice="google", language=lang, user=user)
+      if tts_out is not None:
+        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+        response.headers['X-Generated-Response-Text'] = chatbot_resp.encode('utf-8').decode('latin-1')
+        return response
+      else:
+        threading.Thread(target=lambda: utils.populate_tts(chatbot_resp, chatid=chatid, voice=voice, language=lang)).start()
+        @after_this_request
+        def clear_cache(response):
+          cache.delete_memoized(AudioAskUserClass.get, self, str, str, int, str, str, str)
+          return make_response("TTS Generation Error!", 500)
+    except AudioLimitException:
+      return get_response_limit_error(chatbot_resp)
+    except Exception as e:
+      g.request_error = str(e)
+      @after_this_request
+      def clear_cache(response):
+        cache.delete_memoized(AudioAskUserClass.get, self, str, str, int, str, str, str)
         return make_response(g.get('request_error'), 500)
 
 @nsaudio.route('/search/<string:text>/')
@@ -1044,7 +1078,6 @@ def vacuum():
   filtersdb.vacuum()
 
 #if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-previousMessages = {}
 chatbots_dict = {}
 audiodb.create_empty_tables()
 filtersdb.create_empty_tables()
