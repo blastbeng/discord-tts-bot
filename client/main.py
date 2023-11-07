@@ -43,6 +43,12 @@ class MyClient(discord.AutoShardedClient):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
 
+class AdminPermissionError(Exception):
+    pass
+
+class ExcludedPermissionError(Exception):
+    pass
+
 class PermissionError(Exception):
     pass
 
@@ -184,7 +190,7 @@ class SaveButton(discord.ui.Button["InteractionRoles"]):
         try:
             await interaction.response.defer(thinking=True, ephemeral=True)
             currentguildid = get_current_guild_id(interaction.guild.id)
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "repeat/learn/" + urllib.parse.quote(self.message) + "/" + currentguildid + "/" + utils.get_guild_language(currentguildid)
+            url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "repeat/learn/" + urllib.parse.quote(self.message) + "/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/"
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if (response.status == 200):
@@ -402,6 +408,31 @@ async def send_error(e, interaction, from_generic=False, is_deferred=False):
                 await interaction.followup.send("Discord API Error, " + await utils.translate(currentguildid,"please try again later"), ephemeral = True)
             else:
                 await interaction.response.send_message("Discord API Error, " + await utils.translate(currentguildid,"please try again later"), ephemeral = True)
+    elif isinstance(e, ExcludedPermissionError):
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("[GUILDID : %s] %s %s %s - %s", currentguildid, exc_type, fname, exc_tb.tb_lineno, e.args[0])
+        
+        voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+        await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
+        lang_to_use = utils.get_guild_language(currentguildid)
+        #url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/Vaffanculo%20Valeriu/google/"
+        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/Disagio/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
+                
+        await do_play(url, interaction, currentguildid)
+
+        if is_deferred:
+            await interaction.followup.send(await utils.translate(currentguildid,"Disagio."), ephemeral = True)
+        else:
+            await interaction.response.send_message(await utils.translate(currentguildid,"Disagio."), ephemeral = True)
+    elif isinstance(e, AdminPermissionError):
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("[GUILDID : %s] %s %s %s - %s", currentguildid, exc_type, fname, exc_tb.tb_lineno, e.args[0])
+        if is_deferred:
+            await interaction.followup.send(await utils.translate(currentguildid,"You do not have permission to use this command."), ephemeral = True)
+        else:
+            await interaction.response.send_message(await utils.translate(currentguildid,"You do not have permission to use this command."), ephemeral = True)
     elif isinstance(e, PermissionError):
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -436,11 +467,21 @@ def get_voice_client_by_guildid(voice_clients, guildid):
 
 def check_permissions(interaction):
     if not interaction.user.voice or not interaction.user.voice.channel:
-        raise NoChannelError("NO CHANNEL ERROR - User [" + str(interaction.user.name) + "] tried to use a command without being connected to a voice channel")
+        raise NoChannelError("NO CHANNEL ERROR - User [ NAME: " + str(interaction.user.name) + " - ID: " + str(interaction.user.id) + "] tried to use a command without being connected to a voice channel")
 
     perms = interaction.user.voice.channel.permissions_for(interaction.user.voice.channel.guild.me)
     if (not perms.speak):
-        raise PermissionError("PERMISSION ERROR - User [" + str(interaction.user.name) + "] tried to use a command in a disabled voice channel")
+        raise PermissionError("PERMISSION ERROR - User [NAME: " + str(interaction.user.name) + " - ID: " + str(interaction.user.id) + "] some excluded user tried to use a command")
+
+    excluded_ids = json.loads(os.environ['EXCLUDED_IDS'])
+    for excluded_id in excluded_ids:
+        if (str(interaction.user.id) == str(excluded_id)):
+            raise ExcludedPermissionError("EXCLUDED PERMISSION ERROR - User [NAME: " + str(interaction.user.name) + " - ID: " + str(interaction.user.id) + "] some excluded user tried to use a command")
+
+
+def check_admin_permissions(interaction):
+    if (not str(interaction.user.id) == str(os.environ.get("ADMIN_ID"))):
+        raise AdminPermissionError("ADMIN PERMISSION ERROR - User [NAME: " + str(interaction.user.name) + " - ID: " + str(interaction.user.id) + "] tried to use a command who requires admin grants")
         
 
 async def connect_bot_by_voice_client(voice_client, channel, guild, member=None):
@@ -573,7 +614,7 @@ class PlayAudioLoop:
             if channelfound is not None and channeluserfound is not None:
                 await connect_bot_by_voice_client(voice_client, channelfound, None)
                 if voice_client and hasattr(voice_client, 'play') and voice_client.is_connected() and not voice_client.is_playing():
-                    url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/" + currentguildid + "/" + utils.get_guild_language(currentguildid)
+                    url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/"
                     connector = aiohttp.TCPConnector(force_close=True)
                     async with aiohttp.ClientSession(connector=connector) as session:
                         async with session.get(url) as response:
@@ -602,11 +643,11 @@ class PopulatorLoop:
             
             connector = aiohttp.TCPConnector(force_close=True)
             async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(os.environ.get("API_URL")+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/20/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/1") as response:
+                async with session.get(os.environ.get("API_URL")+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/20/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/1" + "/") as response:
                     if (response.status == 200):
                         logging.info("populator_loop - " + str(response.text))
                     else:
-                        logging.error("populator_loop - Error calling populator - status_code: " + str(response.status_code))
+                        logging.error("populator_loop - Error calling populator - status_code: " + str(response.status))
                 await session.close()  
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -836,7 +877,7 @@ async def on_guild_remove(guild):
     try:
         if str(interaction.guild.id) != str(os.environ.get("GUILD_ID")):
             utils.delete_guild(str(guild.id))
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/reset/" +urllib.parse.quote(str(guild.id))
+            url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/reset/" +urllib.parse.quote(str(guild.id)) + "/"
             async with aiohttp.ClientSession(connector=connector) as session:
                 async with session.get(url) as response:
                     if (response.status != 200):
@@ -913,7 +954,7 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "googl
                 voice = await listvoices_api(language=lang_to_use, filter=voice)
 
             if voice is not None:
-                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use)
+                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
                 await do_play(url, interaction, currentguildid)
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)      
@@ -943,7 +984,7 @@ async def wikipedia(interaction: discord.Interaction, text: str):
         elif voice_client:
 
             currentguildid = get_current_guild_id(interaction.guild.id)
-            url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"search/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+            url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"search/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
             await do_play(url, interaction, currentguildid)
 
         else:
@@ -981,7 +1022,7 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
                 voice = await listvoices_api(language=lang_to_use, filter=voice)
 
             if voice is not None:
-                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/"+urllib.parse.quote(str(text))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
                 await do_play(url, interaction, currentguildid)
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True) 
@@ -1012,12 +1053,12 @@ async def generate(interaction: discord.Interaction):
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
         elif voice_client:
             currentguildid = get_current_guild_id(interaction.guild.id)
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/sentences/generate/" + urllib.parse.quote(currentguildid) + "/0"
+            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/sentences/generate/" + urllib.parse.quote(currentguildid) + "/0" + "/"
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if (response.status == 200):
                         text = await response.text()
-                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
                         await do_play(url, interaction, currentguildid, show_save=True)
                     else:
                         logging.error("[GUILDID : %s] generate - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)))
@@ -1047,12 +1088,12 @@ async def story(interaction: discord.Interaction):
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
         elif voice_client:
             currentguildid = get_current_guild_id(interaction.guild.id)
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/paragraph/generate/" + urllib.parse.quote(currentguildid)
+            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/paragraph/generate/" + urllib.parse.quote(currentguildid) + "/"
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if (response.status == 200):
                         text = await response.text()
-                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)
+                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid) + "/"
                         await do_play(url, interaction, currentguildid)
                     else:
                         logging.error("[GUILDID : %s] story - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)))
@@ -1134,7 +1175,7 @@ async def random(interaction: discord.Interaction, voice: str = "random", text: 
                 voice = await listvoices_api(language=utils.get_guild_language(currentguildid), filter=voice)
 
             if voice is not None:
-                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid)
+                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid) + "/"
                 if text != "":
                     url = url + "/" + text
                 await do_play(url, interaction, currentguildid)
@@ -1176,7 +1217,7 @@ async def curse(interaction: discord.Interaction):
                             elif voice_client:
                                 
 
-                                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"curse/"+urllib.parse.quote(currentguildid)+ "/" + utils.get_guild_language(currentguildid)
+                                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"curse/"+urllib.parse.quote(currentguildid)+ "/" + utils.get_guild_language(currentguildid) + "/"
                                 await do_play(url, interaction, currentguildid)
                             else:
                                 await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
@@ -1196,7 +1237,7 @@ async def restart(interaction: discord.Interaction):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        #check_permissions(interaction)
         if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")) and str(interaction.user.id) == str(os.environ.get("ADMIN_ID")):
             if interaction.user.guild_permissions.administrator:
                 await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I am restarting the bot."), ephemeral = True)
@@ -1217,7 +1258,7 @@ async def delete(interaction: discord.Interaction, text: str):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        check_admin_permissions(interaction)
         
         currentguildid = get_current_guild_id(interaction.guild.id)
 
@@ -1251,6 +1292,8 @@ async def delete(interaction: discord.Interaction, text: str):
                             if (response.status == 200):
                                 text = await response.text()
                                 await interaction.followup.send(text, ephemeral = True) 
+                            elif (response.status == 500):
+                                await interaction.followup.send("Temporarily disabled. Other processes are running in the background, you need to wait for the end of their execution.", ephemeral = True) 
                             else:
                                 logging.error("[GUILDID : %s] forcedelete/bytext - Received bad response from APIs", str(currentguildid))
                                 await interaction.followup.send(await utils.translate(currentguildid,"Error."), ephemeral = True)     
@@ -1271,7 +1314,7 @@ async def download(interaction: discord.Interaction):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        #check_permissions(interaction)
         if interaction.user.guild_permissions.administrator:
             currentguildid = get_current_guild_id(interaction.guild.id)
 
@@ -1338,7 +1381,7 @@ async def rename(interaction: discord.Interaction, name: str):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        #check_permissions(interaction)
         
         if len(name) < 32:
             currentguildid = get_current_guild_id(interaction.guild.id)
@@ -1362,7 +1405,7 @@ async def avatar(interaction: discord.Interaction, image: discord.Attachment):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        #check_permissions(interaction)
         if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")) and str(interaction.user.id) == str(os.environ.get("ADMIN_ID")):
             if interaction.user.guild_permissions.administrator:
                 imgfile=await image.to_file()
@@ -1394,7 +1437,7 @@ async def language(interaction: discord.Interaction, language: app_commands.Choi
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        #check_permissions(interaction)
         currentguildid = get_current_guild_id(interaction.guild.id)
         if interaction.user.guild_permissions.administrator:
 
@@ -1485,10 +1528,10 @@ async def translate(interaction: discord.Interaction, text: str, language_to: ap
             
 
             async with aiohttp.ClientSession() as session:
-                async with session.get(os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "translate/" + urllib.parse.quote(lang_to_use_from) + "/" + urllib.parse.quote(language_to.value) + "/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid)) as response:
+                async with session.get(os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "translate/" + urllib.parse.quote(lang_to_use_from) + "/" + urllib.parse.quote(language_to.value) + "/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid) + "/") as response:
                     if (response.status == 200):
                         translated_text = await response.text()
-                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(translated_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(language_to.value)
+                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(translated_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(language_to.value) + "/"
                         await do_play(url, interaction, currentguildid)
                     else:
                         logging.error("[GUILDID : %s] translate - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)))
@@ -1693,7 +1736,7 @@ async def commands(interaction: discord.Interaction):
     is_deferred=True
     try:     
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        #check_permissions(interaction)
         view = discord.ui.View()
         view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.DISCLAIMER))
         view.add_item(SlashCommandButton(discord.ButtonStyle.green, constants.CURSE))
@@ -1744,7 +1787,7 @@ async def admin(interaction: discord.Interaction):
     is_deferred=True
     try:     
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        #check_permissions(interaction)
         if interaction.user.guild_permissions.administrator:
 
             view = discord.ui.View()
@@ -1775,7 +1818,7 @@ async def accept(interaction: discord.Interaction):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        #check_permissions(interaction)
         if interaction.user.guild_permissions.administrator:
             view = discord.ui.View()
             view.add_item(AcceptButton())
@@ -1797,7 +1840,7 @@ async def disclaimer(interaction: discord.Interaction):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=False)
-        check_permissions(interaction)
+        #check_permissions(interaction)
         await interaction.followup.send(await get_disclaimer(get_current_guild_id(interaction.guild.id)), ephemeral = True)   
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
@@ -1806,13 +1849,13 @@ async def disclaimer(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(file='file')
 @app_commands.describe(file="The sentences file")
-@app_commands.checks.cooldown(1, 300.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def train(interaction: discord.Interaction, file: discord.Attachment):
     """Train the Bot using a sentences file."""
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        check_admin_permissions(interaction)
         currentguildid = get_current_guild_id(interaction.guild.id)
         if not utils.allowed_file(file.filename):
             await interaction.followup.send(await utils.translate(currentguildid,"Please upload a valid text file.") + " (.txt)", ephemeral = True)     
@@ -1833,7 +1876,9 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
                 
                 response = requests.post(url, data=form_data, files={"trainfile": open(filepath, "rb")})
                 if (response.status_code == 200):
-                    await interaction.followup.send(await utils.translate(currentguildid,"I am inserting the sentences into the bot. It could take a few minutes."), ephemeral = True) 
+                    await interaction.followup.send(await utils.translate(currentguildid,"I am inserting the sentences into the bot. This process might take a lot time."), ephemeral = True) 
+                elif response.status_code == 500:
+                    await interaction.followup.send(await utils.translate(currentguildid,"Temporarily disabled. Other functions are running in the background, you need to wait for the end of their execution. This process might take a lot time."), ephemeral = True) 
                 elif response.status_code == 406:
                     message = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
                     logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(get_current_guild_id(interaction.guild.id)))
@@ -1862,7 +1907,7 @@ async def block(interaction: discord.Interaction, word: str):
     is_deferred=True
     try:        
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        #check_permissions(interaction)
         currentguildid = get_current_guild_id(interaction.guild.id)
         url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/filters/addword/" + urllib.parse.quote(word) +"/"+urllib.parse.quote(currentguildid)
 
@@ -1890,7 +1935,7 @@ async def unblock(interaction: discord.Interaction, word: str):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        #check_permissions(interaction)
         currentguildid = get_current_guild_id(interaction.guild.id)
         url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/filters/deleteword/" + urllib.parse.quote(word) +"/"+urllib.parse.quote(currentguildid)
 
@@ -1916,7 +1961,7 @@ async def unblockall(interaction: discord.Interaction):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        #check_permissions(interaction)
         if interaction.user.guild_permissions.administrator:
             currentguildid = get_current_guild_id(interaction.guild.id)
             url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/filters/deleteall/" +urllib.parse.quote(currentguildid)
@@ -1943,7 +1988,7 @@ async def reset(interaction: discord.Interaction):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
+        #check_permissions(interaction)
         
         if interaction.user.guild_permissions.administrator:
             currentguildid = get_current_guild_id(interaction.guild.id)

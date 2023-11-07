@@ -15,6 +15,7 @@ import fakeyou
 import time
 import logging
 import audiodb
+import filtersdb
 from chatterbot import ChatBot
 from chatterbot import languages
 from chatterbot.conversation import Statement
@@ -445,6 +446,11 @@ def train_txt(trainfile, chatbot: ChatBot, lang: str, chatid: str):
 
       clean_duplicates(chatid)
 
+      
+      for text in trainfile_array:
+        audiodb.update_is_correct_by_word(text, chatid, 1, False)
+      
+
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -506,10 +512,10 @@ def delete_by_text(chatid: str, text: str, force = False):
     sqliteConnection = sqlite3.connect(dbfile)
     cursor = sqliteConnection.cursor()
 
-    sqlite_delete_query1 = "DELETE FROM Statement WHERE text like '" + text + "%' OR text like '%" + text + "' OR text LIKE '%" + text + "%' OR text = '" + text + "' COLLATE NOCASE"
-    sqlite_delete_query2 = "DELETE FROM Statement WHERE in_response_to like '" + text + "%' OR in_response_to like '%" + text + "' OR in_response_to LIKE '%" + text + "%' OR in_response_to = '" + text + "' COLLATE NOCASE"
+    sqlite_delete_query1 = "DELETE FROM Statement WHERE text like ? OR text like ? OR text LIKE ? OR text = ? COLLATE NOCASE"
+    sqlite_delete_query2 = "DELETE FROM Statement WHERE in_response_to like ? OR in_response_to like ? OR in_response_to LIKE ? OR in_response_to = ? COLLATE NOCASE"
 
-    data_tuple = ()
+    data_tuple = (text+"%","%"+text,"%"+text+"%",text,)
 
     logging.info("delete_by_text - Executing: %s", sqlite_delete_query1)
 
@@ -530,7 +536,7 @@ def delete_by_text(chatid: str, text: str, force = False):
         sqliteConnection.close()
   if force:
     #delete_from_audiodb_by_text(chatid, text)
-    audiodb.update_is_correct_by_word(text, chatid, 0)
+    audiodb.update_is_correct_by_word(text, chatid, 0, True)
     return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot e dal db audio!')
   else:
     return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot!')
@@ -543,9 +549,9 @@ def delete_from_audiodb_by_text(chatid: str, text: str):
     sqliteConnection = sqlite3.connect(dbfile)
     cursor = sqliteConnection.cursor()
 
-    sqlite_delete_query = "DELETE FROM Audio WHERE chatid = '" + chatid + "' and (name like '" + text + "%' OR name like '%" + text + "' OR name LIKE '%" + text + "%' OR name = '" + text + "') COLLATE NOCASE"
+    sqlite_delete_query = "DELETE FROM Audio WHERE chatid = '" + chatid + "' and (name like ?' OR name like ? OR name LIKE ? OR name = ?) COLLATE NOCASE"
 
-    data_tuple = ()
+    data_tuple = (text+"%","%"+text,"%"+text+"%",text,)
 
     logging.info("delete_from_audiodb_by_text - Executing:  %s", sqlite_delete_query)
 
@@ -742,13 +748,13 @@ def get_random_from_bot(chatid: str, text: str):
     sqliteConnection = sqlite3.connect('./config/'+dbfile)
     cursor = sqliteConnection.cursor()
 
+    data = ()
     
     sqlite_select_sentences_query = "SELECT text FROM statement "
     if text is not None:
-      sqlite_select_sentences_query = sqlite_select_sentences_query + " where (text like '" + text + "%' OR text like '%" + text + "' OR text LIKE '%" + text + "%' OR text = '" + text + "') COLLATE NOCASE "
+      sqlite_select_sentences_query = sqlite_select_sentences_query + " where (text like ? OR text like ? OR text LIKE ? OR text = ?) COLLATE NOCASE "
+      data = (text+"%","%"+text,"%"+text+"%",text,)
     sqlite_select_sentences_query = sqlite_select_sentences_query + " ORDER BY RANDOM() LIMIT 1;"
-
-    data = ()
 
     cursor.execute(sqlite_select_sentences_query, data)
     records = cursor.fetchall()
@@ -926,7 +932,8 @@ def restore(chatid: str, text: str):
 
     if(text is not None):
       
-      sqlite_select_query = sqlite_select_query + " WHERE chatid = '" + chatid + "' and (name like '" + text + "%' OR name like '%" + text + "' OR name LIKE '%" + text + "%' OR name = '" + text + "') COLLATE NOCASE"
+      data_tuple = (text+"%","%"+text,"%"+text+"%",text,)
+      sqlite_select_query = sqlite_select_query + " WHERE chatid = '" + chatid + "' and (name like ? OR name like ? OR name LIKE ?' OR name = ?) COLLATE NOCASE"
 
     cursor.execute(sqlite_select_query, data_tuple)
     records = cursor.fetchall()
@@ -1143,7 +1150,7 @@ def reset(chatid: str):
 
   vacuum_chatbot_db(chatid)
 
-  delete_from_audiodb(chatid, text)
+  delete_from_audiodb(chatid)
   audiodb.vacuum()
 
   filtersdb.delete_all(chatid)

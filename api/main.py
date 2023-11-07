@@ -876,6 +876,9 @@ class DatabaseAudiodbPopulate(Resource):
 class DatabaseTrainFile(Resource):
   def post (self):
     try:
+      for thread in threading.enumerate(): 
+        if thread.name == 'trainer_thread' and thread.is_alive():
+          return make_response(str("Trainer thread is still running."), 500)
       chatid = request.form.get("chatid")
       if chatid is None:
         chatid = "000000"
@@ -896,7 +899,11 @@ class DatabaseTrainFile(Resource):
               if word.lower() in line.lower():
                 os.remove(trainfile)
                 return get_response_filters_error(word)
-        threading.Timer(0, utils.train_txt, args=[trainfile, get_chatbot_by_id(chatid, lang), lang, chatid]).start()
+        #threading.Timer(0, utils.train_txt, args=[trainfile, get_chatbot_by_id(chatid, lang), lang, chatid]).start()
+        chatbot = get_chatbot_by_id(chatid, lang)
+        daemon = Thread(target=utils.train_txt, args=(trainfile,chatbot, lang, chatid,), daemon=True, name="trainer_thread")
+        daemon.start()
+
         return get_response_str("Done. Watch the logs for errors.")
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -912,7 +919,7 @@ class FiltersAdd(Resource):
     try:
       if word != "":
         filtersdb.insert(chatid, word)
-        audiodb.update_is_correct_by_word(word, chatid, 0)
+        audiodb.update_is_correct_by_word(word, chatid, 0, True)
         return get_response_str("Adding to blocked words: " + word)
       else:
         return make_response(str("ERROR: No word provided"), 500)
@@ -930,7 +937,7 @@ class FiltersDelete(Resource):
     try:
       if word != "":
         filtersdb.delete(chatid, word)
-        audiodb.update_is_correct_by_word(word, chatid, 1)
+        audiodb.update_is_correct_by_word(word, chatid, 1, True)
         return get_response_str("Removing from blocked words: " + word)
       else:
         return make_response(str("ERROR: No word provided"), 500)
@@ -946,7 +953,7 @@ class FiltersDelete(Resource):
 class FiltersDelete(Resource):
   def get (self, chatid = "000000"):
     try:
-      utils.reset(chatid, word)
+      utils.reset(chatid)
       return get_response_str("All the sentences deleted from the database")
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -994,6 +1001,9 @@ class RestoreChatbot(Resource):
 class AdminForceDeleteByText(Resource):
   def get (self, text: str, chatid = "000000"):
     try:
+      for thread in threading.enumerate(): 
+        if thread.name == 'trainer_thread' and thread.is_alive():
+          return make_response(str("Trainer thread is still running."), 500)
       response = get_response_str(utils.delete_by_text(chatid, text, force=True))
       return response
     except Exception as e:

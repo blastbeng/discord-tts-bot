@@ -68,7 +68,7 @@ services:
       - "8967:8967"
     volumes:
       - "/tmp/discord-tts-bot-api:/tmp/discord-tts-bot-api"
-      - "./config.json:/usr/src/app/config.json"
+      - "./config/config.json:/usr/src/app/config.json"
       - "./config/wacache:/usr/src/app/config/wacache"
     image: "blastbeng/discord-tts-bot-whatsapp:1.0.0"
     restart: "no"

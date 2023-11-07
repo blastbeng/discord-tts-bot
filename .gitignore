@@ -147,3 +147,4 @@ backups
 backups_old
 rclone/rclone.conf
 wwebjs_auth
+manual_backup_*

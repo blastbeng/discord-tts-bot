@@ -165,14 +165,20 @@ def update_is_correct(name: str, chatid: str, voice: str, language: str, is_corr
 
 
 
-def update_is_correct_by_word(text: str, chatid: str, is_correct: int):
+def update_is_correct_by_word(text: str, chatid: str, is_correct: int, use_like: bool):
   try:
+    text = text.strip()
     sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
     cursor = sqliteConnection.cursor()
 
-    sqlite_query = "UPDATE Audio SET is_correct = ? WHERE chatid = ? and data is not null and duration <= ? and  (name like '" + text + "%' OR name like '%" + text + "' OR name LIKE '%" + text + "%' OR name = '" + text + "') COLLATE NOCASE"
+    logging.info('Updating word is_correct to %s for text: "%s"', str(is_correct), text)
 
-    data_audio_tuple = (is_correct,chatid,int(os.environ.get("MAX_TTS_DURATION")),)
+    if use_like: 
+      sqlite_query = "UPDATE Audio SET is_correct = ? WHERE is_correct != ? and chatid = ? and data is not null and duration <= ? and (trim(name) like ? OR trim(name) like ? OR trim(name) LIKE ? OR trim(name) = ?) COLLATE NOCASE"
+      data_audio_tuple = (is_correct,is_correct,chatid,int(os.environ.get("MAX_TTS_DURATION")),text+"%","%"+text,"%"+text+"%",text,)
+    else: 
+      sqlite_query = "UPDATE Audio SET is_correct = ? WHERE is_correct != ? and chatid = ? and data is not null and duration <= ? and trim(name) = ? COLLATE NOCASE"
+      data_audio_tuple = (is_correct,is_correct,chatid,int(os.environ.get("MAX_TTS_DURATION")),text,)
 
     cursor.execute(sqlite_query, data_audio_tuple)
 
@@ -416,13 +422,15 @@ def select_by_chatid_voice_language_random(chatid: str, voice:str, language:str,
       if voice != "random":
         sqlite_select_query = sqlite_select_query + " and voice = ?"
         params=(chatid,language,voice,)
+        
 
       if text is None:
         sqlite_select_query = sqlite_select_query + " ORDER BY RANDOM() LIMIT 1;"
       elif text is not None:
-        sqlite_select_query = sqlite_select_query + " and (name like '" + text + "%' OR name like '%" + text + "' OR name LIKE '%" + text + "%' OR name = '" + text + "') COLLATE NOCASE ORDER BY RANDOM() LIMIT 1;"
+        params = params + (text+"%","%"+text,"%"+text+"%",text,)
+        sqlite_select_query = sqlite_select_query + " and (name like ? OR name like ? OR name LIKE ? OR name =?) COLLATE NOCASE ORDER BY RANDOM() LIMIT 1;"
 
-      cursor.execute(sqlite_select_query, params)
+      cursor.execute(sqlite_select_query, params )
       records = cursor.fetchall()
 
       name = False
