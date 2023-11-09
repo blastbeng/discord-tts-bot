@@ -205,7 +205,7 @@ class SaveButton(discord.ui.Button["InteractionRoles"]):
 class PlayButton(discord.ui.Button["InteractionRoles"]):
 
     def __init__(self, content, message):
-        super().__init__(style=discord.ButtonStyle.green, label="Play", name="Play")
+        super().__init__(style=discord.ButtonStyle.green, label="Play")
         self.content = content
         self.message = message
         self.cd_mapping = commands.CooldownMapping.from_cooldown(5, 5, commands.BucketType.member)
