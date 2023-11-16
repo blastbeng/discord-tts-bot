@@ -208,7 +208,6 @@ class PlayButton(discord.ui.Button["InteractionRoles"]):
         super().__init__(style=discord.ButtonStyle.green, label="Play")
         self.content = content
         self.message = message
-        self.cd_mapping = commands.CooldownMapping.from_cooldown(5, 5, commands.BucketType.member)
     
     async def callback(self, interaction: discord.Interaction):
         is_deferred=True
@@ -216,28 +215,6 @@ class PlayButton(discord.ui.Button["InteractionRoles"]):
             await interaction.response.defer(thinking=True, ephemeral=True)
                     
             check_permissions(interaction)
-
-            view: CooldownView = self.view
-            bucket = view.cd_mapping.get_bucket(interaction.message)
-            retry_after = bucket.update_rate_limit()
-            if retry_after:
-                currentguildid=get_current_guild_id(interaction.guild.id)
-                dtc = "Spam " + await utils.translate(currentguildid,"detected.")
-                spamarray=[]
-                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"I am watching you."))
-                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"This doesn't make you a good person."))
-                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"I'm stupid but not annoying."))
-                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"Take your time."))
-                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"Keep calm."))
-                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"Do you also do this at your home?"))
-                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"Why are you so anxious?"))
-                spamarray.append(dtc + " " + interaction.user.mention + " " + await utils.translate(currentguildid,"I'll add you to the blacklist."))
-                command = str(interaction.data['name'])
-                #cooldown = command + ' -> Cooldown: ' + str(e.cooldown.per) + '[' + str(round(retry_after, 2)) + ']s'
-
-                #spaminteractionmsg = utils.get_random_from_array(spamarray) + '\n' + cooldown
-                spaminteractionmsg = utils.get_random_from_array(spamarray)
-                await interaction.followup.send(spaminteractionmsg, ephemeral = True)
 
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
@@ -1646,7 +1623,7 @@ async def disable(interaction: discord.Interaction):
 
 @client.tree.command()
 @app_commands.rename(seconds='seconds')
-@app_commands.describe(seconds="Timeout seconds (Min 60 - Max 180)")
+@app_commands.describe(seconds="Timeout seconds (Min 60 - Max 600)")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def timer(interaction: discord.Interaction, seconds: int):
     """Change the timer for the auto talking feature."""
@@ -1655,8 +1632,8 @@ async def timer(interaction: discord.Interaction, seconds: int):
         await interaction.response.defer(thinking=True, ephemeral=True)
         check_permissions(interaction)
         currentguildid = get_current_guild_id(interaction.guild.id)
-        if seconds < 60 or seconds > 180:
-            await interaction.followup.send(await utils.translate(currentguildid,"Seconds must be greater than 60 and lower than 180"), ephemeral = True)
+        if seconds < 60 or seconds > 600:
+            await interaction.followup.send(await utils.translate(currentguildid,"Seconds must be greater than 60 and lower than 600"), ephemeral = True)
         else:
             loops_dict[interaction.guild.id].play_audio_loop.change_interval(seconds=seconds)
             logging.info("timer - play_audio_loop.change_interval(seconds="+str(seconds)+")")
