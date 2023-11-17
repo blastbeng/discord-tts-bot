@@ -34,3 +34,4 @@ tqdm==4.65.0
 essential_generators
 bestemmie
 bs4
+pymongo==4.6.0

@@ -234,16 +234,9 @@ def get_class( kls ):
 
 def get_chatterbot(chatid: str, train: False, lang = "it"):
 
-  dbfile=chatid+"-db.sqlite3"
+  dbfile=chatid+"-db"
 
   spacymodel = lang+"_core_news_sm"
-
-  fle = Path('./config/'+dbfile)
-  fle.touch(exist_ok=True)
-  f = open(fle)
-  f.close()
-
-  #nlp = spacy.load(spacymodel)
 
   language = None
 
@@ -256,8 +249,8 @@ def get_chatterbot(chatid: str, train: False, lang = "it"):
 
   chatbot = ChatBot(
       'PezzenteCapo',
-      storage_adapter='chatterbot.storage.SQLStorageAdapter',
-      database_uri='sqlite:///config/'+dbfile,
+      storage_adapter='chatterbot.storage.MongoDatabaseAdapter',
+      database_uri='mongodb://localhost:27017/'+dbfile,
       statement_comparison_function = LevenshteinDistance,
       response_selection_method = get_random_response,
       tagger_language=language,
