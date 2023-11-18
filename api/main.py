@@ -779,7 +779,6 @@ class InitChatterbotClass(Resource):
     try:
       #threading.Timer(0, get_chatbot_by_id, args=[chatid]).start()
       #return make_response("Initializing chatterbot. Watch the logs for errors.", 200)
-      utils.vacuum_chatbot_db(chatid)
       chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
       if chatbot is not None:
         return make_response("Initialized chatterbot on chatid " + chatid, 200)
@@ -923,7 +922,7 @@ class DatabaseTrainFile(Resource):
       if not trf and utils.allowed_file(trf):
         return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
       else:
-        trainfile=TMP_DIR + '/' + utils.get_random_string(24) + ".txt"
+        trainfile=TMP_DIR + utils.get_slashes() + utils.get_random_string(24) + ".txt"
         out_stream = BytesIO()
         trf.save(trainfile)
         with open(trainfile) as f:
@@ -1015,8 +1014,7 @@ class FiltersDelete(Resource):
 @nsdatabase.route('/backup/chatbot/<string:chatid>')
 class BackupChatbot(Resource):
   def get (self, chatid = "000000"):
-    utils.backupdb(chatid, "sqlite3")
-    filename = os.path.dirname(os.path.realpath(__file__)) + '/config/' + chatid + '-db.txt'
+    filename = os.path.dirname(os.path.realpath(__file__)) + utils.get_slashes() + 'config' + utils.get_slashes() + chatid + '-db.txt'
     if utils.extract_sentences_from_chatbot(filename, chatid=chatid):
       utils.backupdb(chatid, "txt")
     return "Databases for chatid "+chatid+" backed up!"

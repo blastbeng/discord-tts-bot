@@ -8,6 +8,7 @@ import requests
 import sys
 import os
 import urllib
+import pymongo
 import yt_dlp
 from functools import lru_cache
 import string
@@ -250,7 +251,7 @@ def get_chatterbot(chatid: str, train: False, lang = "it"):
   chatbot = ChatBot(
       'PezzenteCapo',
       storage_adapter='chatterbot.storage.MongoDatabaseAdapter',
-      database_uri='mongodb://localhost:27017/'+dbfile,
+      database_uri='mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/'+dbfile,
       statement_comparison_function = LevenshteinDistance,
       response_selection_method = get_random_response,
       tagger_language=language,
@@ -374,31 +375,21 @@ def extract_sentences_from_audiodb(filename, language="it", chatid="000000"):
 def extract_sentences_from_chatbot(filename, chatid="000000"):
   try:    
 
-    sqliteConnection = sqlite3.connect('./config/' + chatid + '-db.sqlite3')
-    cursor = sqliteConnection.cursor()
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    statements = chatbotdb["statements"]
 
-    sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY text"""
-
-    data = ()
-
-    cursor.execute(sqlite_select_sentences_query, data)
-    records = cursor.fetchall()
-
-    
-    records_len = len(records)-1
-
-
-    with open(filename, 'a') as sentence_file:
-      for row in records:
-        logging.info('extract_sentences_from_chatbot - [chatid:' + chatid + '] - "' + row[0] + '"')
-        sentence_file.write(row[0])
+    with open(filename, 'a', encoding="utf8") as sentence_file:      
+      for row in statements.distinct('text'): 
+        logging.info('extract_sentences_from_chatbot - [chatid:' + chatid + '] - "' + row + '"')
+        sentence_file.write(row)
         sentence_file.write("\n")
 
-    cursor.close()
 
-    lines = open(filename, 'r').readlines()
+    lines = open(filename, 'r', encoding="utf8").readlines()
     lines_set = set(lines)
-    out  = open(filename, 'w')
+    out  = open(filename, 'w', encoding="utf8")
     for line in lines_set:
         out.write(line)
 
@@ -407,9 +398,6 @@ def extract_sentences_from_chatbot(filename, chatid="000000"):
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return False
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
   return True
 
 def get_random_string(length):
@@ -428,7 +416,7 @@ def train_txt(trainfile, chatbot: ChatBot, lang: str, chatid: str):
       logging.info("Loading: %s", trainfile)
       trainer = CustomListTrainer(chatbot)
       trainfile_array = []
-      with open(trainfile) as file:
+      with open(trainfile, encoding="utf-8") as file:
           for line in file:
               trainfile_array.append(line.strip())
       if len(trainfile_array) > 0:
@@ -451,112 +439,63 @@ def train_txt(trainfile, chatbot: ChatBot, lang: str, chatid: str):
 
 def clean_duplicates(chatid: str):
   try:
-    dbfile='./config/'+chatid+"-db.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
-
-    sqlite_delete_query = """DELETE FROM statement
-                             WHERE EXISTS (
-                               SELECT 1 FROM statement s2
-                               WHERE (statement.text = s2.text 
-                                  OR statement.text = SUBSTR(s2.text, 1,LENGTH(s2.text)-1)
-                                  OR s2.text = SUBSTR(statement.text, 1,LENGTH(statement.text)-1))
-                               AND statement.id > s2.id
-                             );"""
     
-    data_tuple = ()
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    statements = chatbotdb["statements"]
 
-    logging.info("clean_duplicates - Executing: %s", sqlite_delete_query)
+    statements.aggregate(
+      [ 
+          { "$sort": { "_id": 1 } }, 
+          { "$group": { 
+              "_id": "$text", 
+              "doc": { "$first": "$$ROOT" } 
+          }}, 
+          { "$replaceRoot": { "newRoot": "$doc" } },
+          { "$out": "collection" }
+      ]
 
-    cursor.execute(sqlite_delete_query, data_tuple)
+    )
+    logging.info("clean_duplicates - Done!")
 
-    sqliteConnection.commit()
-    cursor.close()
-  except sqlite3.Error as error:
-    logging.error("Failed to delete data from sqlite", exc_info=1)
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return("Errore!")
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
-
-def vacuum_chatbot_db(chatid: str):
-  try:
-    dbfile='./config/'+chatid+"-db.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
-
-    cursor.execute("VACUUM")
-
-    cursor.close()
-  except sqlite3.Error as error:
-    logging.error("Failed to Execute VACUUM", exc_info=1)
-  finally:
-    if sqliteConnection:
-      sqliteConnection.close()
 
 def delete_by_text(chatid: str, text: str, force = False):
   try:
-    backupdb(chatid, "sqlite3")
-    filename = os.path.dirname(os.path.realpath(__file__)) + '/config/' + chatid + '-db.txt'
+    filename = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'config' + get_slashes() + chatid + '-db.txt'
     if extract_sentences_from_chatbot(filename, chatid=chatid):
       backupdb(chatid, "txt")
     
-    dbfile='./config/'+chatid+"-db.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
+    
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    statements = chatbotdb["statements"]
 
-    sqlite_delete_query1 = "DELETE FROM Statement WHERE text like ? OR text like ? OR text LIKE ? OR text = ? COLLATE NOCASE"
-    sqlite_delete_query2 = "DELETE FROM Statement WHERE in_response_to like ? OR in_response_to like ? OR in_response_to LIKE ? OR in_response_to = ? COLLATE NOCASE"
+    rgx = re.compile('.*' + text + '.*', re.IGNORECASE)  # compile the regex
+    statements.delete_many({'text':rgx})
 
-    data_tuple = (text+"%","%"+text,"%"+text+"%",text,)
+    rgx_2 = re.compile('.*' + text + '.*', re.IGNORECASE)  # compile the regex
+    statements.delete_many({'in_response_to':rgx_2})
 
-    logging.info("delete_by_text - Executing: %s", sqlite_delete_query1)
+    logging.info("delete_by_text - Deleting: %s", text)
 
-    cursor.execute(sqlite_delete_query1, data_tuple)
-
-    logging.info("delete_by_text - Executing: %s", sqlite_delete_query2)
-
-    cursor.execute(sqlite_delete_query2, data_tuple)
-
-
-    sqliteConnection.commit()
-    cursor.close()
-  except sqlite3.Error as error:
-    logging.error("Failed to delete data from sqlite", exc_info=1)
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return("Errore!")
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
   if force:
     #delete_from_audiodb_by_text(chatid, text)
     audiodb.update_is_correct_by_word(text, chatid, 0, True)
     return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot e dal db audio!')
   else:
     return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot!')
-
-
-
-def delete_from_audiodb_by_text(chatid: str, text: str):
-  try:
-    dbfile="./config/audiodb.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
-
-    sqlite_delete_query = "DELETE FROM Audio WHERE chatid = '" + chatid + "' and (name like ?' OR name like ? OR name LIKE ? OR name = ?) COLLATE NOCASE"
-
-    data_tuple = (text+"%","%"+text,"%"+text+"%",text,)
-
-    logging.info("delete_from_audiodb_by_text - Executing:  %s", sqlite_delete_query)
-
-    cursor.execute(sqlite_delete_query, data_tuple)
-    sqliteConnection.commit()
-    cursor.close()
-
-  except sqlite3.Error as error:
-    logging.error("Failed to delete data from sqlite", exc_info=1)
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
 
 def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it", save=True, call_fy=True, limit=True, user=None):
   try:
@@ -738,40 +677,30 @@ def list_fakeyou_voices(lang:str):
 
 def get_random_from_bot(chatid: str, text: str):
   try:
-    dbfile=chatid+"-db.sqlite3"
-    sqliteConnection = sqlite3.connect('./config/'+dbfile)
-    cursor = sqliteConnection.cursor()
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    statements = chatbotdb["statements"]
 
-    data = ()
-    
-    sqlite_select_sentences_query = "SELECT text FROM statement "
-    if text is not None:
-      sqlite_select_sentences_query = sqlite_select_sentences_query + " where (text like ? OR text like ? OR text LIKE ? OR text = ?) COLLATE NOCASE "
-      data = (text+"%","%"+text,"%"+text+"%",text,)
-    sqlite_select_sentences_query = sqlite_select_sentences_query + " ORDER BY RANDOM() LIMIT 1;"
+    cursor = statements.aggregate([
+      {
+        "$sample": {
+          "size": 1
+        }
+      }
+    ])
 
-    cursor.execute(sqlite_select_sentences_query, data)
-    records = cursor.fetchall()
+    sentence = ""
 
-    count = 0
+    for row in cursor:    
+      sentence = row['text']
 
-    sentence = None
-
-    for row in records:
-      sentence = row[0]
-
-    cursor.close()
     return sentence
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     raise Exception(e)
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
-
-
     
 
 def populate_audiodb_unlimited(limit: int, chatid: str, lang: str):  
@@ -889,8 +818,8 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
 
 def backupdb(chatid: str, extension: str):  
   try:
-    dbfile="./config/" + chatid + "-db." + extension
-    dst="./backups/" + chatid + "-db_backup_" + str(time.time()) + "." + extension
+    dbfile=os.path.dirname(os.path.realpath(__file__)) + get_slashes() + "config" + get_slashes() + chatid + "-db." + extension
+    dst=os.path.dirname(os.path.realpath(__file__)) + get_slashes() + "backups" + get_slashes() + chatid + "-db_backup_" + str(time.time()) + "." + extension
     shutil.copyfile(dbfile, dst)
 
     current_time = time.time()
@@ -917,7 +846,7 @@ def backupdb(chatid: str, extension: str):
 def restore(chatid: str, text: str):
   sentences = ""
   try:
-    dbfile="./config/audiodb.sqlite3"
+    dbfile=os.path.dirname(os.path.realpath(__file__)) + get_slashes() + "config" + get_slashes() + "audiodb.sqlite3"
     sqliteConnection = sqlite3.connect(dbfile)
     cursor = sqliteConnection.cursor()
 
@@ -1142,8 +1071,6 @@ def reset(chatid: str):
     if sqliteConnection:
         sqliteConnection.close()
 
-  vacuum_chatbot_db(chatid)
-
   delete_from_audiodb(chatid)
   audiodb.vacuum()
 
@@ -1188,3 +1115,10 @@ def delete_tts(limit=100):
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+
+def get_slashes():
+  if os.name == "nt": 
+    return "\\"
+  else:
+    return "/"
