@@ -1077,7 +1077,6 @@ def vacuum():
 
 #if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
 chatbots_dict = {}
-audiodb.create_empty_tables()
 filtersdb.create_empty_tables()
 cache.init_app(app)
 limiter.init_app(app)
