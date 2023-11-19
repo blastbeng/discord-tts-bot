@@ -693,16 +693,16 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
       dbfile = chatid + "-db"
       myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
       chatbotdb = myclient[dbfile]
-      statement = chatbotdb["statement"]     
+      statement = chatbotdb["statements"]     
 
       #records = statement.find().limit(limit)
-      statement.aggregate(
-          [ { "$sample": { size: limit } } ]
+      cursor = statement.aggregate(
+          [ { "$sample": { "size" : limit } } ]
       )
 
       sentences = []
 
-      for row in records:
+      for row in cursor:
         sentences.append(row['text'])
     except Exception as e:
       raise Exception(e)
@@ -919,7 +919,7 @@ def reset(chatid: str):
     dbfile = chatid + "-db"
     myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
-    statement = chatbotdb["statement"]     
+    statement = chatbotdb["statements"]     
 
     statement.delete_many()
 
