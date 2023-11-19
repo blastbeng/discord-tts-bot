@@ -9,7 +9,6 @@ RUN apt-get update && \
         libncurses5-dev \
         libncursesw5-dev \
         libreadline-dev \
-        libsqlite3-dev \
         libssl-dev \
         llvm \
         make \
@@ -28,7 +27,6 @@ RUN apt-get update && \
         libpcre3-dev \
         libpcre3 \
         hunspell-it \
-        sqlite3 \
         iputils-ping
         
 RUN echo 'vm.overcommit_memory=1' >> /etc/sysctl.conf
@@ -61,7 +59,6 @@ COPY data data
 COPY libretranslator.py .
 COPY utils.py .
 COPY audiodb.py .
-COPY filtersdb.py .
 COPY custom_trainer.py .
 COPY insults.py .
 COPY image.py .

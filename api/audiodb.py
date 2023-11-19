@@ -1,5 +1,5 @@
 import os
-import sqlite3
+import random
 import pymongo
 import datetime
 import logging
@@ -339,8 +339,6 @@ def select_voice_by_name_chatid_language(name: str, chatid: str, language: str):
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]   
     voice = None
-
-    sqlite_select_query = """SELECT voice from Audio WHERE name = ? AND chatid = ? AND language = ? ORDER BY RANDOM() LIMIT 1; """
     
     records = audiotable.find({
                         "chatid": chatid,
@@ -361,236 +359,125 @@ def select_voice_by_name_chatid_language(name: str, chatid: str, language: str):
 
 
 def select_distinct_language_by_name_chatid(name: str, chatid: str):
-  if chatid == "X":
-    return None
-  else:
-    lang = None
-    try:
-      sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
-      cursor = sqliteConnection.cursor()
-
-      sqlite_select_query = """SELECT DISTINCT language from Audio WHERE name = ? AND chatid = ? """
-      cursor.execute(sqlite_select_query, (name, chatid,))
-      records = cursor.fetchall()
-
-      for row in records:
-        lang   =  str(row[0])
-
-      cursor.close()
-
-    except sqlite3.Error as error:
-      logging.error("Failed to Execute SQLITE Query", exc_info=1)
-    finally:
-      if sqliteConnection:
-        sqliteConnection.close()
-    return lang
-
-def select_by_chatid_voice_language_random(chatid: str, voice:str, language:str, text:str):
-  if chatid == "X":
-    return None
-  else:
-    audio = None
-    name = None
-    try:
-      sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
-      cursor = sqliteConnection.cursor()
-
-      sqlite_select_query="SELECT data, name, duration from Audio WHERE chatid = ? AND language = ? AND is_correct = 1 AND counter > 0 and data is not null"
-      params=None
-      params=(chatid,language,)
-
-      if voice != "random":
-        sqlite_select_query = sqlite_select_query + " and voice = ?"
-        params=(chatid,language,voice,)
-        
-
-      if text is None:
-        sqlite_select_query = sqlite_select_query + " ORDER BY RANDOM() LIMIT 1;"
-      elif text is not None:
-        params = params + (text+"%","%"+text,"%"+text+"%",text,)
-        sqlite_select_query = sqlite_select_query + " and (name like ? OR name like ? OR name LIKE ? OR name =?) COLLATE NOCASE ORDER BY RANDOM() LIMIT 1;"
-
-      cursor.execute(sqlite_select_query, params )
-      records = cursor.fetchall()
-
-      name = False
-
-      for row in records:
-        data = row[0]
-        duration = row[2]
-        cursor.close()
-        if duration > int(os.environ.get("MAX_TTS_DURATION")):
-          sqliteConnection.close()
-          raise AudioLimitException
-        audio = BytesIO(data)
-        audio.seek(0)
-        name = row[1]
-
-      cursor.close()
-
-    except sqlite3.Error as error:
-      logging.error("Failed to Execute SQLITE Query", exc_info=1)
-    finally:
-      if sqliteConnection:
-        sqliteConnection.close()
-    return audio, name
-
-def select_audio_by_id(id: int):
-  audio = None
+  lang = None
   try:
-    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
-    cursor = sqliteConnection.cursor()
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    audiotable = chatbotdb["audio"]   
+    
+    records = audiotable.find({
+                        "chatid": chatid,
+                        "name": name                    
+                      })
 
-    sqlite_select_query = """SELECT data from Audio WHERE id = ? """
-    cursor.execute(sqlite_select_query, (id,))
-    records = cursor.fetchall()
 
     for row in records:
-      data   =  row[0]
-      cursor.close()
-      audio = BytesIO(data)
-      audio.seek(0)
-
-    cursor.close()
-
-  except sqlite3.Error as error:
-    logging.error("Failed to Execute SQLITE Query", exc_info=1)
-  finally:
-    if sqliteConnection:
-      sqliteConnection.close()
-  if audio is None:
-    raise Exception("Audio not found")
-  else:
-    return audio
-
-def select_count_by_text_chatid_voice(text: str, chatid: str, voice: str):
-  count = 0
-  try:
-    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
-    cursor = sqliteConnection.cursor()
-
-    sqlite_select_query = """SELECT count(id) from Audio WHERE name = ? and chatid = ? and voice = ?"""
-    cursor.execute(sqlite_select_query, (text, chatid, voice,))
-    records = cursor.fetchall()
-
-    for row in records:
-      count = row[0]
-
-    cursor.close()
-  except sqlite3.Error as error:
-    logging.error("Failed to Execute SQLITE Query", exc_info=1)
-    return count
-  finally:
-    if sqliteConnection:
-      sqliteConnection.close()
-    return count
-
-def select_count_by_text_chatid(text: str, chatid: str):
-  count = 0
-  try:
-    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
-    cursor = sqliteConnection.cursor()
-
-    sqlite_select_query = """SELECT count(id) from Audio WHERE name = ? and chatid = ?"""
-
-    cursor.execute(sqlite_select_query, (text, chatid))
-    records = cursor.fetchall()
-
-    for row in records:
-      count = row[0]
-
-    cursor.close()
-  except sqlite3.Error as error:
-    logging.error("Failed to Execute SQLITE Query", exc_info=1)
-    return count
-  finally:
-    if sqliteConnection:
-      sqliteConnection.close()
-    return count
-
-def select_count_by_chatid_voice(chatid: str, voice: str):
-  count = 0
-  try:
-    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
-    cursor = sqliteConnection.cursor()
-
-    sqlite_select_query = """SELECT count(id) from Audio WHERE chatid = ? and voice = ?"""
-    cursor.execute(sqlite_select_query, (chatid, voice,))
-    records = cursor.fetchall()
-
-    for row in records:
-      count = row[0]
-
-    cursor.close()
-  except sqlite3.Error as error:
-    logging.error("Failed to Execute SQLITE Query", exc_info=1)
-    return count
-  finally:
-    if sqliteConnection:
-      sqliteConnection.close()
-    return count
-
-
-def delete_by_name(name: str, chatid: str):
-  try:
-    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
-    cursor = sqliteConnection.cursor()
-
-    sqlite_delete_query = """DELETE from Audio 
-                          WHERE chatid = ?
-                          AND (name like ?
-                          OR name like ?
-                          OR name = ?)"""
-
-
-    data_tuple = (chatid,
-                  name+'%', 
-                  '%'+name, 
-                  name) 
-    cursor.execute(sqlite_delete_query, data_tuple)
-
-    sqliteConnection.commit()
-    cursor.close()
+      lang = row['language']
 
   except Exception as e:
-    logging.error("Failed to Execute SQLITE Query", exc_info=1)
-    raise Exception(e)
-  finally:
-    if sqliteConnection:
-      sqliteConnection.close()
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+  return lang
 
-
-
-def clean_old_limited_audios(limit: int):
+def select_by_chatid_voice_language_random(chatid: str, voice:str, language:str, text:str):
+  audio = None
+  name = None
   try:
-    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
-    cursor = sqliteConnection.cursor()
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    audiotable = chatbotdb["audio"]       
+    
+    params={
+           "chatid": chatid,
+           "language": language,
+           "is_correct": 1,
+           "counter": {"$gte": 0},   
+           "file": {
+             "$nin": [None, ""]
+           }                
+         }
 
-    sqlite_delete_audio_query = """DELETE from audio where data is null and duration > 0 and duration < ?"""
+    if voice != "random":
+      params["voice"] = voice      
 
-    data_audio_tuple = (limit,)
+    if text is not None:
+      rgx = re.compile('.*' + text + '.*', re.IGNORECASE)
+      params["name"] = rgx
 
-    cursor.execute(sqlite_delete_audio_query, data_audio_tuple)
+    
+    records = audiotable.find(params)
+
+    name = False
+    recordlist = list(records)
+    sizel = len(list(recordlist))
+
+    if sizel > 0:
+      random_index = int(random.random() * sizel)
+      row = recordlist[random_index]
+      file = row['file']
+      duration = row['duration']
+      name = row['name']
+      if duration > int(os.environ.get("MAX_TTS_DURATION")):
+        raise AudioLimitException
+      sound = AudioSegment.from_mp3(file)
+      audio = BytesIO()
+      sound.export(audio, format='mp3', bitrate="256")
+      audio.seek(0)
 
 
-    sqliteConnection.commit()
-    cursor.close()
-  except sqlite3.Error as error:
-    logging.error("Failed to Execute SQLITE Query", exc_info=1)
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+  return audio, name
 
-def vacuum():
+
+def extract_sentences_from_audiodb(filename, language="it", chatid="000000"):
   try:
-    sqliteConnection = sqlite3.connect("./config/audiodb.sqlite3")
-    cursor = sqliteConnection.cursor()
 
-    cursor.execute("VACUUM")
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    audiotable = chatbotdb["audio"]     
+    
+    params={
+           "chatid": chatid,
+           "language": language              
+         }     
 
-    cursor.close()
-  except sqlite3.Error as error:
-    logging.error("Failed to Execute VACUUM", exc_info=1)
-  finally:
-    if sqliteConnection:
-      sqliteConnection.close()
+    records = audiotable.find(params)
+
+    with open(filename, 'w') as sentence_file:
+      for row in records:
+        logging.info('extract_sentences_from_audiodb - [chatid:' + chatid + ',lang:' + language + '] - "' + row[0] + '"')
+        sentence_file.write(row[0])
+        sentence_file.write("\n")
+        
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    return False
+  return True
+
+def delete_by_chatid(chatid: str):
+  try:
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    audiotable = chatbotdb["audio"]    
+
+    params = { "chatid": chatid }
+
+    audiotable.delete_many(params)
+
+    logging.info("delete_from_audiodb - Executing delete by chatid: %s", chatid)
+
+
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)

@@ -15,8 +15,6 @@ MarkupSafe==2.1.2
 wikipedia
 gtts
 git+https://github.com/yt-dlp/yt-dlp
-#pysqlite3==0.5.0
-git+https://github.com/pysqlite3/pysqlite3
 redis==4.3.4
 Flask-Caching==2.0.1
 libretranslatepy

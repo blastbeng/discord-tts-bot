@@ -2,7 +2,6 @@ import re
 import shutil
 import random
 import wikipedia
-import sqlite3
 import json
 import requests
 import sys
@@ -17,7 +16,6 @@ import time
 import logging
 import audiodb
 import hashlib
-import filtersdb
 from chatterbot import ChatBot
 from chatterbot import languages
 from chatterbot.conversation import Statement
@@ -332,41 +330,6 @@ def get_random_date():
   return date
 
 
-
-def extract_sentences_from_audiodb(filename, language="it", chatid="000000"):
-  try:
-
-    sqliteConnection = sqlite3.connect('./config/audiodb.sqlite3')
-    cursor = sqliteConnection.cursor()
-
-    sqlite_select_sentences_query = """SELECT DISTINCT name FROM audio WHERE chatid = ? and language = ? ORDER BY RANDOM()"""
-
-    data = (chatid, language,)
-
-    cursor.execute(sqlite_select_sentences_query, data)
-    records = cursor.fetchall()
-
-    
-    records_len = len(records)-1
-
-
-    with open(filename, 'w') as sentence_file:
-      for row in records:
-        logging.info('extract_sentences_from_audiodb - [chatid:' + chatid + ',lang:' + language + '] - "' + row[0] + '"')
-        sentence_file.write(row[0])
-        sentence_file.write("\n")
-        
-    cursor.close()
-  except Exception as e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-    return False
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
-  return True
-
 def extract_sentences_from_chatbot(filename, chatid="000000"):
   try:    
 
@@ -542,16 +505,6 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
     else:
       audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=1, user=user)
       raise Exception(e)
-
-    
-def download_tts(id: int):
-  try:
-    return audiodb.select_audio_by_id(id)
-  except Exception as e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-    raise Exception(e)
 
 def populate_tts(text: str, chatid="000000", voice=None, israndom=False, language="it"):
   try:
@@ -737,49 +690,19 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
 
     try:
 
-      file = chatid + "-db.sqlite3"
+      dbfile = chatid + "-db"
+      myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+      chatbotdb = myclient[dbfile]
+      statement = chatbotdb["statement"]     
 
-      dbfile=os.path.join('./config/', file)
-
-      sqliteConnection = sqlite3.connect(dbfile)
-      cursor = sqliteConnection.cursor()
-    
-      cursor.execute("ATTACH DATABASE ? AS audiodb",("./config/audiodb.sqlite3",))
+      records = statement.find()
 
       sentences = []
 
-      sqlite_select_sentences_query1 = " SELECT * FROM (SELECT DISTINCT statement.text as name FROM statement WHERE statement.text NOT IN (SELECT audiodb.audio.name from audiodb.audio) ORDER BY RANDOM() LIMIT " + str(limit) + ")"
-      log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query1)
-      cursor.execute(sqlite_select_sentences_query1, ())
-      records1 = cursor.fetchall()
-
-      for row1 in records1:
-        sentences.append(row1[0])
-      
-      sqlite_select_sentences_query2 = " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = '" + chatid + "' and COUNTER > 0 and COUNTER < " + str(os.environ.get("COUNTER_LIMIT")) + " and IS_CORRECT = 1 GROUP BY audio.name HAVING COUNT(audio.name) < " + str(len(listvoices)) + " ORDER BY RANDOM() LIMIT " + str(limit) + ")"
-      log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query2)
-      cursor.execute(sqlite_select_sentences_query2, ())
-      records2 = cursor.fetchall()
-
-      for row2 in records2:
-        sentences.append(row2[0])
-      
-      sqlite_select_sentences_query3 = " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = '" + chatid + "' and COUNTER > 0 and COUNTER < " + str(os.environ.get("COUNTER_LIMIT")) + " and IS_CORRECT = 1 AND DATA IS NULL ORDER BY RANDOM() LIMIT " + str(limit) + ")"
-      log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query3)
-      cursor.execute(sqlite_select_sentences_query3, ())
-      records3 = cursor.fetchall()
-
-      for row3 in records3:
-        sentences.append(row3[0])
-
-      
-
-      cursor.close()
+      for row in records:
+        sentences.append(row['text'])
     except Exception as e:
       raise Exception(e)
-    finally:
-      if 'sqliteConnection' in locals() and sqliteConnection:
-        sqliteConnection.close()
     if len(sentences) > 0:
       for sentence in sentences:
         key, voice = random.choice(listvoices)
@@ -848,39 +771,6 @@ def backupdb(chatid: str, extension: str):
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     raise Exception(e)
 
-def restore(chatid: str, text: str):
-  sentences = ""
-  try:
-    dbfile=os.path.dirname(os.path.realpath(__file__)) + get_slashes() + "config" + get_slashes() + "audiodb.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
-
-    sqlite_select_query = """SELECT DISTINCT name FROM Audio"""
-    data_tuple = ()
-
-    if(text is not None):
-      
-      data_tuple = (text+"%","%"+text,"%"+text+"%",text,)
-      sqlite_select_query = sqlite_select_query + " WHERE chatid = '" + chatid + "' and (name like ? OR name like ? OR name LIKE ?' OR name = ?) COLLATE NOCASE"
-
-    cursor.execute(sqlite_select_query, data_tuple)
-    records = cursor.fetchall()
-
-    logging.info("restore - Executing: %s", sqlite_select_query)
-    
-    for row in records:\
-      sentences = sentences + "\n" + row[0] 
-
-    cursor.close()
-
-  except sqlite3.Error as error:
-    logging.error("Failed to select data from sqlite", exc_info=1)
-    return("Errore!")
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
-  return BytesIO(bytes(sentences,'utf-8'))
-
 def init_generator_models(chatid, language):
 
   logging.info("START -- essential_generators - [chatid:" + chatid + ",lang:" + language + "] - Models Generator")
@@ -889,7 +779,7 @@ def init_generator_models(chatid, language):
 
   filename = dir_path + '/config/sentences_'+chatid+'.txt'
   
-  if extract_sentences_from_audiodb(filename, language=language, chatid=chatid):
+  if audiodb.extract_sentences_from_audiodb(filename, language=language, chatid=chatid):
 
     text_model_path = dir_path + '/config/markov_textgen_'+chatid+'.json'
     word_model_path = dir_path + '/config/markov_wordgen_'+chatid+'.json'
@@ -1023,54 +913,22 @@ def rmdir(directory):
 
 def reset(chatid: str):
   try:
-    dbfile='./config/'+chatid+"-db.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    statement = chatbotdb["statement"]     
 
-    sqlite_delete_query = "DELETE FROM Statement"
-    
-    data_tuple = ()
+    statement.delete_many()
 
-    logging.info("reset - Executing: %s", sqlite_delete_query)
+    logging.info("reset - Executing delete by chatid: %s", chatid)
 
-    cursor.execute(sqlite_delete_query, data_tuple)
+    audiodb.delete_by_chatid(chatid)
 
-    sqliteConnection.commit()
-    cursor.close()
-  except sqlite3.Error as error:
-    logging.error("Failed to delete data from sqlite", exc_info=1)
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
-  delete_from_audiodb(chatid)
-  audiodb.vacuum()
-
-  filtersdb.delete_all(chatid)
-  filtersdb.vacuum()
-
-
-def delete_from_audiodb(chatid: str):
-  try:
-    dbfile="./config/audiodb.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
-
-    sqlite_delete_query = "DELETE FROM Audio WHERE chatid = ?"
-
-    data_tuple = (chatid, )
-
-    logging.info("delete_from_audiodb - Executing:  %s", sqlite_delete_query)
-
-    cursor.execute(sqlite_delete_query, data_tuple)
-    sqliteConnection.commit()
-    cursor.close()
-
-  except sqlite3.Error as error:
-    logging.error("Failed to delete data from sqlite", exc_info=1)
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
 
 
 def delete_tts(limit=100):
