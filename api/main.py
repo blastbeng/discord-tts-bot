@@ -866,22 +866,6 @@ class DownloadSentencesDb(Resource):
 
 
 
-@nsdatabase.route('/create/zipfile/')
-@nsdatabase.route('/create/zipfile/<string:chatid>')
-class  DatabaseCreateZipFile(Resource):
-  def get (self, chatid = "000000"):
-    try:
-      if chatid == "000000":
-        threading.Timer(0, utils.download_audio_zip, args=[chatid]).start()
-        return make_response("Creating zipfile under ./config dir. Watch the logs for errors.", 200)
-      else:
-        return make_response("Creating zipfile not permitted for this chatid!", 500)
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-      return make_response(str(e), 500)
-
 
 @nsdatabase.route('/delete/bytext/<string:text>/')
 @nsdatabase.route('/delete/bytext/<string:text>/<string:chatid>')
@@ -1053,10 +1037,9 @@ def get_chatbot_by_id(chatid = "000000", lang = "it"):
   
 @scheduler.task('interval', id='backupdb', hours=12)
 def backupdb():
-  utils.backupdb("000000", "sqlite3")
   filename = os.path.dirname(os.path.realpath(__file__)) + '/config/' + chatid + '-db.txt'
-  if utils.extract_sentences_from_chatbot(filename, chatid=chatid):
-    utils.backupdb(chatid, "txt")
+  if utils.extract_sentences_from_chatbot(filename, chatid="000000"):
+    utils.backupdb("000000", "txt")
   
 @scheduler.task('interval', id='clean_audio_zip', hours=28)
 def clean_audio_zip():

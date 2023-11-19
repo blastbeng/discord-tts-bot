@@ -174,9 +174,6 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=T
     tts = gTTS(text=text, lang=language, slow=False)
     hashtext = hashlib.md5(text.encode('utf-8')).hexdigest()
     filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
-    #fp = BytesIO()
-    #tts.write_to_fp(fp)
-    #fp.seek(0)
     tts.save(filesave)
     sound = AudioSegment.from_mp3(filesave)
     duration = (len(sound) / 1000.0)
@@ -185,16 +182,12 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=T
       os.remove(filesave)
       raise AudioLimitException
     else:
-      #sound.duration_seconds == duration
       memoryBuff = BytesIO()
       sound.export(memoryBuff, format='mp3', bitrate="256")
       memoryBuff.seek(0)
-      #if chatid == "000000" and save:
       if save:
         audiodb.insert_or_update(text, chatid, filesave, "google", language, duration=duration, user=user)
       return memoryBuff
-    #return memoryBuff
-    #return fp
 
 def populate_tts_google(text: str, chatid="000000", language="it"):
   data = audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
@@ -203,9 +196,6 @@ def populate_tts_google(text: str, chatid="000000", language="it"):
   else:
     tts = gTTS(text=text, lang="it", slow=False)
     filesave = TMP_DIR + get_slashes() + get_random_string(24) + ".mp3"
-    #fp = BytesIO()
-    #tts.write_to_fp(fp)
-    #fp.seek(0)
     tts.save(filesave)
     sound = AudioSegment.from_mp3(filesave)
     duration = (len(sound) / 1000.0)
@@ -522,14 +512,16 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
             audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=0, duration=duration, user=user)
             raise AudioLimitException
           else:
-            #sound.duration_seconds == duration
-            out = BytesIO()
-            sound.export(out, format='mp3', bitrate="256")
-            out.seek(0)
             if save:
-              audiodb.insert_or_update(text.strip(), chatid, out, voice_to_use, language, duration=duration, user=user)
+              hashtext = hashlib.md5(text.encode('utf-8')).hexdigest()
+              filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
+              sound.export(filesave, format='mp3', bitrate="256")
+              audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration, user=user)
               return audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
             else:
+              out = BytesIO()
+              sound.export(out, format='mp3', bitrate="256")
+              out.seek(0)
               return out
         elif voice == "random" or voice == "google":
           return get_tts_google(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
@@ -588,10 +580,10 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
             return None
           else:
             #sound.duration_seconds == duration
-            out = BytesIO()
-            sound.export(out, format='mp3', bitrate="256")
-            out.seek(0)
-            audiodb.insert_or_update(text.strip(), chatid, out, voice_to_use, language, duration=duration)
+            hashtext = hashlib.md5(text.encode('utf-8')).hexdigest()
+            filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
+            sound.export(filesave, format='mp3', bitrate="256")
+            audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration)
             return True
         raise Exception("FakeYou Generation KO")
     else:
@@ -687,18 +679,26 @@ def get_random_from_bot(chatid: str, text: str):
     chatbotdb = myclient[dbfile]
     statements = chatbotdb["statements"]
 
-    cursor = statements.aggregate([
-      {
-        "$sample": {
-          "size": 1
+    sentence = None
+
+    if text is not None:
+      rgx = re.compile('.*' + text + '.*', re.IGNORECASE)  # compile the regex
+      cursor = statements.find({"text": rgx})
+      textlist = list(cursor)
+      sizel = len(textlist)
+      if sizel > 0:
+        random_index = int(random.random() * sizel)
+        sentence = textlist[random_index]['text']
+    else:
+      cursor = statements.aggregate([
+        {
+          "$sample": {
+            "size": 1
+          }
         }
-      }
-    ])
-
-    sentence = ""
-
-    for row in cursor:    
-      sentence = row['text']
+      ])
+      for row in cursor:    
+        sentence = row['text']
 
     return sentence
   except Exception as e:
@@ -1010,39 +1010,6 @@ def query_myinstants_sound(query: str):
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return []
-
-def clean_audio_zip():
-  dirname = "./config/download_audio_zip"
-  if os.path.exists(dirname):
-    rmdir(dirname)
-
-def download_audio_zip(chatid: str):
-  try:
-    dirname = "./config/download_audio_zip"
-    if not os.path.exists(dirname):
-      os.mkdir(dirname)
-      voices = list_fakeyou_voices("it")
-      datas = audiodb.select_data_name_voice_by_chatid(chatid)
-      audios = []
-      for data in datas:
-        audio = BytesIO(data[0])
-        name  = data[1].replace(" ", "_")
-        voice = ([k for k, v in voices.items() if v == data[2]][0]).replace(" ", "_")
-
-        if(len(name) > 40):
-          name = name[0:40]
-
-        filename_tmp1 = name + "_" + voice
-        filename_tmp2 = ''.join(e for e in filename_tmp1 if e.isalnum() or e == "_")
-        filename = dirname + "/" + filename_tmp2 +".mp3"
-        with open(filename, "wb") as outfile:
-            outfile.write(audio.getbuffer())
-    shutil.make_archive(dirname, 'zip', dirname)
-  except Exception as e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-    return False
 
 def rmdir(directory):
   directory = Path(directory)
