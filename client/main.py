@@ -141,10 +141,6 @@ class SlashCommandButton(discord.ui.Button["InteractionRoles"]):
                 await interaction.followup.send("/untrackall -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"Untrack all users"), ephemeral = True)
             elif self.name == constants.WIKIPEDIA:
                 await interaction.followup.send("/wikipedia <text> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot searches something on wikipedia"), ephemeral = True)
-            elif self.name == constants.BLOCK:
-                await interaction.followup.send("/block <word> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot adds a word to the blacklist"), ephemeral = True)         
-            elif self.name == constants.UNBLOCK:
-                await interaction.followup.send("/unblock <word> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot removes a word from the blacklist"), ephemeral = True)   
             else:
                 await interaction.followup.send("Work in progress", ephemeral = True)
         except Exception as e:
@@ -169,9 +165,7 @@ class AdminCommandButton(discord.ui.Button["InteractionRoles"]):
             elif self.name == constants.DELETE:
                 await interaction.followup.send("/delete <text> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot deletes all the sentences containing the given text"), ephemeral = True)
             elif self.name == constants.DOWNLOAD:
-                await interaction.followup.send("/download -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"Downloads a copy of the BOT's database"), ephemeral = True)       
-            elif self.name == constants.UNBLOCKALL:
-                await interaction.followup.send("/unblockall -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot removes all the words from the blacklist"), ephemeral = True)         
+                await interaction.followup.send("/download -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"Downloads a copy of the BOT's database"), ephemeral = True)           
             elif self.name == constants.RESET:
                 await interaction.followup.send("/reset -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot resets its database and deletes all the saved sentences"), ephemeral = True)         
             else:
@@ -1764,8 +1758,6 @@ async def commands(interaction: discord.Interaction):
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRACKUSER))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.UNTRACKALL))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRAIN))
-        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.BLOCK))
-        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.UNBLOCK))
 
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.SOUNDSEARCH))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.YOUTUBE))
@@ -1796,7 +1788,6 @@ async def admin(interaction: discord.Interaction):
             view.add_item(AdminCommandButton(discord.ButtonStyle.primary, constants.LANGUAGE))
             view.add_item(AdminCommandButton(discord.ButtonStyle.primary, constants.AVATAR))
             view.add_item(AdminCommandButton(discord.ButtonStyle.primary, constants.DELETE))
-            view.add_item(AdminCommandButton(discord.ButtonStyle.primary, constants.UNBLOCKALL))
             view.add_item(AdminCommandButton(discord.ButtonStyle.red, constants.RESET))
 
             message = await utils.translate(get_current_guild_id(interaction.guild.id),"These are the bot's admin commands")
@@ -1898,90 +1889,6 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 
-
-@client.tree.command()
-@app_commands.rename(word='word')
-@app_commands.describe(word="The word to block")
-@app_commands.checks.cooldown(1, 10.0, key=lambda i: (i.user.id))
-async def block(interaction: discord.Interaction, word: str):
-    """Add a word to the blacklist"""
-    is_deferred=True
-    try:        
-        await interaction.response.defer(thinking=True, ephemeral=True)
-        #check_permissions(interaction)
-        currentguildid = get_current_guild_id(interaction.guild.id)
-        url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/filters/addword/" + urllib.parse.quote(word) +"/"+urllib.parse.quote(currentguildid)
-
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                if (response.status == 200):
-                    await interaction.followup.send(await utils.translate(currentguildid,"Word added to the blacklist") + " ["+word+"]", ephemeral = True)
-                else:
-                    logging.error("[GUILDID : %s] block - Received bad response from APIs [word:%s]", str(currentguildid), word)
-                    await interaction.followup.send("API Timeout, " + await utils.translate(currentguildid,"please try again later"), ephemeral = True)
-            await session.close() 
-
-            
-    except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
-
-
-@client.tree.command()
-@app_commands.rename(word='word')
-@app_commands.describe(word="The word to unblock")
-@app_commands.checks.cooldown(1, 10.0, key=lambda i: (i.user.id))
-async def unblock(interaction: discord.Interaction, word: str):
-    """Remove a word from the blacklist"""
-    is_deferred=True
-    try:
-        await interaction.response.defer(thinking=True, ephemeral=True)
-        #check_permissions(interaction)
-        currentguildid = get_current_guild_id(interaction.guild.id)
-        url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/filters/deleteword/" + urllib.parse.quote(word) +"/"+urllib.parse.quote(currentguildid)
-
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                if (response.status == 200):
-                    await interaction.followup.send(await utils.translate(currentguildid,"Word removed from blacklist") + " ["+word+"]", ephemeral = True)
-                else:
-                    logging.error("[GUILDID : %s] unblock - Received bad response from APIs [word:%s]", str(currentguildid), word)
-                    await interaction.followup.send("API Timeout, " + await utils.translate(currentguildid,"please try again later"), ephemeral = True)
-            await session.close() 
-
-            
-    except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
-
-
-@client.tree.command()
-@app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
-async def unblockall(interaction: discord.Interaction):
-    """Remove all the words from the blacklist"""
-    is_deferred=True
-    try:
-        await interaction.response.defer(thinking=True, ephemeral=True)
-        #check_permissions(interaction)
-        if interaction.user.guild_permissions.administrator:
-            currentguildid = get_current_guild_id(interaction.guild.id)
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/filters/deleteall/" +urllib.parse.quote(currentguildid)
-
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    if (response.status == 200):
-                        await interaction.followup.send(await utils.translate(currentguildid,"All the words removed from blacklist"), ephemeral = True)
-                    else:
-                        logging.error("[GUILDID : %s] unblockall - Received bad response from APIs", str(currentguildid))
-                        await interaction.followup.send("API Timeout, " + await utils.translate(currentguildid,"please try again later"), ephemeral = True)
-                await session.close() 
-        else:        
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
-            
-    except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
-
-
 @client.tree.command()
 @app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
 async def reset(interaction: discord.Interaction):
@@ -2013,7 +1920,6 @@ async def reset(interaction: discord.Interaction):
 @admin.error
 @accept.error
 @avatar.error
-@block.error
 @commands.error
 @curse.error
 @delete.error
@@ -2038,8 +1944,6 @@ async def reset(interaction: discord.Interaction):
 @trackuser.error
 @translate.error
 @stop.error
-@unblock.error
-@unblockall.error
 @untrackall.error
 @youtube.error
 @wikipedia.error
