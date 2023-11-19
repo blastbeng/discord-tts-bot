@@ -11,6 +11,7 @@ from os.path import dirname
 from os.path import join
 from pathlib import Path
 from exceptions import AudioLimitException
+from pydub import AudioSegment
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -41,15 +42,16 @@ GUILD_ID = os.environ.get("GUILD_ID")
 #            UNIQUE(name,chatid,voice,language)
 #        ); """
 
-def insert(name: str, chatid: str, data: BytesIO, voice: str, language: str, is_correct=1, duration=0):
+def insert(name: str, chatid: str, filesave, voice: str, language: str, is_correct=1, duration=0):
   try:
+    dbfile = chatid + "-db"
     myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
-    audiodb = myclient["audiodb"]
-    audiotable = audiodb["audio"]
+    chatbotdb = myclient[dbfile]
+    audiotable = chatbotdb["audio"]
 
     record = { "name": name, 
                "chatid": chatid, 
-               "data": data.getbuffer() if data is not None else None,
+               "file": filesave,
                "voice": voice,
                "is_correct": is_correct,
                "language": language,
@@ -72,11 +74,18 @@ def select_count_by_name_chatid_voice_language(name: str, chatid: str, voice: st
   count = 0
   try:
     
+    dbfile = chatid + "-db"
     myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
-    audiodb = myclient["audiodb"]
-    audiotable = audiodb["audio"]
+    chatbotdb = myclient[dbfile]
+    audiotable = chatbotdb["audio"]
 
-    count = len(list(audiotable.find()))
+
+    count = len(list(audiotable.find({
+                        "chatid": chatid,
+                        "voice": voice,
+                        "name": name,
+                        "language": language                        
+                      })))
 
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -85,11 +94,12 @@ def select_count_by_name_chatid_voice_language(name: str, chatid: str, voice: st
   return count
   
 
-def insert_or_update(name: str, chatid: str, data: BytesIO, voice: str, language: str, is_correct=1, duration=0, user=None):
+def insert_or_update(name: str, chatid: str, filesave: str, voice: str, language: str, is_correct=1, duration=0, user=None):
   try:
+    dbfile = chatid + "-db"
     myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
-    audiodb = myclient["audiodb"]
-    audiotable = audiodb["audio"]
+    chatbotdb = myclient[dbfile]
+    audiotable = chatbotdb["audio"]
 
     count = select_count_by_name_chatid_voice_language(name, chatid, voice, language)
 
@@ -101,23 +111,24 @@ def insert_or_update(name: str, chatid: str, data: BytesIO, voice: str, language
                 "language": language
               }
 
-      record = {"name": name, 
-              "chatid": chatid, 
-              "data": data.getbuffer() if data is not None else None,
-              "voice": voice,
-              "is_correct": is_correct,
-              "language": language,
-              "counter": 0,
-              "duration": duration,
-              "user": user,
-              "tms_update": datetime.datetime.now() }
+      record = { "$set": {"name": name, 
+                          "chatid": chatid, 
+                          "file": filesave,
+                          "voice": voice,
+                          "is_correct": is_correct,
+                          "language": language,
+                          "counter": 0,
+                          "duration": duration,
+                          "user": user,
+                          "tms_update": datetime.datetime.now() }
+                  }
       audiotable.update_one(query, record)
 
     else:
 
       record = {"name": name, 
                 "chatid": chatid, 
-                "data": data.getbuffer() if data is not None else None,
+                "file": filesave,
                 "voice": voice,
                 "is_correct": is_correct,
                 "language": language,
@@ -137,18 +148,19 @@ def insert_or_update(name: str, chatid: str, data: BytesIO, voice: str, language
 
 
 def select_by_name_chatid_voice_language(name: str, chatid: str, voice: str, language: str):
-  audio = None
+  memoryBuff = None
   try:
+    dbfile = chatid + "-db"
     myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
-    audiodb = myclient["audiodb"]
-    audiotable = audiodb["audio"]
+    chatbotdb = myclient[dbfile]
+    audiotable = chatbotdb["audio"]
     
     query = { "chatid": chatid,
               "voice": voice,
               "name": name,
               "language": language,
               "is_correct": 1,
-              "data": {
+              "file": {
                 "$nin": [None, ""]
               }
             }
@@ -156,12 +168,14 @@ def select_by_name_chatid_voice_language(name: str, chatid: str, voice: str, lan
     records = audiotable.find(query)
 
     for row in records:
-      data = row["data"]
+      file = row["file"]
       duration = row["duration"]
       if duration > int(os.environ.get("MAX_TTS_DURATION")) :
         raise AudioLimitException
-      audio = BytesIO(data)
-      audio.seek(0)
+      sound = AudioSegment.from_mp3(file)
+      memoryBuff = BytesIO()
+      sound.export(memoryBuff, format='mp3', bitrate="256")
+      memoryBuff.seek(0)
 
 
   except Exception as e:
@@ -169,7 +183,7 @@ def select_by_name_chatid_voice_language(name: str, chatid: str, voice: str, lan
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
-  return audio
+  return memoryBuff
 
 def update_is_correct(name: str, chatid: str, voice: str, language: str, is_correct=1):
   try:

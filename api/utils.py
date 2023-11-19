@@ -16,6 +16,7 @@ import fakeyou
 import time
 import logging
 import audiodb
+import hashlib
 import filtersdb
 from chatterbot import ChatBot
 from chatterbot import languages
@@ -171,13 +172,17 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=T
     return data
   else:
     tts = gTTS(text=text, lang=language, slow=False)
-    fp = BytesIO()
-    tts.write_to_fp(fp)
-    fp.seek(0)
-    sound = AudioSegment.from_mp3(fp)
+    hashtext = hashlib.md5(text.encode('utf-8')).hexdigest()
+    filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
+    #fp = BytesIO()
+    #tts.write_to_fp(fp)
+    #fp.seek(0)
+    tts.save(filesave)
+    sound = AudioSegment.from_mp3(filesave)
     duration = (len(sound) / 1000.0)
     if limit and duration > int(os.environ.get("MAX_TTS_DURATION")):
       audiodb.insert_or_update(text, chatid, None, "google", language, is_correct=0, duration=duration, user=user)
+      os.remove(filesave)
       raise AudioLimitException
     else:
       #sound.duration_seconds == duration
@@ -186,10 +191,8 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=T
       memoryBuff.seek(0)
       #if chatid == "000000" and save:
       if save:
-        audiodb.insert_or_update(text, chatid, memoryBuff, "google", language, duration=duration, user=user)
-        return audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
-      else:
-        return memoryBuff
+        audiodb.insert_or_update(text, chatid, filesave, "google", language, duration=duration, user=user)
+      return memoryBuff
     #return memoryBuff
     #return fp
 
@@ -199,10 +202,12 @@ def populate_tts_google(text: str, chatid="000000", language="it"):
     return False
   else:
     tts = gTTS(text=text, lang="it", slow=False)
-    fp = BytesIO()
-    tts.write_to_fp(fp)
-    fp.seek(0)
-    sound = AudioSegment.from_mp3(fp)
+    filesave = TMP_DIR + get_slashes() + get_random_string(24) + ".mp3"
+    #fp = BytesIO()
+    #tts.write_to_fp(fp)
+    #fp.seek(0)
+    tts.save(filesave)
+    sound = AudioSegment.from_mp3(filesave)
     duration = (len(sound) / 1000.0)
     if duration > int(os.environ.get("MAX_TTS_DURATION")):
       audiodb.insert_or_update(text, chatid, None, "google", language, is_correct=0, duration=duration)
