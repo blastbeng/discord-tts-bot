@@ -398,7 +398,8 @@ class AudioRandomClass(Resource):
     try:
       tts_out, text_response = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang,text)
       if not text_response:
-          response = make_response("Audio not found", 204)
+          text = "Audio not found"
+          response = make_response(text, 204)
           response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
           return response
       elif tts_out is not None:

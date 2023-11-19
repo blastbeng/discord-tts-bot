@@ -170,7 +170,7 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=T
     return data
   else:
     tts = gTTS(text=text, lang=language, slow=False)
-    hashtext = hashlib.md5(text.encode('utf-8')).hexdigest()
+    hashtext = hashlib.md5((text+"google").encode('utf-8')).hexdigest()
     filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
     tts.save(filesave)
     sound = AudioSegment.from_mp3(filesave)
@@ -476,7 +476,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
             raise AudioLimitException
           else:
             if save:
-              hashtext = hashlib.md5(text.encode('utf-8')).hexdigest()
+              hashtext = hashlib.md5((text+language).encode('utf-8')).hexdigest()
               filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
               sound.export(filesave, format='mp3', bitrate="256")
               audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration, user=user)
@@ -695,7 +695,10 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
       chatbotdb = myclient[dbfile]
       statement = chatbotdb["statement"]     
 
-      records = statement.find()
+      #records = statement.find().limit(limit)
+      statement.aggregate(
+          [ { "$sample": { size: limit } } ]
+      )
 
       sentences = []
 
