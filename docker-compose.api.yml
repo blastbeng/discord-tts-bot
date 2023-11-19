@@ -1,0 +1,42 @@
+---
+version: "3.3"
+services:
+  discord-tts-bot-redis:
+    image: redis
+    container_name: discord-tts-bot-redis
+    ports:
+      - "63799:6379"
+    restart: "no"
+    volumes:
+      - redisdata:/data
+  discord-tts-bot-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.api
+    container_name: discord-tts-bot-api
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Rome
+    image: "blastbeng/discord-tts-bot-api:1.0.0"
+    restart: "no"
+    volumes:
+      - ".env:/app/.env"
+      - "./config:/app/config"
+      - "./audios:/app/audios"
+      - "./backups:/app/backups"
+      - "./config:/app/config-external"
+      - "/tmp/discord-tts-bot-api:/tmp/discord-tts-bot-api"
+      - "/tmp/discord-tts-bot-discord:/tmp/discord-tts-bot-discord"
+      - "/dev/dri/card0:/dev/dri/card0"
+      - "/dev/dri/renderD128:/dev/dri/renderD128"
+    entrypoint: ./entrypoint.sh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5080/utils/healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+    network_mode: host
+
+volumes:
+  redisdata:
