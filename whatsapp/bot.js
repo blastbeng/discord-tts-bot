@@ -14,8 +14,7 @@ log.setLevel(config.LOG_LEVEL);
 client = new Client({
     authStrategy: new LocalAuth({ dataPath: `${process.cwd()}/config/wacache` }),
     puppeteer: {
-        args: ['--no-sandbox'],
-        headless: "new"
+        args: ['--no-sandbox']
     }
 });
 
