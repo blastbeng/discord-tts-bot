@@ -169,19 +169,20 @@ def select_by_name_chatid_voice_language(name: str, chatid: str, voice: str, lan
     records = audiotable.find(query)
 
     for row in records:
+      duration = row["duration"]
+      if duration > int(os.environ.get("MAX_TTS_DURATION")):
+        raise AudioLimitException
       file = row["file"]
       if os.path.isfile(file) and int(os.environ.get("MASTER")) == 1:
-        duration = row["duration"]
-        if duration > int(os.environ.get("MAX_TTS_DURATION")):
-          raise AudioLimitException
         if int(os.environ.get("MASTER")) == 1:
           sound = AudioSegment.from_mp3(file)
           memoryBuff = BytesIO()
           sound.export(memoryBuff, format='mp3', bitrate="256")
           memoryBuff.seek(0)
       elif int(os.environ.get("MASTER")) == 0:
-        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"get_mp3/" + os.path.basename(file)
+        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"getmp3/" + os.path.basename(file)
         response = requests.get(url)
+        audio = BytesIO(response.content)
       else:
         delquery = { "_id": row["_id"] }
         audiotable.delete_one(delquery)
@@ -425,20 +426,21 @@ def select_by_chatid_voice_language_random(chatid: str, voice:str, language:str,
     if sizel > 0:
       random_index = int(random.random() * sizel)
       row = recordlist[random_index]
+      duration = row['duration']
+      if duration > int(os.environ.get("MAX_TTS_DURATION")):
+        raise AudioLimitException
+      name = row['name']
       file = row['file']      
       if os.path.isfile(file) and int(os.environ.get("MASTER")) == 1:
-        duration = row['duration']
-        name = row['name']
-        if duration > int(os.environ.get("MAX_TTS_DURATION")):
-          raise AudioLimitException
         if int(os.environ.get("MASTER")) == 1:
           sound = AudioSegment.from_mp3(file)
           audio = BytesIO()
           sound.export(audio, format='mp3', bitrate="256")
           audio.seek(0)
       elif int(os.environ.get("MASTER")) == 0:
-        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"get_mp3/" + os.path.basename(file)
+        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"getmp3/" + os.path.basename(file)
         response = requests.get(url)
+        audio = BytesIO(response.content)
       else:
         delquery = { "_id": row["_id"] }
         audiotable.delete_one(delquery)
