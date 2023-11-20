@@ -205,7 +205,7 @@ def populate_tts_google(text: str, chatid="000000", language="it"):
       memoryBuff = BytesIO()
       sound.export(memoryBuff, format='mp3', bitrate="256")
       memoryBuff.seek(0)
-      audiodb.insert_or_update(text, chatid, memoryBuff, "google", language, duration=duration)
+      audiodb.insert_or_update(text, chatid, filesave, "google", language, duration=duration)
       return True
     #return memoryBuff
     #return fp

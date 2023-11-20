@@ -33,13 +33,16 @@ load_dotenv(dotenv_path)
 
 GUILD_ID = discord.Object(id=os.environ.get("GUILD_ID"))
 
-#def get_api_url():
-#    url = os.environ.get("REMOTE_API_URL")+os.environ.get("API_PATH_UTILS")+"/healtcheck"
-#    response = requests.get(url)
-#    if response.status == 200:
-#        return os.environ.get("REMOTE_API_URL")
-#    else:
-#        return os.environ.get("API_URL")
+def get_api_url():
+    try:
+        url = os.environ.get("REMOTE_API_URL")+os.environ.get("API_PATH_UTILS")+"/healthcheck"
+        response = requests.get(url, timeout=1)
+        if response.status_code == 200:
+            return os.environ.get("REMOTE_API_URL")
+        else:
+            return os.environ.get("API_URL")
+    except:
+        return os.environ.get("API_URL")
 
 class TrackUser:
     def __init__(self, name, guildid, whatsapp):
@@ -1026,7 +1029,7 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
                 voice = await listvoices_api(language=lang_to_use, filter=voice)
 
             if voice is not None:
-                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"ask/user/"+urllib.parse.quote(str(interaction.user.name))+"/"+urllib.parse.quote(str(text))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
+                url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"ask/user/"+urllib.parse.quote(str(interaction.user.name))+"/"+urllib.parse.quote(str(text))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
                 await do_play(url, interaction, currentguildid)
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True) 

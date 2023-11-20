@@ -14,7 +14,8 @@ log.setLevel(config.LOG_LEVEL);
 client = new Client({
     authStrategy: new LocalAuth({ dataPath: `${process.cwd()}/config/wacache` }),
     puppeteer: {
-        args: ['--no-sandbox']
+        args: ['--no-sandbox'],
+        headless: "new"
     }
 });
 
@@ -136,7 +137,11 @@ client.on('message', async msg => {
                 } else if (msg.body.toLowerCase().startsWith('/ask')) {
                     let message = msg.body.slice(4);
                     if ( message.length !== 0 ) {
-                        await replyMsg(config.API_URL + "chatbot_text/ask/user/" + encodeURIComponent(msg.author) + "/" + encodeURIComponent(message.trim()) + "/000000/it", msg, chat)
+                        getApiUrl().then(res => async function(res){
+                            await replyMsg(res + "chatbot_text/ask/user/" + encodeURIComponent(msg.author) + "/" + encodeURIComponent(message.trim()) + "/000000/it", msg, chat)
+                        }).catch(async function(error) {
+                            await replyMsg(config.API_URL + "chatbot_text/ask/user/" + encodeURIComponent(msg.author) + "/" + encodeURIComponent(message.trim()) + "/000000/it", msg, chat)
+                        });
                     } else {
                         await msg.reply("Sei stronzo?\nMangi le pietre o sei scemo?\nSe devi chiedermi qualcosa devi scrivere un testo dopo /ask.");
                     }
@@ -247,5 +252,25 @@ async function replyMsg(url, msg, chat){
         log.error("ERRORE!", "["+ error + "]");
         await msg.reply(ERROR_MSG);
         await chat.clearState();
+    });
+}   
+
+
+
+async function getApiUrl(){
+    const url = config.REMOTE_API_URL + "utils/healthcheck"
+    const config = {
+        timeout: 10000,
+        method: 'get',
+        url: url
+    }
+    await axios(config).then(async function(response) {
+        if(response.status === 200) {
+            return config.REMOTE_API_URL;
+        } else {
+            return config.API_URL;
+        }
+    }).catch(async function(error) {
+        log.info("SLAVE OFFLINE!", "["+ error + "]");
     });
 }
