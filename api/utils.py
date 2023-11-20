@@ -686,8 +686,6 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
     listvoices = list(voices.items())
     #random.shuffle(listvoices)
 
-    records = None
-
     try:
 
       dbfile = chatid + "-db"
@@ -695,7 +693,6 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
       chatbotdb = myclient[dbfile]
       statement = chatbotdb["statements"]     
 
-      #records = statement.find().limit(limit)
       cursor = statement.aggregate(
           [ { "$sample": { "size" : limit } } ]
       )
@@ -925,7 +922,15 @@ def reset(chatid: str):
 
     logging.info("reset - Executing delete by chatid: %s", chatid)
 
-    audiodb.delete_by_chatid(chatid)
+    audiodb.delete_by_chatid(chatid)    
+
+    folder = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes()
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        if os.path.isfile(file_path) or os.path.islink(file_path):
+            os.unlink(file_path)
+        elif os.path.isdir(file_path):
+            shutil.rmtree(file_path)
 
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -949,6 +954,16 @@ def delete_tts(limit=100):
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
+def get_mp3(filename):
+  file = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + filename
+  if os.path.isfile(file):      
+    sound = AudioSegment.from_mp3(file)
+    memoryBuff = BytesIO()
+    sound.export(memoryBuff, format='mp3', bitrate="256")
+    memoryBuff.seek(0)
+    return memoryBuff
+  else:
+    return None
 
 def get_slashes():
   if os.name == "nt": 

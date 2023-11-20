@@ -34,3 +34,4 @@ essential_generators
 bestemmie
 bs4
 pymongo==4.6.0
+requests

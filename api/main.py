@@ -304,6 +304,28 @@ class ImageGenerateByText(Resource):
 nsaudio = api.namespace('chatbot_audio', 'Accumulators Chatbot TTS audio APIs')
 
 
+@nsaudio.route('/getmp3/<string:filename>')
+class AudioGetMp3Class(Resource):
+  @cache.cached(timeout=7200, query_string=True)
+  def get (self, filename: str):
+    try:
+      file = utils.get_mp3(filename)
+      if file is not None:
+        response = send_file(file, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        return response
+      else:
+        @after_this_request
+        def clear_cache(response):
+          cache.delete_memoized(AudioGetMp3Class.get, self, str)
+          return make_response("TTS Generation Error!", 500)
+    except Exception as e:
+      g.request_error = str(e)
+      @after_this_request
+      def clear_cache(response):
+        cache.delete_memoized(AudioGetMp3Class.get, self, str)
+        return make_response(g.get('request_error'), 500)
+
+
 @nsaudio.route('/repeat/<string:text>/<string:voice>/')
 @nsaudio.route('/repeat/<string:text>/<string:voice>/<string:chatid>')
 @nsaudio.route('/repeat/<string:text>/<string:voice>/<string:chatid>/<string:language>')
