@@ -64,9 +64,9 @@ app.config.from_object(Config())
     
 @app.after_request
 def after_request(response):
-  if not request.path.startswith('/utils/healthcheck'):
-    timestamp = strftime('[%Y-%b-%d %H:%M]')
-    logging.info('%s %s %s %s %s %s', timestamp, request.remote_addr, request.method, request.scheme, request.full_path, response.status)
+  #if not request.path.startswith('/utils/healthcheck'):
+  timestamp = strftime('[%Y-%b-%d %H:%M]')
+  logging.info('%s %s %s %s %s %s', timestamp, request.remote_addr, request.method, request.scheme, request.full_path, response.status)
   #if request.path.startswith('/chatbot_audio/repeat/learn/'):
   #  request_args = {**request.view_args, **request.args} if request.view_args else {**request.args}
   #  if "text" in request_args and "chatid" in request_args "lang" in request_args:
