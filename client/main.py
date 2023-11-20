@@ -4,6 +4,7 @@ import sys
 import json
 import time
 import utils
+import socket
 import random
 import urllib
 import logging
@@ -31,6 +32,14 @@ dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 
 GUILD_ID = discord.Object(id=os.environ.get("GUILD_ID"))
+
+#def get_api_url():
+#    url = os.environ.get("REMOTE_API_URL")+os.environ.get("API_PATH_UTILS")+"/healtcheck"
+#    response = requests.get(url)
+#    if response.status == 200:
+#        return os.environ.get("REMOTE_API_URL")
+#    else:
+#        return os.environ.get("API_URL")
 
 class TrackUser:
     def __init__(self, name, guildid, whatsapp):
