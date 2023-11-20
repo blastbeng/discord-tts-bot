@@ -1029,7 +1029,7 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
                 voice = await listvoices_api(language=lang_to_use, filter=voice)
 
             if voice is not None:
-                url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"ask/user/"+urllib.parse.quote(str(interaction.user.name))+"/"+urllib.parse.quote(str(text))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
+                url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"ask/user/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(str(interaction.user.name))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
                 await do_play(url, interaction, currentguildid)
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True) 
