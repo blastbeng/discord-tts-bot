@@ -468,8 +468,8 @@ def extract_sentences_from_audiodb(filename, language="it", chatid="000000"):
 
     with open(filename, 'w') as sentence_file:
       for row in records:
-        logging.info('extract_sentences_from_audiodb - [chatid:' + chatid + ',lang:' + language + '] - "' + row[0] + '"')
-        sentence_file.write(row[0])
+        logging.info('extract_sentences_from_audiodb - [chatid:' + chatid + ',lang:' + language + '] - "' + row['name'] + '"')
+        sentence_file.write(row['name'])
         sentence_file.write("\n")
         
   except Exception as e:
