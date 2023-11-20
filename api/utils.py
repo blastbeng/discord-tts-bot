@@ -171,13 +171,23 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=T
   else:
     tts = gTTS(text=text, lang=language, slow=False)
     hashtext = hashlib.md5((text+"_google").encode('utf-8')).hexdigest()
-    filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
-    tts.save(filesave)
+    filesave = ""
+    if int(os.environ.get("MASTER")) == 1:
+      filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
+      tts.save(filesave)
+    else:      
+      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
+      fp = BytesIO()
+      tts.write_to_fp(fp)
+      fp.seek(0)
+      sound = AudioSegment.from_mp3(fp)
+      requests.post(url, data=sound, json = {'filename': urllib.parse.quote(hashtext)}, verify=False)
     sound = AudioSegment.from_mp3(filesave)
     duration = (len(sound) / 1000.0)
     if limit and duration > int(os.environ.get("MAX_TTS_DURATION")):
       audiodb.insert_or_update(text, chatid, None, "google", language, is_correct=0, duration=duration, user=user)
-      os.remove(filesave)
+      if int(os.environ.get("MASTER")) == 1:
+        os.remove(filesave)
       raise AudioLimitException
     else:
       memoryBuff = BytesIO()
@@ -193,8 +203,18 @@ def populate_tts_google(text: str, chatid="000000", language="it"):
     return False
   else:
     tts = gTTS(text=text, lang="it", slow=False)
-    filesave = TMP_DIR + get_slashes() + get_random_string(24) + ".mp3"
-    tts.save(filesave)
+    hashtext = hashlib.md5((text+"_google").encode('utf-8')).hexdigest()
+    filesave = ""
+    if int(os.environ.get("MASTER")) == 1:
+      filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
+      tts.save(filesave)
+    else:
+      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
+      fp = BytesIO()
+      tts.write_to_fp(fp)
+      fp.seek(0)
+      sound = AudioSegment.from_mp3(fp)
+      requests.post(url, data=sound, json = {'filename': urllib.parse.quote(hashtext)}, verify=False)
     sound = AudioSegment.from_mp3(filesave)
     duration = (len(sound) / 1000.0)
     if duration > int(os.environ.get("MAX_TTS_DURATION")):
@@ -366,8 +386,8 @@ def get_random_string(length):
 
 
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in "txt"
+def allowed_file(filename, extension="txt"):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in extension
 
 def train_txt(trainfile, chatbot: ChatBot, lang: str, chatid: str):
   try:
@@ -455,6 +475,17 @@ def delete_by_text(chatid: str, text: str, force = False):
   else:
     return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot!')
 
+def save_mp3(mp3, name):
+  filesave = None
+  try:
+    filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + name + ".mp3"
+    mp3.save(filesave)
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+  return filesave
+
 def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it", save=True, call_fy=True, limit=True, user=None):
   try:
     if voice is None or voice == "null" or voice == "random":
@@ -476,9 +507,17 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
             raise AudioLimitException
           else:
             if save:
-              hashtext = hashlib.md5((text+"_"+language).encode('utf-8')).hexdigest()
-              filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
-              sound.export(filesave, format='mp3', bitrate="256")
+              hashtext = hashlib.md5((text+"_"+voice_to_use).encode('utf-8')).hexdigest()
+              filesave = ""
+              if int(os.environ.get("MASTER")) == 1:
+                filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
+                sound.export(filesave, format='mp3', bitrate="256")
+              else:
+                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
+                audio = BytesIO()
+                sound.export(audio, format='mp3', bitrate="256")
+                audio.seek(0)
+                requests.post(url, data=audio, json = {'filename': urllib.parse.quote(hashtext)}, verify=False)
               audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration, user=user)
               return audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
             else:
@@ -533,9 +572,17 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
             return None
           else:
             #sound.duration_seconds == duration
-            hashtext = hashlib.md5((text+"_"+language).encode('utf-8')).hexdigest()
-            filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
-            sound.export(filesave, format='mp3', bitrate="256")
+            hashtext = hashlib.md5((text+"_"+voice_to_use).encode('utf-8')).hexdigest()
+            filesave = ""
+            if int(os.environ.get("MASTER")) == 1:
+              filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
+              sound.export(filesave, format='mp3', bitrate="256")
+            else:
+              url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
+              audio = BytesIO()
+              sound.export(audio, format='mp3', bitrate="256")
+              audio.seek(0)
+              requests.post(url, data=audio, json = {'filename': urllib.parse.quote(hashtext)}, verify=False)
             audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration)
             return True
         raise Exception("FakeYou Generation KO")

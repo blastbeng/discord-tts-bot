@@ -182,7 +182,7 @@ def select_by_name_chatid_voice_language(name: str, chatid: str, voice: str, lan
       elif int(os.environ.get("MASTER")) == 0:
         url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"getmp3/" + os.path.basename(file)
         response = requests.get(url)
-        audio = BytesIO(response.content)
+        memoryBuff = BytesIO(response.content)
       else:
         delquery = { "_id": row["_id"] }
         audiotable.delete_one(delquery)

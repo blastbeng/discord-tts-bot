@@ -326,6 +326,24 @@ class AudioGetMp3Class(Resource):
         cache.delete_memoized(AudioGetMp3Class.get, self, str)
         return make_response(g.get('request_error'), 500)
 
+@nsaudio.route('/putmp3')
+class AudioPutMp3Class(Resource):
+  def post (self):
+    try:
+      mp3 = request.files['mp3']
+      name = request.form.get("filename")
+      if not mp3 and utils.allowed_file(mp3, extension="mp3"):
+        return get_response_str("Error! Please upload an mp3 file.")      
+      elif mp3 is None:
+        return get_response_str("Error! filename is mandatory.")      
+      else:
+        path = utils.save_mp3(mp3, name)
+        return get_response_str(path)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
 
 @nsaudio.route('/repeat/<string:text>/<string:voice>/')
 @nsaudio.route('/repeat/<string:text>/<string:voice>/<string:chatid>')
@@ -892,7 +910,7 @@ class DatabaseTrainFile(Resource):
       if lang is None:
         lang = "it"
       trf=request.files['trainfile']
-      if not trf and utils.allowed_file(trf):
+      if not trf and utils.allowed_file(trf, extension="txt"):
         return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
       else:
         trainfile=TMP_DIR + utils.get_slashes() + utils.get_random_string(24) + ".txt"
