@@ -180,8 +180,7 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=T
       fp = BytesIO()
       tts.write_to_fp(fp)
       fp.seek(0)
-      sound = AudioSegment.from_mp3(fp)
-      requests.post(url, data=sound, json = {'filename': urllib.parse.quote(hashtext)}, verify=False)
+      requests.post(url, data=fp, json = {'filename': urllib.parse.quote(hashtext)}, verify=False)
     sound = AudioSegment.from_mp3(filesave)
     duration = (len(sound) / 1000.0)
     if limit and duration > int(os.environ.get("MAX_TTS_DURATION")):
@@ -478,8 +477,9 @@ def delete_by_text(chatid: str, text: str, force = False):
 def save_mp3(mp3, name):
   filesave = None
   try:
+    sound = AudioSegment.from_mp3(mp3)
     filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + name + ".mp3"
-    mp3.save(filesave)
+    sound.export(filesave, format='mp3', bitrate="256")
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
