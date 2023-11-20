@@ -793,7 +793,7 @@ class InitGeneratorClass(Resource):
 
 
 
-@limiter.limit("1/second")
+@limiter.limit("10/second")
 @nsutils.route('/healthcheck')
 class Healthcheck(Resource):
   def get (self):
