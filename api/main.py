@@ -174,7 +174,7 @@ class AudioRepeatLearnUserClass(Resource):
 @nstext.route('/ask/<string:text>/<string:chatid>/')
 @nstext.route('/ask/<string:text>/<string:chatid>/<string:lang>')
 class TextAskClass(Resource):
-  @cache.cached(timeout=10, query_string=True)
+  @cache.cached(timeout=5, query_string=True)
   def get (self, text: str, chatid = "000000", lang = "it"):
     chatbot_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text).text
     return get_response_str(chatbot_response)
@@ -184,6 +184,7 @@ class TextAskClass(Resource):
 @nstext.route('/ask/nolearn/<string:text>/<string:chatid>/')
 @nstext.route('/ask/nolearn/<string:text>/<string:chatid>/<string:lang>')
 class TextAskNoLearnClass(Resource):
+  @cache.cached(timeout=5, query_string=True)
   def get (self, text: str, chatid = "000000", lang = "it"):
     chatbot_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
     return get_response_str(chatbot_response)
@@ -193,7 +194,7 @@ class TextAskNoLearnClass(Resource):
 @nstext.route('/ask/user/<string:user>/<string:text>/<string:chatid>/')
 @nstext.route('/ask/user/<string:user>/<string:text>/<string:chatid>/<string:lang>')
 class TextAskUserClass(Resource):
-  @cache.cached(timeout=10, query_string=True)
+  @cache.cached(timeout=5, query_string=True)
   def get (self, user: str, text: str, chatid = "000000", lang = "it"):
     chatbot_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=True).text
     audiodb.insert_or_update(text.strip(), chatid, None, "google", lang, is_correct=1, user=user)
@@ -507,7 +508,7 @@ class AudioRepeatLearnUserClass(Resource):
 @nsaudio.route('/ask/<string:text>/<int:learn>/<string:voice>/<string:chatid>/')
 @nsaudio.route('/ask/<string:text>/<int:learn>/<string:voice>/<string:chatid>/<string:lang>/')
 class AudioAskClass(Resource):
-  @cache.cached(timeout=30, query_string=True)
+  @cache.cached(timeout=5, query_string=True)
   def get (self, text: str, learn = 1, voice = "random", chatid = "000000", lang= "it"):
     try:
       tts_out = None
@@ -545,7 +546,7 @@ class AudioAskClass(Resource):
 @nsaudio.route('/ask/user/<string:text>/<string:user>/<int:learn>/<string:voice>/<string:chatid>/')
 @nsaudio.route('/ask/user/<string:text>/<string:user>/<int:learn>/<string:voice>/<string:chatid>/<string:lang>/')
 class AudioAskUserClass(Resource):
-  @cache.cached(timeout=30, query_string=True)
+  @cache.cached(timeout=5, query_string=True)
   def get (self, text: str, user: str, learn = 1, voice = "random", chatid = "000000", lang= "it"):
     try:
       tts_out = None
