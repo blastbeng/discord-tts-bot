@@ -135,9 +135,19 @@ client.on('message', async msg => {
                     await replyMsg(url, msg, chat)    
                 } else if (msg.body.toLowerCase().startsWith('/ask')) {
                     let message = msg.body.slice(4);
-                    if ( message.length !== 0 ) {
-                        getApiUrl().then(res => async function(res){
-                            await replyMsg(res + "chatbot_text/ask/user/" + encodeURIComponent(msg.author) + "/" + encodeURIComponent(message.trim()) + "/000000/it", msg, chat)
+                    if ( message.length !== 0 ) {                        
+                        const url = config.REMOTE_API_URL + "utils/healthcheck"
+                        const params = {
+                            timeout: 1000,
+                            method: 'get',
+                            url: url
+                        }
+                        await axios(params).then(async function(response) {
+                            if(response.status === 200) {
+                                await replyMsg(config.REMOTE_API_URL + "chatbot_text/ask/user/" + encodeURIComponent(msg.author) + "/" + encodeURIComponent(message.trim()) + "/000000/it", msg, chat)
+                            } else {
+                                await replyMsg(config.API_URL + "chatbot_text/ask/user/" + encodeURIComponent(msg.author) + "/" + encodeURIComponent(message.trim()) + "/000000/it", msg, chat)
+                            }
                         }).catch(async function(error) {
                             await replyMsg(config.API_URL + "chatbot_text/ask/user/" + encodeURIComponent(msg.author) + "/" + encodeURIComponent(message.trim()) + "/000000/it", msg, chat)
                         });
@@ -254,22 +264,3 @@ async function replyMsg(url, msg, chat){
     });
 }   
 
-
-
-async function getApiUrl(){
-    const url = config.REMOTE_API_URL + "utils/healthcheck"
-    const config = {
-        timeout: 10000,
-        method: 'get',
-        url: url
-    }
-    await axios(config).then(async function(response) {
-        if(response.status === 200) {
-            return config.REMOTE_API_URL;
-        } else {
-            return config.API_URL;
-        }
-    }).catch(async function(error) {
-        log.info("SLAVE OFFLINE!", "["+ error + "]");
-    });
-}
