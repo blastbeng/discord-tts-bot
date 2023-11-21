@@ -38,3 +38,4 @@ git+https://github.com/dsdanielpark/Bard-API.git
 langdetect
 selenium
 webdriver_manager
+undetected-chromedriver
