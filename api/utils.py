@@ -5,6 +5,7 @@ import wikipedia
 import json
 import requests
 import sys
+import threading
 import os
 import urllib
 import pymongo
@@ -16,6 +17,7 @@ import time
 import logging
 import audiodb
 import hashlib
+import dotenv
 from chatterbot import ChatBot
 from chatterbot import languages
 from chatterbot.conversation import Statement
@@ -43,10 +45,11 @@ from exceptions import TimeExceededException
 import multiprocessing
 from functools import wraps
 from bardapi import BardCookies
-
-from selenium import webdriver
-from selenium.webdriver.common.by import By
+from undetected_chromedriver import Chrome, ChromeOptions
+from selenium.webdriver.common.by  import By
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support    import expected_conditions as EC
+from selenium import webdriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
@@ -1013,45 +1016,39 @@ def reset(chatid: str):
 
 
 def login_google():
-  driver.get('https://accounts.google.com/ServiceLogin')
   try:
-    path = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'config' + get_slashes() + "chrome"
-    isExist = os.path.exists(path)
-    if not isExist:
-      os.makedirs(path)
-    chrome_options = webdriver.ChromeOptions() 
-    chrome_options.add_experimental_option("prefs", {"profile.managed_default_content_settings.images": 2}) 
-    chrome_options.add_argument("--no-sandbox") 
+    email = os.environ.get("BARD_USER")
+    password = os.environ.get("BARD_PASS")
+    
+    chrome_options = ChromeOptions() 
     chrome_options.add_argument("--disable-setuid-sandbox") 
-    chrome_options.add_argument("--remote-debugging-port=9222") 
     chrome_options.add_argument("--disable-dev-shm-using") 
     chrome_options.add_argument("--disable-extensions") 
     chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-startup-window")
-    chrome_options.add_argument("--headless")
+    #chrome_options.add_argument("--headless")
     chrome_options.add_argument("--window-size=%s" % "640,480")
-    chrome_options.add_argument("disable-infobars")
-    chrome_options.add_argument(r"user-data-dir=" + path) 
 
-    driver = webdriver.Chrome(options=chrome_options, service=ChromeService(ChromeDriverManager().install()))
-    driver.set_page_load_timeout(900)
-    WebDriverWait(driver, 900).until(EC.visibility_of_element_located((By.NAME, 'identifier'))).send_keys(f'{os.environ.get("BARD_USER")}\n')
-    WebDriverWait(driver, 900).until(EC.visibility_of_element_located((By.XPATH, '//*[@id="password"]/div[1]/div/div[1]/input'))).send_keys(f'{os.environ.get("BARD_PASS")}\n')
-    WebDriverWait(driver, 900).until(EC.visibility_of_element_located((By.ID, 'sdgBod')))
+    driver = Chrome(use_subprocess=True, options=chrome_options)
+    driver.get("https://accounts.google.com/ServiceLogin")
+    time.sleep(10)
+    WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.NAME, 'identifier'))).send_keys(f'{email}\n')
+    time.sleep(10)
+    WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.NAME, 'Passwd'))).send_keys(f'{password}\n')
+   
     driver.get("https://bard.google.com/")
     cookies = driver.get_cookies()
 
     for cookie in cookies:
       if cookie["name"] == "__Secure-1PSID":
         os.environ["__Secure-1PSID"] = cookie["value"]
+        dotenv.set_key(dotenv_path, "__Secure-1PSID", cookie["value"])
       elif cookie["name"] == "__Secure-1PSIDTS":
         os.environ["__Secure-1PSIDTS"] = cookie["value"]
+        dotenv.set_key(dotenv_path, "__Secure-1PSIDTS", cookie["value"])
       elif cookie["name"] == "__Secure-1PSIDCC":
         os.environ["__Secure-1PSIDCC"] = cookie["value"]
-
-    dotenv.set_key(dotenv_path, "", os.environ["__Secure-1PSID"])
-    dotenv.set_key(dotenv_path, "", os.environ["__Secure-1PSIDTS"])
-    dotenv.set_key(dotenv_path, "", os.environ["__Secure-1PSIDCC"])
+        dotenv.set_key(dotenv_path, "__Secure-1PSIDCC", cookie["value"])
+    driver.close()
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -1064,17 +1061,17 @@ def ask_google_bard(text: str):
         "__Secure-1PSID": os.environ.get("__Secure-1PSID"),
         "__Secure-1PSIDTS": os.environ.get("__Secure-1PSIDTS"),
         "__Secure-1PSIDCC": os.environ.get("__Secure-1PSIDCC")
-    }
+    } 
     bard = BardCookies(cookie_dict=cookie_dict)
     response = bard.get_answer(text)
     text = response['content']
     if response['links'] is not None and len(response['links']) > 0 and response['links'][0] is not None:
-      out = out + "\n" + str(response['links'][0])
+      out = text + "\n" + str(response['links'][0])
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-    login_google()
+    threading.Thread(target=lambda: login_google()).start()
   return out, text
 
 
