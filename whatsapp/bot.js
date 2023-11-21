@@ -99,6 +99,7 @@ client.on('message', async msg => {
             || msg.body.toLowerCase().startsWith('/berlusca')
             || msg.body.toLowerCase().startsWith('/goku')
             || msg.body.toLowerCase().startsWith('/gerry')
+            || msg.body.toLowerCase().startsWith('/bard')
             ){
 
             let canReply = false;
@@ -119,7 +120,7 @@ client.on('message', async msg => {
                 if (msg.body.toLowerCase() == '/help' || msg.body.toLowerCase().startsWith('/help')) {
                     await chat.sendStateTyping();
                     let message = msg.body.slice(5);
-                    helpmsg = "Lista Comandi: \n- /ask: chiedimi qualcosa\n- /speak: parla con la voce di google\n- /generate: genera frasi idiote\n- /insult: genera insulti\n- /curse: curse\n- /berlusca: parla con la voce di Silvio Berlusconi\n- /gerry: parla con la voce di Gerry Scotti\n- /goku: parla con la voce di Goku\n- /papa: parla con la voce di Papa Francesco\n- /random: frase casuale\n /random <testo>: frase casuale dato un testo"
+                    helpmsg = "Lista Comandi: \n- /ask <testo>: chiedimi qualcosa\n- /speak: parla con la voce di google\n- /generate: genera frasi idiote\n- /insult: genera insulti\n- /curse: curse\n- /berlusca: parla con la voce di Silvio Berlusconi\n- /gerry: parla con la voce di Gerry Scotti\n- /goku: parla con la voce di Goku\n- /papa: parla con la voce di Papa Francesco\n- /random: frase casuale\n /random <testo>: frase casuale dato un testo\n /bard: chiedi qualcosa a Google Bard"
                     if ( message.length === 0 ) {
                         await msg.reply(helpmsg);
                     } else {
@@ -133,7 +134,16 @@ client.on('message', async msg => {
                         url = config.API_URL + "chatbot_text/random/000000/" + encodeURIComponent(message.trim())
                     } 
                     await replyMsg(url, msg, chat)    
-                } else if (msg.body.toLowerCase().startsWith('/ask')) {
+                }
+                else if (msg.body.toLowerCase().startsWith('/bard')) {
+                    let message = msg.body.slice(5);   
+                    if ( message.length !== 0 ) {                
+                        await replyMsg(config.API_URL + "chatbot_text/askgooglebard/" + encodeURIComponent(message.trim()) + "/", msg, chat)
+                    } else {
+                        await msg.reply("Sei stronzo?\nMangi le pietre o sei scemo?\nSe devi chiedere qualcosa a Google Bard devi scrivere un testo dopo /bard.");
+                    }
+                } 
+                else if (msg.body.toLowerCase().startsWith('/ask')) {
                     let message = msg.body.slice(4);
                     if ( message.length !== 0 ) {                        
                         const url = config.REMOTE_API_URL + "utils/healthcheck"
