@@ -995,11 +995,9 @@ def get_chatbot_by_id(chatid = "000000", lang = "it"):
     chatbots_dict[chatid + "_" + lang] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True", lang = lang)
   return chatbots_dict[chatid + "_" + lang]
   
- 
-  
 @scheduler.task('interval', id='backupdb', hours=12)
 def backupdb():
-  filename = os.path.dirname(os.path.realpath(__file__)) + '/config/' + chatid + '-db.txt'
+  filename = os.path.dirname(os.path.realpath(__file__)) + '/config/000000-db.txt'
   if utils.extract_sentences_from_chatbot(filename, chatid="000000"):
     utils.backupdb("000000", "txt")
   
@@ -1011,9 +1009,9 @@ def delete_tts():
 chatbots_dict = {}
 cache.init_app(app)
 limiter.init_app(app)
-scheduler.init_app(app)
-scheduler.start()
-
+if int(os.environ.get("MASTER")) == 1:
+  scheduler.init_app(app)
+  scheduler.start()
 
 if __name__ == '__main__':
   app.run()
