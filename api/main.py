@@ -473,6 +473,31 @@ class AudioRandomClass(Resource):
         return make_response("TTS Generation Error!", 500)
     except Exception as e:
       return make_response(g.get('request_error'), 500)
+
+@limiter.limit("1/second")
+@nsaudio.route('/randomtms/')
+@nsaudio.route('/randomtms/<string:tms>/')
+@nsaudio.route('/randomtms/<string:tms>/<string:voice>/')
+@nsaudio.route('/randomtms/<string:tms>/<string:voice>/<string:chatid>/')
+@nsaudio.route('/randomtms/<string:tms>/<string:voice>/<string:chatid>/<string:lang>/')
+@nsaudio.route('/randomtms/<string:tms>/<string:voice>/<string:chatid>/<string:lang>/<string:text>')
+class AudioRandomTmsClass(Resource):
+  def get (self, tms = None, voice = "random", chatid = "000000", lang = "it", text = None):
+    try:
+      tts_out, text_response = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang,text)
+      if not text_response:
+          text = "Audio not found"
+          response = make_response(text, 204)
+          response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+          return response
+      elif tts_out is not None:
+        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
+        return response
+      if tts_out is None:
+        return make_response("TTS Generation Error!", 500)
+    except Exception as e:
+      return make_response(g.get('request_error'), 500)
       
 
 @nsaudio.route('/repeat/learn/<string:text>/<string:voice>/')

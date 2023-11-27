@@ -1,0 +1,10 @@
+Icons from https://icomoon.io/
+Add icons to css
+
+.class {
+  font-family: "icomoon";
+  content: "\icon_code";
+}
+
+Add reference to source css in base.html
+<link rel="stylesheet" href="../static/img/font-icons/style.css" type="text/css">

@@ -1,11 +1,86 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% block body %}
+{% include "header.html" %}
 
-{% block content %}
-    <h1>{% block title %} Messages {% endblock %}</h1>
-    {% for message in messages %}
-        <div class='message'>
-            <h3>{{ message['title'] }}</h3>
-            <p>{{ message['content'] }}</p>
-        </div>
-    {% endfor %}
+<main class="main">
+	<section class="container-main">
+		<div class="center">
+			<div class="banner-home">
+				<div class="heading-block">
+					<h1 class="heading-primary heading-primary--banner">Hello I'm Pezzente.</h1>
+					<div class="sub-heading sub-heading--banner">I'm dumb but I can talk.</div>
+				</div>
+				<div class="banner-img-block clearfix">
+	  			<img src="../static/img/featured/pkgh5366dy601.jpg" alt="Banner Home: 1" class="banner-img banner-img-1" width="480">
+				</div> <!-- /banner-img-block -->
+				<!-- <input type="button" class="button button-signup-trigger" value="Conversation" onclick="location.href='conversation';"> -->
+				<div class="row">
+					<div class="col-25">
+					</div>
+					<div class="col-50">
+					  <input type="text" id="text" name="text" placeholder="Text..">
+					</div>
+					<div class="col-25">
+					</div>
+				  </div>
+				  <div class="row">
+					<div class="col-25">
+					</div>
+					<div class="col-50">
+					  <select id="voice" name="voice">
+						<option value="random" selected="selected">Random</option>
+						<option value="google">Google</option>
+						<option value="TM:4j7nw0gv2mhy">Annunciatore Pokemon Stadium (N64)</option>
+						<option value="TM:nk1h2vqxhzdc">Caparezza</option>
+						<option value="TM:fgt2xfhfz6rv">Carlo Conti (presentatore televisivo)</option>
+						<option value="TM:pvw8tsm764rw">Checco Zalone</option>
+						<option value="TM:120y78vm4nyb">Christian De Sica (comico/cantante) Italiano</option>
+						<option value="TM:a4v2gyz36a1c">Cicciogamer89</option>
+						<option value="TM:453t2dd6j35m">Galeazzi</option>
+						<option value="TM:5ggf3m5w2mhq">Gerry Scotti</option>
+						<option value="TM:xv3f44tdztjs">Giuseppe Conte</option>
+						<option value="TM:qzx2m14a6sv4">Giuseppe Simone</option>
+						<option value="TM:eb0rmkq6fxtj">Goku (Italiano)</option>
+						<option value="TM:dq50arje7sq4">Homer Simpson (Italiano)</option>
+						<option value="TM:7r48p42sbqej">Maria De Filippi(Conduttrice televisiva)</option>
+						<option value="TM:jjpaawj5q18t">Matteo Renzi (Politico)</option>
+						<option value="TM:pw4bfp0gn7ze">Morty Smith (italiano)</option>
+						<option value="TM:zdag8n18q9ct">Paolo Bonolis (Conduttore Televisivo)</option>
+						<option value="TM:8bqjb9x51vz3">Papa Francesco</option>
+						<option value="TM:s493mhsbek15">Peter Griffin (italian)</option>
+						<option value="TM:esw7xh74gvt7">Richard Benson (Ottava nota)</option>
+						<option value="TM:g7m1eztax6gp">Rick Sanchez (Italiano)</option>
+						<option value="TM:vjfm5tdz02b2">Roberto Benigni</option>
+						<option value="TM:22e5sxvt2dvk">Silvio Berlusconi</option>
+						<option value="TM:vjn1rm24d9xc">Stewie griffin (italian)</option>
+					  </select>
+					</div>
+					<div class="col-25">
+					</div>
+				  </div>
+				  <div class="row">
+					<div class="col-25">
+					</div>
+					<div class="col-50">	
+						<fieldset>	
+						  <input type="radio" id="random" name="method" value="0" onclick="changeVoiceValue()" checked/>
+						  <label for="Random">   Random</label>
+						  <input type="radio" id="speak" name="method" value="1" onclick="changeVoiceValue()"/>
+						  <label for="speak">   Speak</label>
+						</fieldset>
+					</div>
+					<div class="col-25">
+					</div>
+				  </div>
+				  <br />
+				  <audio id="audio" controls>
+				  </audio>
+				  <br />
+				<input type="button" class="button button-signup-trigger disable-btn" value="Play!" onclick="play()"/>
+			</div> <!-- /banner-home -->
+		</div> <!-- /center -->
+	</section> <!-- /container-main -->
+</main>
+
+{% include "footer.html" %}
 {% endblock %}

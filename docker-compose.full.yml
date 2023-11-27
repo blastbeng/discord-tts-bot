@@ -6,7 +6,7 @@ services:
     container_name: discord-tts-bot-redis
     ports:
       - "63799:6379"
-    restart: "no"
+    restart: always
     volumes:
       - redisdata:/data
   discord-tts-bot-api:
@@ -19,7 +19,7 @@ services:
       - PGID=1000
       - TZ=Europe/Rome
     image: "blastbeng/discord-tts-bot-api:1.0.0"
-    restart: "no"
+    restart: always
     volumes:
       - ".env:/app/.env"
       - "./config:/app/config"
@@ -55,7 +55,7 @@ services:
       - "/tmp/discord-tts-bot-api:/tmp/discord-tts-bot-api"
       - "/tmp/discord-tts-bot-discord:/tmp/discord-tts-bot-discord"
     image: "blastbeng/discord-tts-bot-client:1.0.0"
-    restart: "no"
+    restart: always
   discord-tts-bot-webapp:
     build:
       context: ./webapp
@@ -74,7 +74,7 @@ services:
       - ".env:/app/.env"
       - "./config:/app/config"
     image: "blastbeng/discord-tts-bot-webapp:1.0.0"
-    restart: "no"
+    restart: always
   discord-tts-bot-whatsapp:
     build:
       context: ./whatsapp
@@ -91,7 +91,7 @@ services:
       - "./config/config.json:/usr/src/app/config.json"
       - "./config/wacache:/usr/src/app/config/wacache"
     image: "blastbeng/discord-tts-bot-whatsapp:1.0.0"
-    restart: "no"
+    restart: always
     depends_on:
       discord-tts-bot-api:
         condition: service_healthy
@@ -135,7 +135,7 @@ services:
     healthcheck:
       test: ['CMD-SHELL', './venv/bin/python scripts/healthcheck.py']
     image: libretranslate/libretranslate
-    restart: "no"
+    restart: always
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
   libretranslate-proxy:

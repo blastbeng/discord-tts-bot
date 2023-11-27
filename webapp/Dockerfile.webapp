@@ -25,8 +25,8 @@ RUN pip3 install -r requirements.txt
 WORKDIR /app
 
 COPY templates templates
+COPY static static
 COPY main.py .
-COPY config.py .
 COPY entrypoint.sh .
 COPY uwsgi.ini .
 RUN chmod +x entrypoint.sh
