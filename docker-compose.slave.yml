@@ -6,7 +6,7 @@ services:
     container_name: discord-tts-bot-redis
     ports:
       - "63799:6379"
-    restart: "always"
+    restart: always
     volumes:
       - redisdata:/data
   discord-tts-bot-api:
@@ -19,7 +19,7 @@ services:
       - PGID=1000
       - TZ=Europe/Rome
     image: "blastbeng/discord-tts-bot-api:1.0.0"
-    restart: "always"
+    restart: always
     ports:
       - "5080:5080"
     volumes:
