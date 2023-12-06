@@ -18,6 +18,7 @@ import logging
 import audiodb
 import hashlib
 import dotenv
+import custom_mongo_adapter
 from chatterbot import ChatBot
 from chatterbot import languages
 from chatterbot.conversation import Statement
@@ -286,10 +287,9 @@ def get_chatterbot(chatid: str, train: False, lang = "it"):
 
   chatbot = ChatBot(
       'PezzenteCapo',
-      storage_adapter='chatterbot.storage.MongoDatabaseAdapter',
-      database_uri='mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/'+dbfile,
-      username=os.environ.get("MONGO_USER"),
-      password=os.environ.get("MONGO_PASS"),
+      storage_adapter='custom_mongo_adapter.CustomMongoAdapter',
+      database_uri='mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/',
+      database_name=dbfile,
       statement_comparison_function = LevenshteinDistance,
       response_selection_method = get_random_response,
       tagger_language=language,

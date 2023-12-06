@@ -68,6 +68,7 @@ COPY insults.py .
 COPY image.py .
 COPY main.py .
 COPY exceptions.py .
+COPY custom_mongo_adapter.py .
 COPY config.py .
 COPY entrypoint.sh .
 COPY uwsgi.ini .
