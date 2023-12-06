@@ -95,69 +95,6 @@ services:
     depends_on:
       discord-tts-bot-api:
         condition: service_healthy
-  mongodb:
-    image: nertworkweb/mongodb-no-avx
-    container_name: discord-tts-bot-mongodb
-    environment:
-      - PUID=1000
-      - PGID=1000
-    volumes:
-      - mongo-data:/data/db
-    ports:
-      - 27017:27017
-    networks:
-      - mongodb_net
-    entrypoint: "/usr/local/bin/mongod --bind_ip_all"
-  mongoclient:
-    image: mongoclient/mongoclient:latest
-    container_name: discord-tts-bot-mongoclient
-    hostname: mongoclient
-    depends_on:
-      - mongodb
-    networks:
-      - mongodb_net
-    ports:
-      - 3300:3000
-  libretranslate:
-    container_name: libretranslate
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Rome
-      - LT_PORT=5000
-      - LT_HOST=0.0.0.00
-      - LT_FRONTEND_LANGUAGE_SOURCE=en
-      - LT_FRONTEND_LANGUAGE_TARGET=it
-      - LT_FRONTEND_TIMEOUT=900
-      - LT_UPDATE_MODELS=True
-    ports:
-      - '5000:5000'
-    healthcheck:
-      test: ['CMD-SHELL', './venv/bin/python scripts/healthcheck.py']
-    image: libretranslate/libretranslate
-    restart: always
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-  libretranslate-proxy:
-    container_name: libretranslate-proxy
-    image: decentralize/caching-proxy
-    environment:
-      - UPSTREAM=http://192.168.1.160:5000
-      - MAX_SIZE=10000m
-      - PROXY_READ_TIMEOUT=900
-      - PROXY_CACHE_VALID=168h
-    ports:
-      - 5075:80/tcp
-
-networks:
-  mongodb_net:
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 192.168.213.0/24
-          gateway: 192.168.213.1
 
 volumes:
   redisdata:
-  mongo-data:

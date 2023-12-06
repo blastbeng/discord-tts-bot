@@ -287,7 +287,7 @@ def get_chatterbot(chatid: str, train: False, lang = "it"):
   chatbot = ChatBot(
       'PezzenteCapo',
       storage_adapter='chatterbot.storage.MongoDatabaseAdapter',
-      database_uri='mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/'+dbfile,
+      database_uri='mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/'+dbfile,
       statement_comparison_function = LevenshteinDistance,
       response_selection_method = get_random_response,
       tagger_language=language,
@@ -377,7 +377,7 @@ def extract_sentences_from_chatbot(filename, chatid="000000"):
   try:    
 
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     statements = chatbotdb["statements"]
 
@@ -442,7 +442,7 @@ def clean_duplicates(chatid: str):
   try:
     
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     statements = chatbotdb["statements"]
 
@@ -474,7 +474,7 @@ def delete_by_text(chatid: str, text: str, force = False):
     
     
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     statements = chatbotdb["statements"]
 
@@ -572,6 +572,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=1, user=user)
       raise Exception(e)
 
+@run_with_timer(max_execution_time=300)
 def populate_tts(text: str, chatid="000000", voice=None, israndom=False, language="it"):
   try:
     if voice is None or voice == "null" or voice == "random":
@@ -705,7 +706,7 @@ def list_fakeyou_voices(lang:str):
 def get_random_from_bot(chatid: str, text: str):
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     statements = chatbotdb["statements"]
 
@@ -757,7 +758,7 @@ def populate_audiodb(limit: int, chatid: str, lang: str):
 def populate_audiodb_internal(limit: int, chatid: str, lang: str):  
 
   try:
-    logging.debug("populate_audiodb - STARTED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
+    logging.info("populate_audiodb - STARTED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
 
     voices = list_fakeyou_voices(lang)
     listvoices = list(voices.items())
@@ -766,7 +767,7 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
     try:
 
       dbfile = chatid + "-db"
-      myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+      myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+':'+os.environ.get("MONGO_PORT")+'/')
       chatbotdb = myclient[dbfile]
       statement = chatbotdb["statements"]     
 
@@ -807,7 +808,7 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
           inserted="Failed (" + str(e) + ")"
           logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
           #raise Exception(e)
-          time.sleep(30)
+          #time.sleep(5)
     else:
       logging.info("populate_audiodb - NO RECORDS FOUND!\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
     
@@ -991,7 +992,7 @@ def rmdir(directory):
 def reset(chatid: str):
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     statement = chatbotdb["statements"]     
 

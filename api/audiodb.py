@@ -46,7 +46,7 @@ GUILD_ID = os.environ.get("GUILD_ID")
 def insert(name: str, chatid: str, filesave, voice: str, language: str, is_correct=1, duration=0):
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]
 
@@ -76,7 +76,7 @@ def select_count_by_name_chatid_voice_language(name: str, chatid: str, voice: st
   try:
     
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]
 
@@ -98,7 +98,7 @@ def select_count_by_name_chatid_voice_language(name: str, chatid: str, voice: st
 def insert_or_update(name: str, chatid: str, filesave: str, voice: str, language: str, is_correct=1, duration=0, user=None):
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]
 
@@ -152,7 +152,7 @@ def select_by_name_chatid_voice_language(name: str, chatid: str, voice: str, lan
   memoryBuff = None
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]
     
@@ -198,7 +198,7 @@ def select_by_name_chatid_voice_language(name: str, chatid: str, voice: str, lan
 def update_is_correct(name: str, chatid: str, voice: str, language: str, is_correct=1):
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]   
 
@@ -222,7 +222,7 @@ def update_is_correct(name: str, chatid: str, voice: str, language: str, is_corr
 def update_is_correct_by_word(text: str, chatid: str, is_correct: int, use_like: bool):
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]   
 
@@ -268,7 +268,7 @@ def update_is_correct_by_word(text: str, chatid: str, is_correct: int, use_like:
 def update_is_correct_if_not_none(chatid: str, is_correct: int):
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]  
 
@@ -292,7 +292,7 @@ def update_is_correct_if_not_none(chatid: str, is_correct: int):
 def increment_counter(name: str, chatid: str, voice: str, language: str, counter_limit: int):
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]   
 
@@ -319,7 +319,7 @@ def select_counter_by_name_chatid_voice_language(name: str, chatid: str, voice: 
   counter = 0
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]   
 
@@ -344,7 +344,7 @@ def select_voice_by_name_chatid_language(name: str, chatid: str, language: str):
   voice = None
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]   
     voice = None
@@ -371,7 +371,7 @@ def select_distinct_language_by_name_chatid(name: str, chatid: str):
   lang = None
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]   
     
@@ -395,7 +395,7 @@ def select_by_chatid_voice_language_random(chatid: str, voice:str, language:str,
   name = None
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]       
     
@@ -457,7 +457,7 @@ def extract_sentences_from_audiodb(filename, language="it", chatid="000000"):
   try:
 
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]     
     
@@ -484,7 +484,7 @@ def extract_sentences_from_audiodb(filename, language="it", chatid="000000"):
 def delete_by_chatid(chatid: str):
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     audiotable = chatbotdb["audio"]    
 
