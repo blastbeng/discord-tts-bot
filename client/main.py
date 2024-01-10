@@ -734,12 +734,22 @@ async def change_presence_loop():
 
 @client.event
 async def on_ready():
-    logging.info(f'Logged in as {client.user} (ID: {client.user.id})')
+    try:
+        logging.info(f'Logged in as {client.user} (ID: {client.user.id})')
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 @client.event
 async def on_connect():
-    logging.info(f'Connected as {client.user} (ID: {client.user.id})')
-    change_presence_loop.start()
+    try:
+        logging.info(f'Connected as {client.user} (ID: {client.user.id})')
+        change_presence_loop.start()
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 @client.event
 async def on_guild_available(guild):
@@ -893,7 +903,7 @@ async def on_guild_remove(guild):
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def join(interaction: discord.Interaction):
     """Join channel."""
     is_deferred=True
@@ -910,7 +920,7 @@ async def join(interaction: discord.Interaction):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def leave(interaction: discord.Interaction):
     """Leave channel"""
     is_deferred=True
@@ -934,7 +944,7 @@ async def leave(interaction: discord.Interaction):
 @app_commands.rename(voice='voice')
 @app_commands.describe(voice="The voice to use")
 @app_commands.autocomplete(voice=rps_autocomplete)
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def speak(interaction: discord.Interaction, text: str, voice: str = "google"):
     """Repeat a sentence"""
     is_deferred=True
@@ -972,7 +982,7 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "googl
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def wikipedia(interaction: discord.Interaction, text: str):
     """Search something on wikipedia"""
     is_deferred=True
@@ -1001,7 +1011,7 @@ async def wikipedia(interaction: discord.Interaction, text: str):
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
-@app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def bard(interaction: discord.Interaction, text: str):
     """Ask something to Google Bard"""
     is_deferred=True
@@ -1040,11 +1050,10 @@ async def bard(interaction: discord.Interaction, text: str):
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="the sentence to ask")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 @app_commands.rename(voice='voice')
 @app_commands.describe(voice="The voice to use")
 @app_commands.autocomplete(voice=rps_autocomplete)
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def ask(interaction: discord.Interaction, text: str, voice: str = "google"):
     """Ask something."""
     is_deferred=True
@@ -1079,7 +1088,7 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def generate(interaction: discord.Interaction):
     """Generate a random sentence."""
     is_deferred=True
@@ -1115,7 +1124,7 @@ async def generate(interaction: discord.Interaction):
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def story(interaction: discord.Interaction):
     """Generate a random story."""
     is_deferred=True
@@ -1153,7 +1162,7 @@ async def story(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(member='member')
 @app_commands.describe(member="The user to insult")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def insult(interaction: discord.Interaction, member: Optional[discord.Member] = None):
     """Insult someone"""
     is_deferred=True
@@ -1197,7 +1206,7 @@ async def insult(interaction: discord.Interaction, member: Optional[discord.Memb
 @app_commands.autocomplete(voice=rps_autocomplete)
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def random(interaction: discord.Interaction, voice: str = "random", text: str = ""):
     """Say a random sentence"""
     is_deferred=True
@@ -1234,7 +1243,7 @@ async def random(interaction: discord.Interaction, voice: str = "random", text: 
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def curse(interaction: discord.Interaction):
     """Curse."""
     is_deferred=True
@@ -1273,7 +1282,7 @@ async def curse(interaction: discord.Interaction):
         await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Impossible to use this command") + ": API 'http://bestemmie.org' Status = OFFLINE", ephemeral = True)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 @app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def restart(interaction: discord.Interaction):
     """Restart bot."""
@@ -1295,7 +1304,7 @@ async def restart(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def delete(interaction: discord.Interaction, text: str):
     """Delete sentences by text."""
     is_deferred=True
@@ -1351,7 +1360,7 @@ async def delete(interaction: discord.Interaction, text: str):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def download(interaction: discord.Interaction):
     """Download sentences."""
     is_deferred=True
@@ -1396,7 +1405,7 @@ async def download(interaction: discord.Interaction):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def stop(interaction: discord.Interaction):
     """Stop playback."""
     is_deferred=True
@@ -1418,7 +1427,7 @@ async def stop(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(name='name')
 @app_commands.describe(name="New bot nickname (32 chars limit)")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def rename(interaction: discord.Interaction, name: str):
     """Rename bot."""
     is_deferred=True
@@ -1442,7 +1451,7 @@ async def rename(interaction: discord.Interaction, name: str):
 @app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 @app_commands.rename(image='image')
 @app_commands.describe(image="New bot avatar")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def avatar(interaction: discord.Interaction, image: discord.Attachment):
     """Change bot avatar."""
     is_deferred=True
@@ -1474,7 +1483,7 @@ async def avatar(interaction: discord.Interaction, image: discord.Attachment):
 @app_commands.rename(language='language')
 @app_commands.describe(language="New bot language")
 @app_commands.choices(language=optionslanguages)
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def language(interaction: discord.Interaction, language: app_commands.Choice[str]):
     """Change bot language."""
     is_deferred=True
@@ -1499,7 +1508,7 @@ async def language(interaction: discord.Interaction, language: app_commands.Choi
 @app_commands.rename(whatsapp='whatsapp')
 @app_commands.describe(whatsapp="Notify user tracking on whatsapp?")
 @app_commands.choices(whatsapp=truefalsemenu)
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def trackuser(interaction: discord.Interaction, member: discord.Member, whatsapp: app_commands.Choice[str]):
     """Track a user."""
     is_deferred=True
@@ -1522,7 +1531,7 @@ async def trackuser(interaction: discord.Interaction, member: discord.Member, wh
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def untrackall(interaction: discord.Interaction):
     """Untrack all users."""
     is_deferred=True
@@ -1544,7 +1553,7 @@ async def untrackall(interaction: discord.Interaction):
 @app_commands.rename(language_from='language_from')
 @app_commands.describe(language_from="The language to convert from")
 @app_commands.choices(language_from=optionslanguages)
-@app_commands.checks.cooldown(1, 30.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def translate(interaction: discord.Interaction, text: str, language_to: app_commands.Choice[str], language_from: app_commands.Choice[str] = "xx"):
     """Translate a sentence and repeat it"""
     is_deferred=True
@@ -1594,7 +1603,7 @@ async def translate(interaction: discord.Interaction, text: str, language_to: ap
 @client.tree.command()
 @app_commands.rename(url='url')
 @app_commands.describe(url="Youtube link (Must match https://www.youtube.com/watch?v=1abcd2efghi)")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def youtube(interaction: discord.Interaction, url: str):
     """Play a youtube link"""
     is_deferred=True
@@ -1625,7 +1634,7 @@ async def youtube(interaction: discord.Interaction, url: str):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def enable(interaction: discord.Interaction):
     """Enable auto talking feature."""
     is_deferred=True
@@ -1644,7 +1653,7 @@ async def enable(interaction: discord.Interaction):
         
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def disable(interaction: discord.Interaction):
     """Disable auto talking feature."""
     is_deferred=True
@@ -1666,7 +1675,7 @@ async def disable(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(seconds='seconds')
 @app_commands.describe(seconds="Timeout seconds (Min 60 - Max 600)")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def timer(interaction: discord.Interaction, seconds: int):
     """Change the timer for the auto talking feature."""
     is_deferred=True
@@ -1674,8 +1683,8 @@ async def timer(interaction: discord.Interaction, seconds: int):
         await interaction.response.defer(thinking=True, ephemeral=True)
         check_permissions(interaction)
         currentguildid = get_current_guild_id(interaction.guild.id)
-        if seconds < 60 or seconds > 600:
-            await interaction.followup.send(await utils.translate(currentguildid,"Seconds must be greater than 60 and lower than 600"), ephemeral = True)
+        if seconds < 90 or seconds > 600:
+            await interaction.followup.send(await utils.translate(currentguildid,"Seconds must be greater than 90 and lower than 600"), ephemeral = True)
         else:
             loops_dict[interaction.guild.id].play_audio_loop.change_interval(seconds=seconds)
             logging.info("timer - play_audio_loop.change_interval(seconds="+str(seconds)+")")
@@ -1689,7 +1698,7 @@ async def timer(interaction: discord.Interaction, seconds: int):
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def soundrandom(interaction: discord.Interaction, text: Optional[str] = "random"):
     """Play a random sound from the soundboard."""
     is_deferred=True
@@ -1731,7 +1740,7 @@ async def soundrandom(interaction: discord.Interaction, text: Optional[str] = "r
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def soundsearch(interaction: discord.Interaction, text: Optional[str] = "random"):
     """Search for sounds on the soundboard."""
     is_deferred=True
@@ -1773,7 +1782,7 @@ async def soundsearch(interaction: discord.Interaction, text: Optional[str] = "r
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def commands(interaction: discord.Interaction):
     """Show bot commands."""
     is_deferred=True
@@ -1823,7 +1832,7 @@ async def commands(interaction: discord.Interaction):
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def admin(interaction: discord.Interaction):
     """Show Admin bot commands."""
     is_deferred=True
@@ -1853,7 +1862,7 @@ async def admin(interaction: discord.Interaction):
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def accept(interaction: discord.Interaction):
     """Accept or Decline NSFW content."""
     is_deferred=True
@@ -1875,7 +1884,7 @@ async def accept(interaction: discord.Interaction):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def disclaimer(interaction: discord.Interaction):
     """Show DISCLAIMER."""
     is_deferred=True
@@ -1890,7 +1899,7 @@ async def disclaimer(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(file='file')
 @app_commands.describe(file="The sentences file")
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def train(interaction: discord.Interaction, file: discord.Attachment):
     """Train the Bot using a sentences file."""
     is_deferred=True
@@ -1939,7 +1948,7 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 60.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def reset(interaction: discord.Interaction):
     """Resets the bot database"""
     is_deferred=True
