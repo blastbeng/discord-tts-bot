@@ -25,6 +25,8 @@ import asyncio
 import threading
 import requests
 import aiohttp
+import subito_wrapper
+import io
 
 from utils import FFmpegPCMAudioBytesIO
 
@@ -303,6 +305,7 @@ discord.utils.setup_logging(level=int(os.environ.get("LOG_LEVEL")), root=False)
 loops_dict = {}
 populator_loops_dict = {}
 generator_loops_dict = {}
+subito_loops_dict = {}
 cvc_loops_dict = {}
 fakeyou_voices = {}
 
@@ -732,6 +735,44 @@ async def change_presence_loop():
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
+class SubitoCheckLoop:
+    
+    def __init__(self, guildid, url):
+        logging.info("subito_check_loop - Starting")
+        self.guildid = guildid
+        self.url = url
+        self.prods = []
+        startquery = subito_wrapper.run_query('', url=self.url)
+        for single in startquery:
+            self.prods.append(single)
+
+    @tasks.loop(seconds=60)
+    async def subito_check_loop(self):
+        try:
+            logging.info("subito_check_loop - Refreshing products")
+            newquery = subito_wrapper.run_query('', url=self.url)
+            new_prods = []
+            for newsingle in newquery:
+                new_prods.append(newsingle)
+
+            for prod in new_prods:
+                if prod not in self.prods:
+                    self.prods.append(prod)
+                    channel = client.get_channel(int(os.environ.get("SUBITO_IT_CHANNEL_ID")))
+                    message = "---------------------------\n" + await utils.translate(get_current_guild_id(self.guildid),"New product found on")  + " subito.it url: " + self.url + "\n\n"  + await utils.translate(get_current_guild_id(self.guildid),"Title") + ": " + str(prod.title) + "\n" + await utils.translate(get_current_guild_id(self.guildid),"Price") + ": " + str(prod.price) + "\n"  + "Link" + ": " + str(prod.link)
+                    await channel.send(message)
+                    if prod.image is not None:
+                        async with aiohttp.ClientSession() as session:
+                            async with session.get(prod.image) as resp:
+                                img = await resp.read()
+                                with io.BytesIO(img) as file:
+                                    await channel.send(file=discord.File(file, "product.png"))
+                    logging.info("subito_check_loop - Found new product")
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
 @client.event
 async def on_ready():
     try:
@@ -746,6 +787,7 @@ async def on_connect():
     try:
         logging.info(f'Connected as {client.user} (ID: {client.user.id})')
         change_presence_loop.start()
+
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -756,6 +798,9 @@ async def on_guild_available(guild):
 
     try:
         currentguildid = get_current_guild_id(str(guild.id))
+
+        subito_loops_dict[guild.id] = SubitoCheckLoop(guild.id, 'https://www.subito.it/annunci-piemonte/vendita/videogiochi/torino/?order=datedesc')
+        subito_loops_dict[guild.id].subito_check_loop.start()
         
         loops_dict[guild.id] = PlayAudioLoop(guild.id)
         #if currentguildid == "000000":
