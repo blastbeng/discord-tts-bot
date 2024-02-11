@@ -737,36 +737,48 @@ async def change_presence_loop():
 
 class SubitoCheckLoop:
     
-    def __init__(self, guildid, url):
+    def __init__(self, guildid, urls):
         logging.info("subito_check_loop - Starting")
         self.guildid = guildid
-        self.url = url
+        self.urls = urls
         self.prods = []
-        startquery = subito_wrapper.run_query('', url=self.url)
-        for single in startquery:
-            self.prods.append(single)
+        for url in self.urls:
+            startquery = subito_wrapper.run_query('', url=url)
+            for single in startquery:
+                self.prods.append(single)
 
     @tasks.loop(seconds=60)
     async def subito_check_loop(self):
         try:
             logging.info("subito_check_loop - Refreshing products")
-            newquery = subito_wrapper.run_query('', url=self.url)
             new_prods = []
-            for newsingle in newquery:
-                new_prods.append(newsingle)
+            for url in self.urls:
+                newquery = subito_wrapper.run_query('', url=url)
+                for newsingle in newquery:
+                    new_prods.append(newsingle)
 
             for prod in new_prods:
                 if prod not in self.prods:
                     self.prods.append(prod)
                     channel = client.get_channel(int(os.environ.get("SUBITO_IT_CHANNEL_ID")))
-                    message = "---------------------------\n" + await utils.translate(get_current_guild_id(self.guildid),"New product found on")  + " subito.it url: " + self.url + "\n\n"  + await utils.translate(get_current_guild_id(self.guildid),"Title") + ": " + str(prod.title) + "\n" + await utils.translate(get_current_guild_id(self.guildid),"Price") + ": " + str(prod.price) + "\n"  + "Link" + ": " + str(prod.link)
-                    await channel.send(message)
+                    message = "-----------------------------------" + "\n"
+                    message = message + str(prod.title) + "\n" 
+                    if prod.price is not None:
+                        message = message + await utils.translate(get_current_guild_id(self.guildid),"Price") + ": " + str(prod.price) + " €\n"  
+                    if prod.location is not None:
+                        message = message + await utils.translate(get_current_guild_id(self.guildid),"Location") + ": " + str(prod.location) + "\n"  
+                    if prod.date is not None:
+                        message = message + await utils.translate(get_current_guild_id(self.guildid),"Date") + ": " + str(prod.date) + "\n"  
+                    message = message + "Link" + ": " + str(prod.link)
+                    #await channel.send()
                     if prod.image is not None:
                         async with aiohttp.ClientSession() as session:
                             async with session.get(prod.image) as resp:
                                 img = await resp.read()
                                 with io.BytesIO(img) as file:
-                                    await channel.send(file=discord.File(file, "product.png"))
+                                    await channel.send(message, file=discord.File(file, "product.png"))
+                    else:
+                        await channel.send(message)
                     logging.info("subito_check_loop - Found new product")
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -799,8 +811,14 @@ async def on_guild_available(guild):
     try:
         currentguildid = get_current_guild_id(str(guild.id))
 
-        subito_loops_dict[guild.id] = SubitoCheckLoop(guild.id, 'https://www.subito.it/annunci-piemonte/vendita/videogiochi/torino/?order=datedesc')
+        urls_subito = []
+        urls_subito.append('https://www.subito.it/annunci-piemonte/vendita/videogiochi/torino/?order=datedesc')
+        urls_subito.append('https://www.subito.it/annunci-piemonte/vendita/informatica/torino/?q=RTX&order=datedesc')
+
+        subito_loops_dict[guild.id] = SubitoCheckLoop(guild.id, urls_subito)
         subito_loops_dict[guild.id].subito_check_loop.start()
+
+        
         
         loops_dict[guild.id] = PlayAudioLoop(guild.id)
         #if currentguildid == "000000":

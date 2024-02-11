@@ -22,6 +22,7 @@ class product:
     location : str
     link     : str
     image    : str
+    date     : str
 
     def to_dict(self) -> dict:
         return self.__dict__
@@ -125,10 +126,11 @@ def load_product(prod_dict:dict) -> product:
 
     return product(
         prod_dict.get('title','Null'),
-        prod_dict.get('price','Unknown price'),
-        prod_dict.get('location','Unknown location'),
+        prod_dict.get('price',None),
+        prod_dict.get('location',None),
         prod_dict.get('link','Null'),
-        prod_dict.get('image','Null')
+        prod_dict.get('image','Null'),
+        prod_dict.get('date',None)
     )
 
 def load_query(query_dict:dict) -> subito_query:
@@ -162,7 +164,7 @@ def run_query(name:str, minPrice: int='null', maxPrice: int='null',url='') -> su
         title = p.find('h2').string
 
         try:
-
+            
             image = p.find('figure',class_=re.compile(r'photo-container')).contents[0].attrs['src']                
 
         except:
@@ -180,13 +182,19 @@ def run_query(name:str, minPrice: int='null', maxPrice: int='null',url='') -> su
             #at the moment (20.5.2021) the price is under the 'p' tag with 'span' inside if shipping available
 
         except:
-            price = "Unknown price"
+            price = None
         link = p.parent.parent.get('href')
         try:
             location = p.find('span',re.compile(r'town')).string + p.find('span',re.compile(r'city')).string
         except:
-            location = "Unknown location"
-        if minPrice == "null" or price == "Unknown price" or price>=minPrice:
-            if maxPrice == "null" or price == "Unknown price" or price<=maxPrice:
-                query.add(product(title,price,location,link,image))
+            location = None
+
+        try:
+            date = p.find('span',re.compile(r'date')).string.replace('::before','')
+        except:
+            date = None
+
+        if minPrice == "null" or price == None or price>=minPrice:
+            if maxPrice == "null" or price == None or price<=maxPrice:
+                query.add(product(title,price,location,link,image,date))
     return query
