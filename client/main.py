@@ -129,7 +129,7 @@ class SlashCommandButton(discord.ui.Button["InteractionRoles"]):
                 await interaction.followup.send("/enable -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"Enable auto talking feature"), ephemeral = True)
             elif self.name == constants.DISABLE:
                 await interaction.followup.send("/disable -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"Disable auto talking feature"), ephemeral = True)
-            elif self.name == constantfs.JOIN:
+            elif self.name == constants.JOIN:
                 await interaction.followup.send("/join -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot joins the voice channel"), ephemeral = True)
             elif self.name == constants.LEAVE:
                 await interaction.followup.send("/leave -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot leaves the voice channel"), ephemeral = True)
@@ -758,8 +758,8 @@ async def on_guild_available(guild):
         currentguildid = get_current_guild_id(str(guild.id))
         
         loops_dict[guild.id] = PlayAudioLoop(guild.id)
-        if currentguildid == "000000":
-            loops_dict[guild.id].play_audio_loop.start()
+        #if currentguildid == "000000":
+        #loops_dict[guild.id].play_audio_loop.start()
 
         populator_loops_dict[guild.id] = PopulatorLoop(guild.id)
         populator_loops_dict[guild.id].populator_loop.start()
@@ -849,17 +849,18 @@ async def on_presence_update(before, after):
 @client.event
 async def on_voice_state_update(member, before, after):
     try:
-        if before.channel is not None and after.channel is not None and before.channel.id != after.channel.id:
-            voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
+        if loops_dict[member.guild.id].play_audio_loop.is_running():
+            if before.channel is not None and after.channel is not None and before.channel.id != after.channel.id:
+                voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
 
-            perms = after.channel.permissions_for(after.channel.guild.me)
-            if (perms.administrator or perms.speak):
-                if voice_client:
-                    await voice_client.disconnect()
+                perms = after.channel.permissions_for(after.channel.guild.me)
+                if (perms.administrator or perms.speak):
+                    if voice_client:
+                        await voice_client.disconnect()
+                    await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
+            elif before.channel is None and after.channel is not None:
+                voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
                 await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
-        elif before.channel is None and after.channel is not None:
-            voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
-            await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -1105,7 +1106,7 @@ async def generate(interaction: discord.Interaction):
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
         elif voice_client:
             currentguildid = get_current_guild_id(interaction.guild.id)
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/sentences/generate/" + urllib.parse.quote(currentguildid) + "/0" + "/"
+            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/sentences/generate/" + urllib.parse.quote(currentguildid) + "/0"
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if (response.status == 200):
@@ -1458,22 +1459,19 @@ async def avatar(interaction: discord.Interaction, image: discord.Attachment):
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
         #check_permissions(interaction)
-        if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")) and str(interaction.user.id) == str(os.environ.get("ADMIN_ID")):
-            if interaction.user.guild_permissions.administrator:
-                imgfile=await image.to_file()
-                filepath = os.environ.get("TMP_DIR") + "/avatar_guild_" + str(interaction.guild.id) + pathlib.Path(imgfile.filename).suffix
-                with open(filepath, 'wb') as file:
-                    file.write(imgfile.fp.getbuffer())
-                if check_image_with_pil(filepath):
-                    with open(filepath, 'rb') as f:
-                        image = f.read()
-                    await client.user.edit(avatar=image)
-                    await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The image has been changed"), ephemeral = True)
-                    os.remove(filepath)
-                else:
-                    await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"This file type is not supported"), ephemeral = True)
+        if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
+            imgfile=await image.to_file()
+            filepath = os.environ.get("TMP_DIR") + "/avatar_guild_" + str(interaction.guild.id) + pathlib.Path(imgfile.filename).suffix
+            with open(filepath, 'wb') as file:
+                file.write(imgfile.fp.getbuffer())
+            if check_image_with_pil(filepath):
+                with open(filepath, 'rb') as f:
+                    image = f.read()
+                await client.user.edit(avatar=image)
+                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The image has been changed"), ephemeral = True)
+                os.remove(filepath)
             else:
-                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Only the bot owner can use this command"), ephemeral = True)
+                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"This file type is not supported"), ephemeral = True)
         else:
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"This is a private command and can only be used by members with specific permissions on the main Bot Server"), ephemeral = True)
     except Exception as e:

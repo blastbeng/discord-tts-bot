@@ -114,29 +114,6 @@ class TextRepeatClass(Resource):
   def get (self, text: str, chatid = "000000"):
     return get_response_str(text)
 
-@limiter.limit("2/minute")
-@nstext.route('/askgooglebard/<string:text>/')
-class AskGoogleBardClass(Resource):
-  @cache.cached(timeout=30, query_string=True)
-  def get (self, text: str):
-    try:
-      out, text = utils.ask_google_bard(text)
-      if out is not None:
-        response = get_response_str(out)
-        response.headers['X-Generated-Text'] = text.replace("\n", "").replace("\r", "").encode('utf-8').decode('latin-1')
-        return response
-      else:
-        @after_this_request
-        def clear_cache(response):
-          cache.delete_memoized(AskGoogleBardClass.get, self, str)
-          return make_response("Google Bard Error!", 500)
-    except Exception as e:
-      g.request_error = str(e)
-      @after_this_request
-      def clear_cache(response):
-        cache.delete_memoized(AskGoogleBardClass.get, self, str)
-        return make_response(g.get('request_error'), 500)
-
 
 @nstext.route('/curse/')
 @nstext.route('/curse/<string:chatid>/')

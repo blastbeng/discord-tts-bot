@@ -45,7 +45,6 @@ from exceptions import AudioLimitException
 from exceptions import TimeExceededException
 import multiprocessing
 from functools import wraps
-from bardapi import BardCookies
 from undetected_chromedriver import Chrome, ChromeOptions
 from selenium.webdriver.common.by  import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -1056,26 +1055,6 @@ def login_google():
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-
-def ask_google_bard(text: str):
-  out = None
-  try:
-    cookie_dict = {
-        "__Secure-1PSID": os.environ.get("__Secure-1PSID"),
-        "__Secure-1PSIDTS": os.environ.get("__Secure-1PSIDTS"),
-        "__Secure-1PSIDCC": os.environ.get("__Secure-1PSIDCC")
-    } 
-    bard = BardCookies(cookie_dict=cookie_dict)
-    response = bard.get_answer(text)
-    text = response['content']
-    if response['links'] is not None and len(response['links']) > 0 and response['links'][0] is not None:
-      out = text + "\n" + str(response['links'][0])
-  except Exception as e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-    #threading.Thread(target=lambda: login_google()).start()
-  return out, text
 
 
 
