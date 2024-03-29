@@ -23,7 +23,6 @@ COPY main.py .
 COPY utils.py .
 COPY database.py .
 COPY constants.py .
-COPY subito_wrapper.py .
 COPY entrypoint.sh .
 COPY loading.gif .
 RUN chmod +x entrypoint.sh

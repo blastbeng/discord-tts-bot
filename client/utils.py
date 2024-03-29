@@ -53,6 +53,23 @@ class FFmpegPCMAudioBytesIO(discord.AudioSource):
 dbms = database.Database(database.SQLITE, dbname='client.sqlite3')
 database.create_db_tables(dbms)
 
+
+async def search_subito_db(guildid: str, url: str, title: str, link: str, price: str, location: str):
+    return database.select_subito(dbms, guildid, url, title, link, price, location)
+
+async def delete_subito_url(guildid: str, url: str):
+    return database.delete_subito_url(dbms, guildid, url)
+
+async def select_subito_urls(guildid: str):
+    return database.select_subito_urls(dbms, guildid)
+
+async def select_subito_channel(guildid: str, channel: str):
+    return database.select_subito_channel(dbms, guildid, channel)
+
+async def insert_subito_db(guildid: str, url: str, title: str, link: str, price: str, location: str, date: str, image: str, channel: str):
+    if database.select_subito(dbms, guildid, url, title, link, price, location) is None:
+        database.insert_subito(dbms, guildid, url, title, link, price, location, date, image, channel)
+
 async def translate(guildid: str, text: str):
     tolang=database.select_guildconfig_lang(dbms, guildid, value = "it")
     fromlang='en'

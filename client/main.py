@@ -25,8 +25,8 @@ import asyncio
 import threading
 import requests
 import aiohttp
-import subito_wrapper
 import io
+import re
 
 from utils import FFmpegPCMAudioBytesIO
 
@@ -737,49 +737,77 @@ async def change_presence_loop():
 
 class SubitoCheckLoop:
     
-    def __init__(self, guildid, urls):
+    def __init__(self, guildid):
         logging.info("subito_check_loop - Starting")
         self.guildid = guildid
-        self.urls = urls
-        self.prods = []
-        for url in self.urls:
-            startquery = subito_wrapper.run_query('', url=url)
-            for single in startquery:
-                self.prods.append(single)
+        for guild in client.guilds:
+            if guild.id == guildid:
+                self.guild = guild
 
     @tasks.loop(seconds=60)
     async def subito_check_loop(self):
         try:
             logging.info("subito_check_loop - Refreshing products")
-            new_prods = []
-            for url in self.urls:
-                newquery = subito_wrapper.run_query('', url=url)
-                for newsingle in newquery:
-                    new_prods.append(newsingle)
+            new_prods_dict = {}
+            guildid = get_current_guild_id(self.guildid)
+            urls = await utils.select_subito_urls(guildid)
+            for url in urls:
+                urlapi = os.environ.get("API_URL") + "/subito/search"
+                params = {'url': url}
+                response = requests.post(urlapi, data=params, timeout=60)
+                if (response.status_code == 200):
+                    json_object = response.json()
+                    newquery = json_object['products']
+                    new_prods = []
+                    for newsingle in newquery:
+                        new_prods.append(newsingle)
+                    new_prods_dict[url] = new_prods
 
-            for prod in new_prods:
-                if prod not in self.prods:
-                    self.prods.append(prod)
-                    channel = client.get_channel(int(os.environ.get("SUBITO_IT_CHANNEL_ID")))
-                    message = "-----------------------------------" + "\n"
-                    message = message + str(prod.title) + "\n" 
-                    if prod.price is not None:
-                        message = message + await utils.translate(get_current_guild_id(self.guildid),"Price") + ": " + str(prod.price) + " €\n"  
-                    if prod.location is not None:
-                        message = message + await utils.translate(get_current_guild_id(self.guildid),"Location") + ": " + str(prod.location) + "\n"  
-                    if prod.date is not None:
-                        message = message + await utils.translate(get_current_guild_id(self.guildid),"Date") + ": " + str(prod.date) + "\n"  
-                    message = message + "Link" + ": " + str(prod.link)
-                    #await channel.send()
-                    if prod.image is not None:
-                        async with aiohttp.ClientSession() as session:
-                            async with session.get(prod.image) as resp:
-                                img = await resp.read()
-                                with io.BytesIO(img) as file:
-                                    await channel.send(message, file=discord.File(file, "product.png"))
-                    else:
-                        await channel.send(message)
-                    logging.info("subito_check_loop - Found new product")
+            for key in new_prods_dict:
+ 
+                keywo = key.replace("https://www.subito.it/", "")
+
+                pattern = r'[-/&?=]'
+                titles = re.split(pattern, keywo)
+
+                finaltitle = await utils.select_subito_channel(guildid, key) 
+
+                if finaltitle is not None:
+
+                    category = discord.utils.get(self.guild.categories, name=str(os.environ.get("SUBITO_IT_CATEGORY_NAME")))
+                    
+
+                    channel = discord.utils.get(self.guild.channels, name=finaltitle)
+                    if channel is None:
+                        channel = await self.guild.create_text_channel(finaltitle, category=category)
+
+                    if channel is not None:
+
+                        for prod in new_prods_dict[key]:
+                            cached = await utils.search_subito_db(guildid, str(key), str(prod['title']), str(prod['link']), str(prod['price']), str(prod['location']))
+                            if cached is None:
+                                await utils.insert_subito_db(guildid, str(key), str(prod['title']), str(prod['link']), str(prod['price']), str(prod['location']), str(prod['date']), str(prod['image']), '')
+                                
+                                message = "-----------------------------------" + "\n"
+                                message = message + str(key) + " - " + await utils.translate(guildid,"New product found") + "!\n" 
+                                message = message + "-----------------------------------" + "\n"
+                                message = message + str(prod['title']) + "\n" 
+                                if prod['price'] is not None:
+                                    message = message + await utils.translate(guildid,"Price") + ": " + str(prod['price']) + " €\n"  
+                                if prod['location'] is not None:
+                                    message = message + await utils.translate(guildid,"Location") + ": " + str(prod['location']) + "\n"  
+                                if prod['date'] is not None:
+                                    message = message + await utils.translate(guildid,"Date") + ": " + str(prod['date']) + "\n"  
+                                message = message + "Link" + ": " + str(prod['link'])
+                                if prod['image'] is not None:
+                                    async with aiohttp.ClientSession() as session:
+                                        async with session.get(prod['image']) as resp:
+                                            img = await resp.read()
+                                            with io.BytesIO(img) as file:
+                                                await channel.send(message, file=discord.File(file, "product.png"))
+                                else:
+                                    await channel.send(message)
+                                logging.info("subito_check_loop - Found new product")
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -811,11 +839,10 @@ async def on_guild_available(guild):
     try:
         currentguildid = get_current_guild_id(str(guild.id))
 
-        urls_subito = []
-        urls_subito.append('https://www.subito.it/annunci-piemonte/vendita/videogiochi/torino/?order=datedesc')
-        urls_subito.append('https://www.subito.it/annunci-piemonte/vendita/informatica/torino/?q=RTX&order=datedesc')
 
-        subito_loops_dict[guild.id] = SubitoCheckLoop(guild.id, urls_subito)
+        
+        
+        subito_loops_dict[guild.id] = SubitoCheckLoop(guild.id)
         subito_loops_dict[guild.id].subito_check_loop.start()
 
         
@@ -1735,7 +1762,7 @@ async def disable(interaction: discord.Interaction):
 
 @client.tree.command()
 @app_commands.rename(seconds='seconds')
-@app_commands.describe(seconds="Timeout seconds (Min 60 - Max 600)")
+@app_commands.describe(seconds="Timeout seconds (Min 30 - Max 1200)")
 @app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
 async def timer(interaction: discord.Interaction, seconds: int):
     """Change the timer for the auto talking feature."""
@@ -1744,12 +1771,115 @@ async def timer(interaction: discord.Interaction, seconds: int):
         await interaction.response.defer(thinking=True, ephemeral=True)
         check_permissions(interaction)
         currentguildid = get_current_guild_id(interaction.guild.id)
-        if seconds < 90 or seconds > 600:
-            await interaction.followup.send(await utils.translate(currentguildid,"Seconds must be greater than 90 and lower than 600"), ephemeral = True)
+        if seconds < 30 or seconds > 1200:
+            await interaction.followup.send(await utils.translate(currentguildid,"Seconds must be greater than 30 and lower than 1200"), ephemeral = True)
         else:
             loops_dict[interaction.guild.id].play_audio_loop.change_interval(seconds=seconds)
             logging.info("timer - play_audio_loop.change_interval(seconds="+str(seconds)+")")
             await interaction.followup.send(await utils.translate(currentguildid,"I'm setting a " + str(seconds) + " seconds timer for the auto talking feature"), ephemeral = True)
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+
+
+
+@client.tree.command()
+@app_commands.rename(link='link')
+@app_commands.describe(link="Subito.it link")
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+async def add_subito_url(interaction: discord.Interaction, link: str):
+    """Add a new Subito.it link."""
+    is_deferred=True
+    try:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        check_permissions(interaction)
+        currentguildid = get_current_guild_id(interaction.guild.id) 
+        
+ 
+        keywo = link.replace("https://www.subito.it/", "")
+
+        pattern = r'[-/&?=]'
+        titles = re.split(pattern, keywo)
+
+        finaltitle = None
+
+        for title in titles:
+            if title != '':
+                string = ''.join(letter for letter in title if letter.isalnum())
+                if finaltitle is None:
+                    finaltitle = string
+                else:
+                    finaltitle = finaltitle + "-" + string
+
+        if finaltitle is not None:
+            finaltitle = finaltitle.lower()
+            if len(finaltitle) > 100:
+                finaltitle = finaltitle[0:99]
+
+            category = discord.utils.get(interaction.guild.categories, name=str(os.environ.get("SUBITO_IT_CATEGORY_NAME")))
+
+            channel = discord.utils.get(interaction.guild.channels, name=finaltitle, category=category)
+            if channel is None:
+                channel = await interaction.guild.create_text_channel(finaltitle, category=category)
+
+            await utils.insert_subito_db(currentguildid, link, '', '', '', '', '', '', finaltitle)     
+            await interaction.followup.send(await utils.translate(currentguildid,"I am adding a configuration link:") + link + "\n" + await utils.translate(currentguildid,"Creating channel:") + finaltitle, ephemeral = True) 
+        else:
+            await interaction.followup.send(await utils.translate(currentguildid,"There was an error generating the discord channel for this link.") + link, ephemeral = True)  
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+
+
+
+@client.tree.command()
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+async def list_subito_urls(interaction: discord.Interaction):
+    """List Subito.it configured link(s)."""
+    is_deferred=True
+    try:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        check_permissions(interaction)
+        currentguildid = get_current_guild_id(interaction.guild.id)
+        links = await utils.select_subito_urls(currentguildid)
+        message = ''
+        for link in links:         
+            message = message + "\n" + link
+        if message == '':
+            await interaction.followup.send(await utils.translate(currentguildid,"No configuration link found."), ephemeral = True)
+        else:
+            message = await utils.translate(currentguildid,"Configured links found:") + "\n" + message
+            await interaction.followup.send(message, ephemeral = True)
+         
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+
+
+
+@client.tree.command()
+@app_commands.rename(link='link')
+@app_commands.describe(link="Subito.it link")
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+async def delete_subito_url(interaction: discord.Interaction, link: str):
+    """Add a new Subito.it link."""
+    is_deferred=True
+    try:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        check_permissions(interaction)
+        currentguildid = get_current_guild_id(interaction.guild.id)  
+
+        finaltitle = await utils.select_subito_channel(currentguildid, link) 
+
+        if finaltitle is not None:
+                
+            category = discord.utils.get(interaction.guild.categories, name=str(os.environ.get("SUBITO_IT_CATEGORY_NAME")))
+
+            channel = discord.utils.get(interaction.guild.channels, name=finaltitle, category=category)
+            if channel is not None:
+                await channel.delete()
+
+            await utils.delete_subito_url(currentguildid, link)
+            await interaction.followup.send(await utils.translate(currentguildid,"I am removing a configuration link:") + link + "\n" + await utils.translate(currentguildid,"Deleting channel:") + finaltitle, ephemeral = True) 
+        else:
+            await interaction.followup.send(await utils.translate(currentguildid,"No configuration found for that link.") + link, ephemeral = True) 
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 

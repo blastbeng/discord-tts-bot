@@ -9,6 +9,9 @@ import audiodb
 import threading
 import sys
 import glob
+import urllib
+import subito_wrapper
+import json
 from io import BytesIO
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -94,6 +97,7 @@ def get_response_str(text: str):
 def get_response_json(data):
   r = Response(response=data, status=200, mimetype="application/json")
   r.headers["Content-Type"] = "application/json; charset=utf-8"
+  r.headers["Accept"] = "application/json"
   return r
 
 def get_response_limit_error(text: str):
@@ -867,6 +871,22 @@ class ParagraphGenerateClass(Resource):
   def get(self, chatid = "000000"):
     try:
       return make_response(utils.generate_paragraph(chatid), 200)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
+
+
+
+nssubito = api.namespace('subito', 'Accumulators Subito.it APIs')
+@nssubito.route('/search')
+class SubitoSearchUrlClass(Resource):
+  def post (self):
+    try:
+      url = request.form.get("url")
+      query = subito_wrapper.run_query('', url=url)
+      return get_response_json(json.dumps(query.to_dict()))
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]

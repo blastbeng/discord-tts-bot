@@ -69,6 +69,7 @@ COPY image.py .
 COPY main.py .
 COPY exceptions.py .
 COPY custom_mongo_adapter.py .
+COPY subito_wrapper.py .
 COPY config.py .
 COPY entrypoint.sh .
 COPY uwsgi.ini .
