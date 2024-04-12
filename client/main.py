@@ -96,7 +96,7 @@ class SoundBoardButton(discord.ui.Button["InteractionRoles"]):
                 currentguildid = get_current_guild_id(interaction.guild.id)
                 await do_play(self.audiourl, interaction, currentguildid, name = self.name)
             else:
-                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)            
+                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)            
             
         except Exception as e:
             await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
@@ -578,7 +578,7 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
                     await interaction.followup.send(message, ephemeral = ephermeal)
                 else:
                     logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(get_current_guild_id(interaction.guild.id)))
-                    await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = ephermeal)
+                    await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = ephermeal)
     
             await session.close()  
     except ClientException as e:
@@ -586,7 +586,7 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
         if write_message:
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = ephermeal)
+            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = ephermeal)
     except Exception as ee:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -1064,7 +1064,7 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "googl
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)      
         else:
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)            
+            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)            
          
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
@@ -1093,7 +1093,7 @@ async def wikipedia(interaction: discord.Interaction, text: str):
             await do_play(url, interaction, currentguildid)
 
         else:
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)            
+            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)            
         
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
@@ -1132,7 +1132,7 @@ async def wikipedia(interaction: discord.Interaction, text: str):
 #                        await interaction.followup.send("Google Bard Error" + "\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later"), ephemeral = True)        
 #                await session.close() 
 #        else:
-#            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+#            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
 #         
 #    except Exception as e:
 #        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
@@ -1172,7 +1172,7 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
             
             
         else:
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
         
            
     except Exception as e:
@@ -1208,7 +1208,7 @@ async def generate(interaction: discord.Interaction):
                         await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),'Error. The generator database is still empty, try again later.\nNOTE: If you just invited the bot, this feature will be available in 12 hours if you continue to use the "speak" command.'), ephemeral = True)     
                 await session.close() 
         else:
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
         
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
@@ -1243,7 +1243,7 @@ async def story(interaction: discord.Interaction):
                         await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),'Error. The generator database is still empty, try again later.\nNOTE: If you just invited the bot, this feature will be available in 12 hours if you continue to use the "speak" command.'), ephemeral = True)         
                 await session.close() 
         else:
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
         
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
@@ -1283,7 +1283,7 @@ async def insult(interaction: discord.Interaction, member: Optional[discord.Memb
                     insulturl=insulturl +"?chatid="+urllib.parse.quote(get_current_guild_id(interaction.guild.id)) + "&lang=" + urllib.parse.quote(utils.get_guild_language(currentguildid))
                 await do_play(insulturl, interaction, currentguildid)
             else:
-                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
 
          
     except Exception as e:
@@ -1325,7 +1325,7 @@ async def random(interaction: discord.Interaction, voice: str = "random", text: 
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)
         else:
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
 
          
     except Exception as e:
@@ -1363,7 +1363,7 @@ async def curse(interaction: discord.Interaction):
                                 url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"curse/"+urllib.parse.quote(currentguildid)+ "/" + utils.get_guild_language(currentguildid) + "/"
                                 await do_play(url, interaction, currentguildid)
                             else:
-                                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+                                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
 
                     except Exception as e:
                         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
@@ -1686,7 +1686,7 @@ async def translate(interaction: discord.Interaction, text: str, language_to: ap
                 
             
         else:
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
 
         
               
@@ -1720,7 +1720,7 @@ async def youtube(interaction: discord.Interaction, url: str):
             else:
                 await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"URL must match something like https://www.youtube.com/watch?v=1abcd2efghi"), ephemeral = True)
         else:
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
            
                 
     except Exception as e:
@@ -1927,7 +1927,7 @@ async def soundrandom(interaction: discord.Interaction, text: Optional[str] = "r
                             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results ") + " [" + text + "]", ephemeral = True)     
                 await session.close() 
         else:
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
          
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
