@@ -155,8 +155,8 @@ class SlashCommandButton(discord.ui.Button["InteractionRoles"]):
                 await interaction.followup.send("/untrackall -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"Untrack all users"), ephemeral = True)
             elif self.name == constants.WIKIPEDIA:
                 await interaction.followup.send("/wikipedia <text> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot searches something on wikipedia"), ephemeral = True)
-            elif self.name == constants.BARD:
-                await interaction.followup.send("/bard <text> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot asks something to") + " Google Bard APIs", ephemeral = True)
+            #elif self.name == constants.BARD:
+            #    await interaction.followup.send("/bard <text> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot asks something to") + " Google Bard APIs", ephemeral = True)
             else:
                 await interaction.followup.send("Work in progress", ephemeral = True)
         except Exception as e:
@@ -305,7 +305,7 @@ discord.utils.setup_logging(level=int(os.environ.get("LOG_LEVEL")), root=False)
 loops_dict = {}
 populator_loops_dict = {}
 generator_loops_dict = {}
-subito_loops_dict = {}
+#subito_loops_dict = {}
 cvc_loops_dict = {}
 fakeyou_voices = {}
 
@@ -735,83 +735,83 @@ async def change_presence_loop():
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
-class SubitoCheckLoop:
-    
-    def __init__(self, guildid):
-        logging.info("subito_check_loop - Starting")
-        self.guildid = guildid
-        for guild in client.guilds:
-            if guild.id == guildid:
-                self.guild = guild
-
-    @tasks.loop(seconds=60)
-    async def subito_check_loop(self):
-        try:
-            logging.info("subito_check_loop - Refreshing products")
-            new_prods_dict = {}
-            guildid = get_current_guild_id(self.guildid)
-            urls = await utils.select_subito_urls(guildid)
-            for url in urls:
-                urlapi = os.environ.get("API_URL") + "/subito/search"
-                params = {'url': url}
-                response = requests.post(urlapi, data=params, timeout=60)
-                if (response.status_code == 200):
-                    json_object = response.json()
-                    newquery = json_object['products']
-                    new_prods = []
-                    for newsingle in newquery:
-                        new_prods.append(newsingle)
-                    new_prods_dict[url] = new_prods
-
-            for key in new_prods_dict:
- 
-                keywo = key.replace("https://www.subito.it/", "")
-
-                pattern = r'[-/&?=]'
-                titles = re.split(pattern, keywo)
-
-                finaltitle = await utils.select_subito_channel(guildid, key) 
-
-                if finaltitle is not None:
-
-                    category = discord.utils.get(self.guild.categories, name=str(os.environ.get("SUBITO_IT_CATEGORY_NAME")))
-                    
-
-                    channel = discord.utils.get(self.guild.channels, name=finaltitle)
-                    if channel is None:
-                        channel = await self.guild.create_text_channel(finaltitle, category=category)
-
-                    if channel is not None:
-
-                        for prod in new_prods_dict[key]:
-                            cached = await utils.search_subito_db(guildid, str(key), str(prod['title']), str(prod['link']), str(prod['price']), str(prod['location']))
-                            if cached is None:
-                                await utils.insert_subito_db(guildid, str(key), str(prod['title']), str(prod['link']), str(prod['price']), str(prod['location']), str(prod['date']), str(prod['image']), '')
-                                
-                                message = "-----------------------------------" + "\n"
-                                message = message + str(key) + " - " + await utils.translate(guildid,"New product found") + "!\n" 
-                                message = message + "-----------------------------------" + "\n"
-                                message = message + str(prod['title']) + "\n" 
-                                if prod['price'] is not None:
-                                    message = message + await utils.translate(guildid,"Price") + ": " + str(prod['price']) + " €\n"  
-                                if prod['location'] is not None:
-                                    message = message + await utils.translate(guildid,"Location") + ": " + str(prod['location']) + "\n"  
-                                if prod['date'] is not None:
-                                    message = message + await utils.translate(guildid,"Date") + ": " + str(prod['date']) + "\n"  
-                                message = message + "Link" + ": " + str(prod['link'])
-                                if prod['image'] is not None:
-                                    async with aiohttp.ClientSession() as session:
-                                        async with session.get(prod['image']) as resp:
-                                            img = await resp.read()
-                                            with io.BytesIO(img) as file:
-                                                await channel.send(message, file=discord.File(file, "product.png"))
-                                else:
-                                    await channel.send(message)
-                                logging.info("subito_check_loop - Found new product")
-        except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+#class SubitoCheckLoop:
+#    
+#    def __init__(self, guildid):
+#        logging.info("subito_check_loop - Starting")
+#        self.guildid = guildid
+#        for guild in client.guilds:
+#            if guild.id == guildid:
+#                self.guild = guild
+#
+#    @tasks.loop(seconds=60)
+#    async def subito_check_loop(self):
+#        try:
+#            logging.info("subito_check_loop - Refreshing products")
+#            new_prods_dict = {}
+#            guildid = get_current_guild_id(self.guildid)
+#            urls = await utils.select_subito_urls(guildid)
+#            for url in urls:
+#                urlapi = os.environ.get("API_URL") + "/subito/search"
+#                params = {'url': url}
+#                response = requests.post(urlapi, data=params, timeout=60)
+#                if (response.status_code == 200):
+#                    json_object = response.json()
+#                    newquery = json_object['products']
+#                    new_prods = []
+#                    for newsingle in newquery:
+#                        new_prods.append(newsingle)
+#                    new_prods_dict[url] = new_prods
+#
+#            for key in new_prods_dict:
+# 
+#                keywo = key.replace("https://www.subito.it/", "")
+#
+#                pattern = r'[-/&?=]'
+#                titles = re.split(pattern, keywo)
+#
+#                finaltitle = await utils.select_subito_channel(guildid, key) 
+#
+#                if finaltitle is not None:
+#
+#                    category = discord.utils.get(self.guild.categories, name=str(os.environ.get("SUBITO_IT_CATEGORY_NAME")))
+#                    
+#
+#                    channel = discord.utils.get(self.guild.channels, name=finaltitle)
+#                    if channel is None:
+#                        channel = await self.guild.create_text_channel(finaltitle, category=category)
+#
+#                    if channel is not None:
+#
+#                        for prod in new_prods_dict[key]:
+#                            cached = await utils.search_subito_db(guildid, str(key), str(prod['title']), str(prod['link']), str(prod['price']), str(prod['location']))
+#                            if cached is None:
+#                                await utils.insert_subito_db(guildid, str(key), str(prod['title']), str(prod['link']), str(prod['price']), str(prod['location']), str(prod['date']), str(prod['image']), '')
+#                                
+#                                message = "-----------------------------------" + "\n"
+#                                message = message + str(key) + " - " + await utils.translate(guildid,"New product found") + "!\n" 
+#                                message = message + "-----------------------------------" + "\n"
+#                                message = message + str(prod['title']) + "\n" 
+#                                if prod['price'] is not None:
+#                                    message = message + await utils.translate(guildid,"Price") + ": " + str(prod['price']) + " €\n"  
+#                                if prod['location'] is not None:
+#                                    message = message + await utils.translate(guildid,"Location") + ": " + str(prod['location']) + "\n"  
+#                                if prod['date'] is not None:
+#                                    message = message + await utils.translate(guildid,"Date") + ": " + str(prod['date']) + "\n"  
+#                                message = message + "Link" + ": " + str(prod['link'])
+#                                if prod['image'] is not None:
+#                                    async with aiohttp.ClientSession() as session:
+#                                        async with session.get(prod['image']) as resp:
+#                                            img = await resp.read()
+#                                            with io.BytesIO(img) as file:
+#                                                await channel.send(message, file=discord.File(file, "product.png"))
+#                                else:
+#                                    await channel.send(message)
+#                                logging.info("subito_check_loop - Found new product")
+#        except Exception as e:
+#            exc_type, exc_obj, exc_tb = sys.exc_info()
+#            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+#            logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 @client.event
 async def on_ready():
@@ -842,8 +842,8 @@ async def on_guild_available(guild):
 
         
         
-        subito_loops_dict[guild.id] = SubitoCheckLoop(guild.id)
-        subito_loops_dict[guild.id].subito_check_loop.start()
+        #subito_loops_dict[guild.id] = SubitoCheckLoop(guild.id)
+        #subito_loops_dict[guild.id].subito_check_loop.start()
 
         
         
@@ -900,41 +900,41 @@ async def on_guild_available(guild):
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
-@client.event
-async def on_presence_update(before, after):
-    try:
-        currentguildid = get_current_guild_id(str(after.guild.id))
-        global track_users_dic
-        if after.id in track_users_dict:
-            if str(before.status).lower() == "offline" and str(after.status).lower() != str(before.status).lower():
-                tracked_user = track_users_dict[after.id]
-                if tracked_user.guildid == "000000":
-                    name = str(after.name)   
-                    #if after.nick is not None:
-                    #    name = str(after.nick)
-                    #else:
-                    #    name = str(after.name)      
-                    updatemessage = name + " ha appena cambiato stato da " + str(before.status) + " a " + str(after.status) + "." 
-
-                    channel = client.get_channel(int(os.environ.get("MAIN_CHANNEL_ID")))
-                    await channel.send(updatemessage)
-
-                    updatemessage_wapp = "Discord Tracking: " + updatemessage    
-                    if tracked_user.whatsapp == "1":     
-                        url = "http://" + os.environ.get("WHATSAPP_HOST") + ":" + os.environ.get("WHATSAPP_PORT") + "/message/" + os.environ.get("WHATSAPP_CHATID") + "/" + urllib.parse.quote(updatemessage_wapp)
-
-                        connector = aiohttp.TCPConnector(force_close=True)
-
-                        async with aiohttp.ClientSession(connector=connector) as session:
-                            async with session.get(url) as response:
-                                if (response.status != 200):
-                                    logging.error("[GUILDID : %s] on_presence_update -> reset - Received bad response from APIs", str(guild.id))
-                            await session.close()  
-
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+#@client.event
+#async def on_presence_update(before, after):
+#    try:
+#        currentguildid = get_current_guild_id(str(after.guild.id))
+#        global track_users_dic
+#        if after.id in track_users_dict:
+#            if str(before.status).lower() == "offline" and str(after.status).lower() != str(before.status).lower():
+#                tracked_user = track_users_dict[after.id]
+#                if tracked_user.guildid == "000000":
+#                    name = str(after.name)   
+#                    #if after.nick is not None:
+#                    #    name = str(after.nick)
+#                    #else:
+#                    #    name = str(after.name)      
+#                    updatemessage = name + " ha appena cambiato stato da " + str(before.status) + " a " + str(after.status) + "." 
+#
+#                    channel = client.get_channel(int(os.environ.get("MAIN_CHANNEL_ID")))
+#                    await channel.send(updatemessage)
+#
+#                    updatemessage_wapp = "Discord Tracking: " + updatemessage    
+#                    if tracked_user.whatsapp == "1":     
+#                        url = "http://" + os.environ.get("WHATSAPP_HOST") + ":" + os.environ.get("WHATSAPP_PORT") + "/message/" + os.environ.get("WHATSAPP_CHATID") + "/" + urllib.parse.quote(updatemessage_wapp)
+#
+#                        connector = aiohttp.TCPConnector(force_close=True)
+#
+#                        async with aiohttp.ClientSession(connector=connector) as session:
+#                            async with session.get(url) as response:
+#                                if (response.status != 200):
+#                                    logging.error("[GUILDID : %s] on_presence_update -> reset - Received bad response from APIs", str(guild.id))
+#                            await session.close()  
+#
+#    except Exception as e:
+#        exc_type, exc_obj, exc_tb = sys.exc_info()
+#        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+#        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 @client.event
 async def on_voice_state_update(member, before, after):
@@ -994,7 +994,7 @@ async def on_guild_remove(guild):
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def join(interaction: discord.Interaction):
     """Join channel."""
     is_deferred=True
@@ -1011,7 +1011,7 @@ async def join(interaction: discord.Interaction):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def leave(interaction: discord.Interaction):
     """Leave channel"""
     is_deferred=True
@@ -1035,7 +1035,7 @@ async def leave(interaction: discord.Interaction):
 @app_commands.rename(voice='voice')
 @app_commands.describe(voice="The voice to use")
 @app_commands.autocomplete(voice=rps_autocomplete)
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def speak(interaction: discord.Interaction, text: str, voice: str = "google"):
     """Repeat a sentence"""
     is_deferred=True
@@ -1073,7 +1073,7 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "googl
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def wikipedia(interaction: discord.Interaction, text: str):
     """Search something on wikipedia"""
     is_deferred=True
@@ -1099,43 +1099,43 @@ async def wikipedia(interaction: discord.Interaction, text: str):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 
-@client.tree.command()
-@app_commands.rename(text='text')
-@app_commands.describe(text="The text to search")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
-async def bard(interaction: discord.Interaction, text: str):
-    """Ask something to Google Bard"""
-    is_deferred=True
-    try:
-        await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
-        
-        voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
-        await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
-
-        
-        if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
-        elif voice_client:
-            currentguildid = get_current_guild_id(interaction.guild.id)
-
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "askgooglebard/" + urllib.parse.quote(str(text)) + "/"
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    if (response.status == 200):
-                        message = await response.text()
-                        text = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
-                        await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results "), ephemeral = True) 
-                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
-                        await do_play(url, interaction, currentguildid, name=message)      
-                    else:
-                        await interaction.followup.send("Google Bard Error" + "\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later"), ephemeral = True)        
-                await session.close() 
-        else:
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
-         
-    except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+#@client.tree.command()
+#@app_commands.rename(text='text')
+#@app_commands.describe(text="The text to search")
+#@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+#async def bard(interaction: discord.Interaction, text: str):
+#    """Ask something to Google Bard"""
+#    is_deferred=True
+#    try:
+#        await interaction.response.defer(thinking=True, ephemeral=True)
+#        check_permissions(interaction)
+#        
+#        voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+#        await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
+#
+#        
+#        if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
+#            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
+#        elif voice_client:
+#            currentguildid = get_current_guild_id(interaction.guild.id)
+#
+#            url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "askgooglebard/" + urllib.parse.quote(str(text)) + "/"
+#            async with aiohttp.ClientSession() as session:
+#                async with session.get(url) as response:
+#                    if (response.status == 200):
+#                        message = await response.text()
+#                        text = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
+#                        await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results "), ephemeral = True) 
+#                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
+#                        await do_play(url, interaction, currentguildid, name=message)      
+#                    else:
+#                        await interaction.followup.send("Google Bard Error" + "\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later"), ephemeral = True)        
+#                await session.close() 
+#        else:
+#            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is already talking or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
+#         
+#    except Exception as e:
+#        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 
 @client.tree.command()
@@ -1144,7 +1144,7 @@ async def bard(interaction: discord.Interaction, text: str):
 @app_commands.rename(voice='voice')
 @app_commands.describe(voice="The voice to use")
 @app_commands.autocomplete(voice=rps_autocomplete)
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def ask(interaction: discord.Interaction, text: str, voice: str = "google"):
     """Ask something."""
     is_deferred=True
@@ -1179,7 +1179,7 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def generate(interaction: discord.Interaction):
     """Generate a random sentence."""
     is_deferred=True
@@ -1215,7 +1215,7 @@ async def generate(interaction: discord.Interaction):
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def story(interaction: discord.Interaction):
     """Generate a random story."""
     is_deferred=True
@@ -1253,7 +1253,7 @@ async def story(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(member='member')
 @app_commands.describe(member="The user to insult")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def insult(interaction: discord.Interaction, member: Optional[discord.Member] = None):
     """Insult someone"""
     is_deferred=True
@@ -1297,7 +1297,7 @@ async def insult(interaction: discord.Interaction, member: Optional[discord.Memb
 @app_commands.autocomplete(voice=rps_autocomplete)
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def random(interaction: discord.Interaction, voice: str = "random", text: str = ""):
     """Say a random sentence"""
     is_deferred=True
@@ -1334,7 +1334,7 @@ async def random(interaction: discord.Interaction, voice: str = "random", text: 
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def curse(interaction: discord.Interaction):
     """Curse."""
     is_deferred=True
@@ -1373,7 +1373,7 @@ async def curse(interaction: discord.Interaction):
         await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Impossible to use this command") + ": API 'http://bestemmie.org' Status = OFFLINE", ephemeral = True)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 @app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 async def restart(interaction: discord.Interaction):
     """Restart bot."""
@@ -1395,7 +1395,7 @@ async def restart(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def delete(interaction: discord.Interaction, text: str):
     """Delete sentences by text."""
     is_deferred=True
@@ -1422,25 +1422,28 @@ async def delete(interaction: discord.Interaction, text: str):
                         #    filewrite.write("\n")            
 
 
-                    #await interaction.followup.send("Bot Backup.", file=discord.File(filename=nameout, fp=open(filepath, "rb")), ephemeral = True) 
-                    
-                    channel = client.get_channel(int(os.environ.get("BACKUP_CHANNEL_ID")))
-                    await channel.send(await utils.translate(currentguildid,"Someone deleted the word: " + text))
-                    await channel.send(await utils.translate(currentguildid,"Here's the backup."), file = discord.File(filename=nameout, fp=open(filepath, "rb")))
+                        #await interaction.followup.send("Bot Backup.", file=discord.File(filename=nameout, fp=open(filepath, "rb")), ephemeral = True) 
+                        
+                        #channel = client.get_channel(int(os.environ.get("BACKUP_CHANNEL_ID")))
+                        #await channel.send(await utils.translate(currentguildid,"Someone deleted the word: " + text))
+                        #await channel.send(await utils.translate(currentguildid,"Here's the backup."), file = discord.File(filename=nameout, fp=open(filepath, "rb")))
 
-                    os.remove(filepath)                    
+                        async with aiohttp.ClientSession() as session2:
+                            async with session2.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/forcedelete/bytext/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid)) as response:
+                                if (response.status == 200):
+                                    #text = await response.text()
+                                    #await interaction.followup.send(text, ephemeral = True) 
+                                    text = await utils.translate(currentguildid,"Someone deleted the word: " + text) + ". " + await utils.translate(currentguildid,"Here's the backup.")
 
-                    async with aiohttp.ClientSession() as session2:
-                        async with session2.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/forcedelete/bytext/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid)) as response:
-                            if (response.status == 200):
-                                text = await response.text()
-                                await interaction.followup.send(text, ephemeral = True) 
-                            elif (response.status == 500):
-                                await interaction.followup.send("Temporarily disabled. Other processes are running in the background, you need to wait for the end of their execution.", ephemeral = True) 
-                            else:
-                                logging.error("[GUILDID : %s] forcedelete/bytext - Received bad response from APIs", str(currentguildid))
-                                await interaction.followup.send(await utils.translate(currentguildid,"Error."), ephemeral = True)     
-                        await session.close() 
+                                    await interaction.followup.send(text, file=discord.File(filename=nameout, fp=open(filepath, "rb")), ephemeral = True) 
+                                elif (response.status == 500):
+                                    await interaction.followup.send("Temporarily disabled. Other processes are running in the background, you need to wait for the end of their execution.", ephemeral = True) 
+                                else:
+                                    logging.error("[GUILDID : %s] forcedelete/bytext - Received bad response from APIs", str(currentguildid))
+                                    await interaction.followup.send(await utils.translate(currentguildid,"Error."), ephemeral = True)     
+                            await session.close() 
+                        
+                    os.remove(filepath)      
                     
                 else:
                     logging.error("[GUILDID : %s] download/sentences - Received bad response from APIs", str(currentguildid))
@@ -1451,7 +1454,7 @@ async def delete(interaction: discord.Interaction, text: str):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def download(interaction: discord.Interaction):
     """Download sentences."""
     is_deferred=True
@@ -1478,14 +1481,16 @@ async def download(interaction: discord.Interaction):
                             #    filewrite.write("\n")            
 
 
-                        #await interaction.followup.send("Bot Backup.", file= 
-                        
-                        channel = client.get_channel(int(os.environ.get("BACKUP_CHANNEL_ID")))
-                        await channel.send(await utils.translate(currentguildid,"Someone generated a Backup."), file = discord.File(filename=nameout, fp=open(filepath, "rb")))
+                            #await interaction.followup.send("Bot Backup.", file= 
+                            
+                            #channel = client.get_channel(int(os.environ.get("BACKUP_CHANNEL_ID")))
+                            #await channel.send(await utils.translate(currentguildid,"Someone generated a Backup."), file = discord.File(filename=nameout, fp=open(filepath, "rb")))
+                                                
+                            await interaction.followup.send("Bot Backup.", file=discord.File(filename=nameout, fp=open(filepath, "rb")), ephemeral = True) 
 
                         os.remove(filepath)
                         
-                        await interaction.followup.send("Done.", ephemeral = True) 
+                        #await interaction.followup.send("Done.", ephemeral = True) 
                     else:
                         logging.error("[GUILDID : %s] download/sentences - Received bad response from APIs", str(currentguildid))
                         await interaction.followup.send(await utils.translate(currentguildid,"Error."), ephemeral = True)     
@@ -1496,7 +1501,7 @@ async def download(interaction: discord.Interaction):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def stop(interaction: discord.Interaction):
     """Stop playback."""
     is_deferred=True
@@ -1518,7 +1523,7 @@ async def stop(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(name='name')
 @app_commands.describe(name="New bot nickname (32 chars limit)")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def rename(interaction: discord.Interaction, name: str):
     """Rename bot."""
     is_deferred=True
@@ -1542,7 +1547,7 @@ async def rename(interaction: discord.Interaction, name: str):
 @app_commands.guilds(discord.Object(id=os.environ.get("GUILD_ID")))
 @app_commands.rename(image='image')
 @app_commands.describe(image="New bot avatar")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def avatar(interaction: discord.Interaction, image: discord.Attachment):
     """Change bot avatar."""
     is_deferred=True
@@ -1571,7 +1576,7 @@ async def avatar(interaction: discord.Interaction, image: discord.Attachment):
 @app_commands.rename(language='language')
 @app_commands.describe(language="New bot language")
 @app_commands.choices(language=optionslanguages)
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def language(interaction: discord.Interaction, language: app_commands.Choice[str]):
     """Change bot language."""
     is_deferred=True
@@ -1590,47 +1595,47 @@ async def language(interaction: discord.Interaction, language: app_commands.Choi
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 
-@client.tree.command()
-@app_commands.rename(member='member')
-@app_commands.describe(member="The user to track")
-@app_commands.rename(whatsapp='whatsapp')
-@app_commands.describe(whatsapp="Notify user tracking on whatsapp?")
-@app_commands.choices(whatsapp=truefalsemenu)
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
-async def trackuser(interaction: discord.Interaction, member: discord.Member, whatsapp: app_commands.Choice[str]):
-    """Track a user."""
-    is_deferred=True
-    try:
-        await interaction.response.defer(thinking=True, ephemeral=True)
-        currentguildid = get_current_guild_id(interaction.guild.id)
-        global track_users_dict
+#@client.tree.command()
+#@app_commands.rename(member='member')
+#@app_commands.describe(member="The user to track")
+#@app_commands.rename(whatsapp='whatsapp')
+#@app_commands.describe(whatsapp="Notify user tracking on whatsapp?")
+#@app_commands.choices(whatsapp=truefalsemenu)
+#@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+#async def trackuser(interaction: discord.Interaction, member: discord.Member, whatsapp: app_commands.Choice[str]):
+#    """Track a user."""
+#    is_deferred=True
+#    try:
+#        await interaction.response.defer(thinking=True, ephemeral=True)
+#        currentguildid = get_current_guild_id(interaction.guild.id)
+#        global track_users_dict
+#
+#        name = ""   
+#        if member.nick is not None:
+#            name = str(member.nick)
+#        else:
+#            name = str(member.name)  
+#        track_users_dict[member.id] = TrackUser(name, currentguildid, whatsapp.value)
+#
+#
+#
+#        await interaction.followup.send(await utils.translate(currentguildid,"I am starting to monitor the user:") + " " + name + ".", ephemeral = True)
+#    except Exception as e:
+#        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
-        name = ""   
-        if member.nick is not None:
-            name = str(member.nick)
-        else:
-            name = str(member.name)  
-        track_users_dict[member.id] = TrackUser(name, currentguildid, whatsapp.value)
-
-
-
-        await interaction.followup.send(await utils.translate(currentguildid,"I am starting to monitor the user:") + " " + name + ".", ephemeral = True)
-    except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
-
-@client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
-async def untrackall(interaction: discord.Interaction):
-    """Untrack all users."""
-    is_deferred=True
-    try:
-        await interaction.response.defer(thinking=True, ephemeral=True)
-        currentguildid = get_current_guild_id(interaction.guild.id)
-        global track_users_dict
-        track_users_dict = {}
-        await interaction.followup.send(await utils.translate(currentguildid,"I am not monitoring anyone anymore."), ephemeral = True)
-    except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+#@client.tree.command()
+#@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+#async def untrackall(interaction: discord.Interaction):
+#    """Untrack all users."""
+#    is_deferred=True
+#    try:
+#        await interaction.response.defer(thinking=True, ephemeral=True)
+#        currentguildid = get_current_guild_id(interaction.guild.id)
+#        global track_users_dict
+#        track_users_dict = {}
+#        await interaction.followup.send(await utils.translate(currentguildid,"I am not monitoring anyone anymore."), ephemeral = True)
+#    except Exception as e:
+#        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
 @app_commands.rename(text='text')
@@ -1641,7 +1646,7 @@ async def untrackall(interaction: discord.Interaction):
 @app_commands.rename(language_from='language_from')
 @app_commands.describe(language_from="The language to convert from")
 @app_commands.choices(language_from=optionslanguages)
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def translate(interaction: discord.Interaction, text: str, language_to: app_commands.Choice[str], language_from: app_commands.Choice[str] = "xx"):
     """Translate a sentence and repeat it"""
     is_deferred=True
@@ -1691,7 +1696,7 @@ async def translate(interaction: discord.Interaction, text: str, language_to: ap
 @client.tree.command()
 @app_commands.rename(url='url')
 @app_commands.describe(url="Youtube link (Must match https://www.youtube.com/watch?v=1abcd2efghi)")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def youtube(interaction: discord.Interaction, url: str):
     """Play a youtube link"""
     is_deferred=True
@@ -1722,7 +1727,7 @@ async def youtube(interaction: discord.Interaction, url: str):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def enable(interaction: discord.Interaction):
     """Enable auto talking feature."""
     is_deferred=True
@@ -1741,7 +1746,7 @@ async def enable(interaction: discord.Interaction):
         
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def disable(interaction: discord.Interaction):
     """Disable auto talking feature."""
     is_deferred=True
@@ -1763,7 +1768,7 @@ async def disable(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(seconds='seconds')
 @app_commands.describe(seconds="Timeout seconds (Min 30 - Max 1200)")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def timer(interaction: discord.Interaction, seconds: int):
     """Change the timer for the auto talking feature."""
     is_deferred=True
@@ -1782,106 +1787,106 @@ async def timer(interaction: discord.Interaction, seconds: int):
 
 
 
-@client.tree.command()
-@app_commands.rename(link='link')
-@app_commands.describe(link="Subito.it link")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
-async def add_subito_url(interaction: discord.Interaction, link: str):
-    """Add a new Subito.it link."""
-    is_deferred=True
-    try:
-        await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
-        currentguildid = get_current_guild_id(interaction.guild.id) 
-        
- 
-        keywo = link.replace("https://www.subito.it/", "")
-
-        pattern = r'[-/&?=]'
-        titles = re.split(pattern, keywo)
-
-        finaltitle = None
-
-        for title in titles:
-            if title != '':
-                string = ''.join(letter for letter in title if letter.isalnum())
-                if finaltitle is None:
-                    finaltitle = string
-                else:
-                    finaltitle = finaltitle + "-" + string
-
-        if finaltitle is not None:
-            finaltitle = finaltitle.lower()
-            if len(finaltitle) > 100:
-                finaltitle = finaltitle[0:99]
-
-            category = discord.utils.get(interaction.guild.categories, name=str(os.environ.get("SUBITO_IT_CATEGORY_NAME")))
-
-            channel = discord.utils.get(interaction.guild.channels, name=finaltitle, category=category)
-            if channel is None:
-                channel = await interaction.guild.create_text_channel(finaltitle, category=category)
-
-            await utils.insert_subito_db(currentguildid, link, '', '', '', '', '', '', finaltitle)     
-            await interaction.followup.send(await utils.translate(currentguildid,"I am adding a configuration link:") + link + "\n" + await utils.translate(currentguildid,"Creating channel:") + finaltitle, ephemeral = True) 
-        else:
-            await interaction.followup.send(await utils.translate(currentguildid,"There was an error generating the discord channel for this link.") + link, ephemeral = True)  
-    except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
-
-
-
-@client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
-async def list_subito_urls(interaction: discord.Interaction):
-    """List Subito.it configured link(s)."""
-    is_deferred=True
-    try:
-        await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
-        currentguildid = get_current_guild_id(interaction.guild.id)
-        links = await utils.select_subito_urls(currentguildid)
-        message = ''
-        for link in links:         
-            message = message + "\n" + link
-        if message == '':
-            await interaction.followup.send(await utils.translate(currentguildid,"No configuration link found."), ephemeral = True)
-        else:
-            message = await utils.translate(currentguildid,"Configured links found:") + "\n" + message
-            await interaction.followup.send(message, ephemeral = True)
-         
-    except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+#@client.tree.command()
+#@app_commands.rename(link='link')
+#@app_commands.describe(link="Subito.it link")
+#@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+#async def add_subito_url(interaction: discord.Interaction, link: str):
+#    """Add a new Subito.it link."""
+#    is_deferred=True
+#    try:
+#        await interaction.response.defer(thinking=True, ephemeral=True)
+#        check_permissions(interaction)
+#        currentguildid = get_current_guild_id(interaction.guild.id) 
+#        
+# 
+#        keywo = link.replace("https://www.subito.it/", "")
+#
+#        pattern = r'[-/&?=]'
+#        titles = re.split(pattern, keywo)
+#
+#        finaltitle = None
+#
+#        for title in titles:
+#            if title != '':
+#                string = ''.join(letter for letter in title if letter.isalnum())
+#                if finaltitle is None:
+#                    finaltitle = string
+#                else:
+#                    finaltitle = finaltitle + "-" + string
+#
+#        if finaltitle is not None:
+#            finaltitle = finaltitle.lower()
+#            if len(finaltitle) > 100:
+#                finaltitle = finaltitle[0:99]
+#
+#            category = discord.utils.get(interaction.guild.categories, name=str(os.environ.get("SUBITO_IT_CATEGORY_NAME")))
+#
+#            channel = discord.utils.get(interaction.guild.channels, name=finaltitle, category=category)
+#            if channel is None:
+#                channel = await interaction.guild.create_text_channel(finaltitle, category=category)
+#
+#            await utils.insert_subito_db(currentguildid, link, '', '', '', '', '', '', finaltitle)     
+#            await interaction.followup.send(await utils.translate(currentguildid,"I am adding a configuration link:") + link + "\n" + await utils.translate(currentguildid,"Creating channel:") + finaltitle, ephemeral = True) 
+#        else:
+#            await interaction.followup.send(await utils.translate(currentguildid,"There was an error generating the discord channel for this link.") + link, ephemeral = True)  
+#    except Exception as e:
+#        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 
 
-@client.tree.command()
-@app_commands.rename(link='link')
-@app_commands.describe(link="Subito.it link")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
-async def delete_subito_url(interaction: discord.Interaction, link: str):
-    """Add a new Subito.it link."""
-    is_deferred=True
-    try:
-        await interaction.response.defer(thinking=True, ephemeral=True)
-        check_permissions(interaction)
-        currentguildid = get_current_guild_id(interaction.guild.id)  
+#@client.tree.command()
+#@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+#async def list_subito_urls(interaction: discord.Interaction):
+#    """List Subito.it configured link(s)."""
+#    is_deferred=True
+#    try:
+#        await interaction.response.defer(thinking=True, ephemeral=True)
+#        check_permissions(interaction)
+#        currentguildid = get_current_guild_id(interaction.guild.id)
+#        links = await utils.select_subito_urls(currentguildid)
+#        message = ''
+#        for link in links:         
+#            message = message + "\n" + link
+#        if message == '':
+#            await interaction.followup.send(await utils.translate(currentguildid,"No configuration link found."), ephemeral = True)
+#        else:
+#            message = await utils.translate(currentguildid,"Configured links found:") + "\n" + message
+#            await interaction.followup.send(message, ephemeral = True)
+#         
+#    except Exception as e:
+#        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
-        finaltitle = await utils.select_subito_channel(currentguildid, link) 
 
-        if finaltitle is not None:
-                
-            category = discord.utils.get(interaction.guild.categories, name=str(os.environ.get("SUBITO_IT_CATEGORY_NAME")))
 
-            channel = discord.utils.get(interaction.guild.channels, name=finaltitle, category=category)
-            if channel is not None:
-                await channel.delete()
-
-            await utils.delete_subito_url(currentguildid, link)
-            await interaction.followup.send(await utils.translate(currentguildid,"I am removing a configuration link:") + link + "\n" + await utils.translate(currentguildid,"Deleting channel:") + finaltitle, ephemeral = True) 
-        else:
-            await interaction.followup.send(await utils.translate(currentguildid,"No configuration found for that link.") + link, ephemeral = True) 
-    except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+#@client.tree.command()
+#@app_commands.rename(link='link')
+#@app_commands.describe(link="Subito.it link")
+#@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+#async def delete_subito_url(interaction: discord.Interaction, link: str):
+#    """Add a new Subito.it link."""
+#    is_deferred=True
+#    try:
+#        await interaction.response.defer(thinking=True, ephemeral=True)
+#        check_permissions(interaction)
+#        currentguildid = get_current_guild_id(interaction.guild.id)  
+#
+#        finaltitle = await utils.select_subito_channel(currentguildid, link) 
+#
+#        if finaltitle is not None:
+#                
+#            category = discord.utils.get(interaction.guild.categories, name=str(os.environ.get("SUBITO_IT_CATEGORY_NAME")))
+#
+#            channel = discord.utils.get(interaction.guild.channels, name=finaltitle, category=category)
+#            if channel is not None:
+#                await channel.delete()
+#
+#            await utils.delete_subito_url(currentguildid, link)
+#            await interaction.followup.send(await utils.translate(currentguildid,"I am removing a configuration link:") + link + "\n" + await utils.translate(currentguildid,"Deleting channel:") + finaltitle, ephemeral = True) 
+#        else:
+#            await interaction.followup.send(await utils.translate(currentguildid,"No configuration found for that link.") + link, ephemeral = True) 
+#    except Exception as e:
+#        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 
 
@@ -1889,7 +1894,7 @@ async def delete_subito_url(interaction: discord.Interaction, link: str):
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def soundrandom(interaction: discord.Interaction, text: Optional[str] = "random"):
     """Play a random sound from the soundboard."""
     is_deferred=True
@@ -1931,7 +1936,7 @@ async def soundrandom(interaction: discord.Interaction, text: Optional[str] = "r
 @client.tree.command()
 @app_commands.rename(text='text')
 @app_commands.describe(text="The text to search")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def soundsearch(interaction: discord.Interaction, text: Optional[str] = "random"):
     """Search for sounds on the soundboard."""
     is_deferred=True
@@ -1973,7 +1978,7 @@ async def soundsearch(interaction: discord.Interaction, text: Optional[str] = "r
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def commands(interaction: discord.Interaction):
     """Show bot commands."""
     is_deferred=True
@@ -2003,14 +2008,14 @@ async def commands(interaction: discord.Interaction):
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TIMER))  
 
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.DOWNLOAD))
-        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRACKUSER))
-        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.UNTRACKALL))
+        #view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRACKUSER))
+        #view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.UNTRACKALL))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.TRAIN))
 
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.SOUNDSEARCH))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.YOUTUBE))
         view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.WIKIPEDIA))
-        view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.BARD))
+        #view.add_item(SlashCommandButton(discord.ButtonStyle.primary, constants.BARD))
         view.add_item(SlashCommandButton(discord.ButtonStyle.red, constants.STOP))
 
         message = await utils.translate(get_current_guild_id(interaction.guild.id),"These are the bot's base commands")
@@ -2023,7 +2028,7 @@ async def commands(interaction: discord.Interaction):
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def admin(interaction: discord.Interaction):
     """Show Admin bot commands."""
     is_deferred=True
@@ -2053,7 +2058,7 @@ async def admin(interaction: discord.Interaction):
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def accept(interaction: discord.Interaction):
     """Accept or Decline NSFW content."""
     is_deferred=True
@@ -2075,7 +2080,7 @@ async def accept(interaction: discord.Interaction):
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def disclaimer(interaction: discord.Interaction):
     """Show DISCLAIMER."""
     is_deferred=True
@@ -2090,7 +2095,7 @@ async def disclaimer(interaction: discord.Interaction):
 @client.tree.command()
 @app_commands.rename(file='file')
 @app_commands.describe(file="The sentences file")
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def train(interaction: discord.Interaction, file: discord.Attachment):
     """Train the Bot using a sentences file."""
     is_deferred=True
@@ -2139,7 +2144,7 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def reset(interaction: discord.Interaction):
     """Resets the bot database"""
     is_deferred=True
@@ -2169,7 +2174,7 @@ async def reset(interaction: discord.Interaction):
 @admin.error
 @accept.error
 @avatar.error
-@bard.error
+#@bard.error
 @commands.error
 @curse.error
 @delete.error
@@ -2191,10 +2196,10 @@ async def reset(interaction: discord.Interaction):
 @story.error
 @timer.error
 @train.error
-@trackuser.error
+#@trackuser.error
 @translate.error
 @stop.error
-@untrackall.error
+#@untrackall.error
 @youtube.error
 @wikipedia.error
 async def on_generic_error(interaction: discord.Interaction, e: app_commands.AppCommandError):
