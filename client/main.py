@@ -1318,7 +1318,7 @@ async def random(interaction: discord.Interaction, voice: str = "random", text: 
                 voice = await listvoices_api(language=utils.get_guild_language(currentguildid), filter=voice)
 
             if voice is not None:
-                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid) + "/"
+                url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"random/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid) + "/"
                 if text != "":
                     url = url + "/" + text
                 await do_play(url, interaction, currentguildid)
