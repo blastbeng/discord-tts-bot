@@ -10,6 +10,7 @@ services:
     volumes:
       - redisdata:/data
   discord-tts-bot-api:
+    pull_policy: build
     build:
       context: ./api
       dockerfile: Dockerfile.api
