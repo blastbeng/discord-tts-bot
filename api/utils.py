@@ -53,6 +53,7 @@ from selenium import webdriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
+from random import randint
 
 
 dotenv_path = join(dirname(__file__), '.env')
@@ -384,7 +385,7 @@ def extract_sentences_from_chatbot(filename, chatid="000000"):
 
     with open(filename, 'a', encoding="utf8") as sentence_file:      
       for row in statements.distinct('text'): 
-        logging.info('extract_sentences_from_chatbot - [chatid:' + chatid + '] - "' + row + '"')
+        logging.debug('extract_sentences_from_chatbot - [chatid:' + chatid + '] - "' + row + '"')
         sentence_file.write(row)
         sentence_file.write("\n")
 
@@ -765,53 +766,7 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
     listvoices = list(voices.items())
     #random.shuffle(listvoices)
 
-    try:
-
-      dbfile = chatid + "-db"
-      myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
-      chatbotdb = myclient[dbfile]
-      statement = chatbotdb["statements"]     
-
-      cursor = statement.aggregate(
-          [ { "$sample": { "size" : limit } } ]
-      )
-
-      sentences = []
-
-      for row in cursor:
-        sentences.append(row['text'])
-    except Exception as e:
-      raise Exception(e)
-    if len(sentences) > 0:
-      for sentence in sentences:
-        key, voice = random.choice(listvoices)
-        language = audiodb.select_distinct_language_by_name_chatid(sentence, chatid)
-        if language is None:
-          language = lang
-        result = False
-        try:
-          #logging.info("populate_audiodb - START ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s", chatid, voice, key, sentence)
-          generation = ""
-          inserted = ""
-          result = populate_tts(sentence, chatid=chatid, voice=voice, language=language)
-          if result is None:
-            inserted="Skipped (TTS lenght limit exceeded)"
-          elif result is True:
-            inserted="Done (Inserted in DB)"
-          elif result is False:
-            inserted="Skipped (Already in DB)"
-          logging.info("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
-        except Exception as e:
-          if audiodb.select_count_by_name_chatid_voice_language(sentence, chatid, voice, language) > 0:
-            audiodb.increment_counter(sentence, chatid, voice, language, int(os.environ.get("COUNTER_LIMIT")))
-          else:
-            audiodb.insert(sentence, chatid, None, voice, language, is_correct=1)
-          inserted="Failed (" + str(e) + ")"
-          logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
-          #raise Exception(e)
-          #time.sleep(5)
-    else:
-      logging.info("populate_audiodb - NO RECORDS FOUND!\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
+    process_population(limit, chatid, lang, listvoices)    
     
     logging.info("populate_audiodb - ENDED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
   except Exception as e:
@@ -820,6 +775,59 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     logging.error("populate_audiodb - ENDED POPULATION WITH ERROR\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
     raise Exception(e)
+
+def process_population(limit, chatid, lang, listvoices):
+
+  
+  result = False
+
+  counter_inserted = 0
+  counter_skipped_failed = 0
+  while counter_inserted < limit or counter_skipped_failed < (limit*10):
+    try:
+      key, voice = random.choice(listvoices)
+      sentence = ""
+      dbfile = chatid + "-db"
+      myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+      chatbotdb = myclient[dbfile]
+      statement = chatbotdb["statements"]     
+      cursor = statement.aggregate(
+          [ { "$sample": { "size" : 1 } } ]
+      )
+      for row in cursor:
+        sentence = row['text']
+      if sentence == "":
+        logging.info("populate_audiodb - NO RECORDS FOUND!\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
+        break
+
+      language = audiodb.select_distinct_language_by_name_chatid(sentence, chatid)
+      if language is None:
+        language = lang
+      inserted = ""
+      result = populate_tts(sentence, chatid=chatid, voice=voice, language=language)
+      if result is None:
+        inserted="Skipped (TTS lenght limit exceeded)"
+        counter_skipped_failed = counter_skipped_failed + 1
+        logging.warning("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+        time.sleep(randint(5,120))
+      elif result is True:
+        inserted="Done (Inserted in DB)"
+        counter_inserted = counter_inserted + 1
+        logging.info("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+        time.sleep(randint(5,120))
+      elif result is False:
+        counter_skipped_failed = counter_skipped_failed + 1
+        inserted="Skipped (Already in DB)"
+        logging.debug("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+    except Exception as e:
+      if audiodb.select_count_by_name_chatid_voice_language(sentence, chatid, voice, language) > 0:
+        audiodb.increment_counter(sentence, chatid, voice, language, int(os.environ.get("COUNTER_LIMIT")))
+      else:
+        audiodb.insert(sentence, chatid, None, voice, language, is_correct=1)
+      inserted="Failed (" + str(e) + ")"
+      logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+      counter_skipped_failed = counter_skipped_failed + 1
+      time.sleep(randint(5,120))
 
 
 
