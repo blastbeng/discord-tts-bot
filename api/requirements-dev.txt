@@ -39,3 +39,4 @@ langdetect
 selenium
 webdriver_manager
 undetected-chromedriver
+awscli

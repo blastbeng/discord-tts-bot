@@ -602,7 +602,7 @@ class PlayAudioLoop:
             if guild.id == guildid:
                 self.guild = guild
 
-    @tasks.loop(seconds=600)
+    @tasks.loop(seconds=300)
     async def play_audio_loop(self):
         try:
             currentguildid = get_current_guild_id(str(self.guild.id))
@@ -657,51 +657,53 @@ class PlayAudioWorker:
         currentguildid = get_current_guild_id(str(self.interaction.guild.id))
         try:
             voice_client = get_voice_client_by_guildid(client.voice_clients, self.interaction.guild.id)
-            if voice_client and hasattr(voice_client, 'play') and voice_client.is_connected() and not voice_client.is_playing():
-                connector = aiohttp.TCPConnector(force_close=True)
-                async with aiohttp.ClientSession(connector=connector) as session:
-                    async with session.get(self.url) as response:
-                        message = ""
-                        if "X-Generated-Text" in response.headers:
-                            message = response.headers["X-Generated-Text"]
-                        if (response.status == 200):
-                            content = await response.content.read()
-                            voice_client = get_voice_client_by_guildid(client.voice_clients, self.interaction.guild.id)
-                            if not voice_client:
-                                raise ClientException("voice_client is None")
-                            if voice_client.is_playing():
-                                voice_client.stop()                                    
+            connector = aiohttp.TCPConnector(force_close=True)
+            async with aiohttp.ClientSession(connector=connector) as session:
+                async with session.get(self.url) as response:
+                    message = ""
+                    if "X-Generated-Text" in response.headers:
+                        message = response.headers["X-Generated-Text"]
+                    if (response.status == 200):
+                        content = await response.content.read()
+                        if not voice_client:
+                            raise ClientException("voice_client is None")
+                        if voice_client.is_playing():
+                            voice_client.stop()                                    
 
-                            view = discord.ui.View()
-                            view.add_item(PlayButton(content, message))
-                            view.add_item(StopButton())
-                            if self.show_save:
-                                view.add_item(SaveButton(message))
-                                
-                            voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info("play_audio_worker - " + message))
-                            #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
-                    
-                            if "X-Generated-Response-Text" in response.headers:
-                                message = response.headers["X-Generated-Response-Text"]
-                            await self.interaction.followup.send(message, view = view, ephemeral = True)
-                        elif response.status == 204:
-                            logging.info("[GUILDID : %s] do_play - Audio not found", str(currentguildid))
-                            message = await utils.translate(currentguildid,"I haven't found any audio for this text: " + message + ".")
-                            await self.interaction.followup.send(message, ephemeral = self.ephermeal)
-                        elif response.status == 400:
-                            logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(currentguildid))
-                            message = message + "\n\n" + await utils.translate(currentguildid,"Error. Can't reproduce audio.\nThe Generated TTS is longer than the maximum limit. ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
-                            await self.interaction.followup.send(message, ephemeral = self.ephermeal)
-                        elif response.status == 406:
-                            logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(currentguildid))
-                            message = await utils.translate(currentguildid,"Error. The sentence contains a word that is blocked by filters.") + " ["+ str(message) +"]"
-                            await self.interaction.followup.send(message, ephemeral = self.ephermeal)
-                        else:
-                            logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(currentguildid))
-                            await self.interaction.followup.send(await utils.translate(currentguildid,"An audio generation error occurred.") + "\n" + await utils.translate(currentguildid,"If a modified voice has been selected, remember that with too much spam the bot may be blocked from FakeYou.com for some minutes.") + "\n" + await utils.translate(currentguildid,"You can check service status and the TTS queue at this address:") + "https://fakeyou.com/", ephemeral = self.ephermeal)
-            
-                                        
-                    await session.close()
+                        view = discord.ui.View()
+                        view.add_item(PlayButton(content, message))
+                        view.add_item(StopButton())
+                        if self.show_save:
+                            view.add_item(SaveButton(message))
+                            
+                        if not voice_client.is_connected():
+                            await voice_client.channel.connect()
+                            time.sleep(10)
+                            
+                        voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info("play_audio_worker - " + message))
+                        #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
+                
+                        if "X-Generated-Response-Text" in response.headers:
+                            message = response.headers["X-Generated-Response-Text"]
+                        await self.interaction.followup.send(message, view = view, ephemeral = True)
+                    elif response.status == 204:
+                        logging.info("[GUILDID : %s] do_play - Audio not found", str(currentguildid))
+                        message = await utils.translate(currentguildid,"I haven't found any audio for this text: " + message + ".")
+                        await self.interaction.followup.send(message, ephemeral = self.ephermeal)
+                    elif response.status == 400:
+                        logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(currentguildid))
+                        message = message + "\n\n" + await utils.translate(currentguildid,"Error. Can't reproduce audio.\nThe Generated TTS is longer than the maximum limit. ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
+                        await self.interaction.followup.send(message, ephemeral = self.ephermeal)
+                    elif response.status == 406:
+                        logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(currentguildid))
+                        message = await utils.translate(currentguildid,"Error. The sentence contains a word that is blocked by filters.") + " ["+ str(message) +"]"
+                        await self.interaction.followup.send(message, ephemeral = self.ephermeal)
+                    else:
+                        logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(currentguildid))
+                        await self.interaction.followup.send(await utils.translate(currentguildid,"An audio generation error occurred.") + "\n" + await utils.translate(currentguildid,"If a modified voice has been selected, remember that with too much spam the bot may be blocked from FakeYou.com for some minutes.") + "\n" + await utils.translate(currentguildid,"You can check service status and the TTS queue at this address:") + "https://fakeyou.com/", ephemeral = self.ephermeal)
+        
+                                    
+                await session.close()
         except aiohttp.ClientConnectionError as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -711,7 +713,7 @@ class PlayAudioWorker:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
             logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-            await interaction.followup.send("Discord API Error, " + await utils.translate(currentguildid,"please try again later"), ephemeral = True) 
+            await self.interaction.interaction.followup.send("Discord API Error, " + await utils.translate(currentguildid,"please try again later"), ephemeral = True) 
             
         if audio_count_queue > 0:
             audio_count_queue = audio_count_queue - 1
@@ -721,14 +723,14 @@ class PopulatorLoop:
     def __init__(self, guildid):  
         self.guildid = guildid
 
-    @tasks.loop(minutes=int(30))
+    @tasks.loop(minutes=int(60))
     async def populator_loop(self):
         try:
             currentguildid = get_current_guild_id(str(self.guildid))
             
             connector = aiohttp.TCPConnector(force_close=True)
             async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(os.environ.get("API_URL")+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/5/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/0" + "/") as response:
+                async with session.get(os.environ.get("API_URL")+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/2/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/0" + "/") as response:
                     if (response.status == 200):
                         logging.info("populator_loop - " + str(response.text))
                     else:
