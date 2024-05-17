@@ -736,7 +736,7 @@ def get_random_voice(lang="it"):
   title, token = random.choice(list(localvoices.items()))
   return token
 
-#@lru_cache(maxsize=128)
+@lru_cache(maxsize=128)
 def list_fakeyou_voices(lang:str):
   foundvoices = None
   try:
