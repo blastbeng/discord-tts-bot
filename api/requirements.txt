@@ -41,4 +41,6 @@ selenium
 webdriver_manager
 undetected-chromedriver
 beautifulsoup4
+piper
 awscli
+boto3

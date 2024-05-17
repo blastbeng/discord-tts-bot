@@ -36,15 +36,16 @@ load_dotenv(dotenv_path)
 GUILD_ID = discord.Object(id=os.environ.get("GUILD_ID"))
 
 def get_api_url():
-    try:
-        url = os.environ.get("REMOTE_API_URL")+os.environ.get("API_PATH_UTILS")+"/healthcheck"
-        response = requests.get(url, timeout=1)
-        if response.status_code == 200:
-            return os.environ.get("REMOTE_API_URL")
-        else:
-            return os.environ.get("API_URL")
-    except:
-        return os.environ.get("API_URL")
+    return os.environ.get("API_URL")
+    #try:
+    #    url = os.environ.get("REMOTE_API_URL")+os.environ.get("API_PATH_UTILS")+"/healthcheck"
+    #    response = requests.get(url, timeout=1)
+    #    if response.status_code == 200:
+    #        return os.environ.get("REMOTE_API_URL")
+    #    else:
+    #        return os.environ.get("API_URL")
+    #except:
+    #    return os.environ.get("API_URL")
 
 class TrackUser:
     def __init__(self, name, guildid, whatsapp):
@@ -1050,7 +1051,7 @@ async def join(interaction: discord.Interaction):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_admin_permissions(interaction)
+        check_permissions(interaction)
         
         voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
         if voice_client:       
@@ -1070,7 +1071,7 @@ async def leave(interaction: discord.Interaction):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_admin_permissions(interaction)
+        check_permissions(interaction)
         
         voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
         if voice_client:       
@@ -1467,7 +1468,7 @@ async def delete(interaction: discord.Interaction, text: str):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_admin_permissions(interaction)
+        check_permissions(interaction)
         
         currentguildid = get_current_guild_id(interaction.guild.id)
 
@@ -2163,7 +2164,7 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        check_admin_permissions(interaction)
+        check_permissions(interaction)
         currentguildid = get_current_guild_id(interaction.guild.id)
         if not utils.allowed_file(file.filename):
             await interaction.followup.send(await utils.translate(currentguildid,"Please upload a valid text file.") + " (.txt)", ephemeral = True)     

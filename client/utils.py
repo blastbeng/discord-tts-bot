@@ -17,9 +17,9 @@ class FFmpegPCMAudioBytesIO(discord.AudioSource):
             args.extend(shlex.split(before_options))
         args.append('-i')
         args.append('-' if pipe else source)
-        #args.extend(('-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'warning'))
+        args.extend(('-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'warning'))
         #args.extend(('-af', 'loudnorm=I=-14:LRA=11:TP=-1', '-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'error'))
-        args.extend(('-af', 'dynaudnorm=p=1/sqrt(2):m=100:s=12:g=15', '-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'error'))
+        #args.extend(('-af', 'dynaudnorm=p=1/sqrt(2):m=100:s=12:g=15', '-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'error'))
         if isinstance(options, str):
             args.extend(shlex.split(options))
         args.append('pipe:1')

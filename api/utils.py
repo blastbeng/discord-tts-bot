@@ -54,6 +54,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 from random import randint
+from boto3 import client
 
 
 dotenv_path = join(dirname(__file__), '.env')
@@ -75,6 +76,10 @@ log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 
 fy=fakeyou.FakeYou()
+
+polly = client('polly', aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), 
+                        aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"), 
+                        region_name='eu-west-1')
 
 try:
   fy.login(FAKEYOU_USER,FAKEYOU_PASS)
@@ -160,6 +165,7 @@ def run_with_timer(func, max_execution_time):
 
     return wrapper
 
+
 def wiki_summary(testo: str, lang: str):
   try:
     wikipedia.set_lang(lang)
@@ -175,6 +181,52 @@ def generate(filename: str):
       while data:
           yield data
           data = fmp3.read(1024)
+
+def get_tts_aws(text: str, chatid="000000", language="it", save=True, limit=True, user=None):
+  data = audiodb.select_by_name_chatid_voice_language(text, chatid, "aws", language)
+  if data is not None:
+    return data
+  else:
+    response = polly.synthesize_speech(
+            Text=text,
+            OutputFormat='mp3',
+            VoiceId='Giorgio')
+
+    stream = response.get('AudioStream')
+    hashtext = hashlib.md5((text+"_aws").encode('utf-8')).hexdigest()
+    filesave = ""
+    if int(os.environ.get("MASTER")) == 1:
+      filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
+      with open(filesave, 'wb') as f:
+          data = stream.read()
+          f.write(data)
+      sound = AudioSegment.from_mp3(filesave)
+    else:      
+      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
+      fp = BytesIO()
+      tts.write_to_fp(fp)
+      fp.seek(0)
+      form_data = {'filename': urllib.parse.quote(hashtext)}
+      response = requests.post(url, data=form_data, files={"mp3": fp})
+      if response.status_code != 200:
+        raise Exception("Error on Slave saving mp3 to Master")
+      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"getmp3/" + hashtext + ".mp3"
+      response = requests.get(url)
+      memoryBuff = BytesIO(response.content)
+      sound = AudioSegment.from_mp3(memoryBuff)
+    duration = (len(sound) / 1000.0)
+    if limit and duration > int(os.environ.get("MAX_TTS_DURATION")):
+      audiodb.insert_or_update(text, chatid, None, "aws", language, is_correct=0, duration=duration, user=user)
+      if int(os.environ.get("MASTER")) == 1:
+        os.remove(filesave)
+      raise AudioLimitException
+    else:
+      memoryBuff = BytesIO()
+      sound.export(memoryBuff, format='mp3', bitrate="256")
+      memoryBuff.seek(0)
+      if save:
+        audiodb.insert_or_update(text, chatid, filesave, "aws", language, duration=duration, user=user)
+      return memoryBuff
 
 def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=True, user=None):
   data = audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
@@ -214,6 +266,52 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=T
       if save:
         audiodb.insert_or_update(text, chatid, filesave, "google", language, duration=duration, user=user)
       return memoryBuff
+
+def populate_tts_aws(text: str, chatid="000000", language="it"):
+  data = audiodb.select_by_name_chatid_voice_language(text, chatid, "aws", language)
+  if data is not None:
+    return False
+  else:
+    response = polly.synthesize_speech(
+            Text=text,
+            OutputFormat='mp3',
+            VoiceId='Giorgio')
+
+    stream = response.get('AudioStream')
+    hashtext = hashlib.md5((text+"_aws").encode('utf-8')).hexdigest()
+    filesave = ""
+    if int(os.environ.get("MASTER")) == 1:
+      filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
+      with open(filesave, 'wb') as f:
+          data = stream.read()
+          f.write(data)
+      sound = AudioSegment.from_mp3(filesave)
+    else:
+      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
+      fp = BytesIO()
+      tts.write_to_fp(fp)
+      fp.seek(0)
+      form_data = {'filename': urllib.parse.quote(hashtext)}
+      response = requests.post(url, data=form_data, files={"mp3": fp})
+      if response.status_code != 200:
+        raise Exception("Error on Slave saving mp3 to Master")
+      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"getmp3/" + hashtext + ".mp3"
+      response = requests.get(url)
+      memoryBuff = BytesIO(response.content)
+      sound = AudioSegment.from_mp3(memoryBuff) 
+    duration = (len(sound) / 1000.0)
+    if duration > int(os.environ.get("MAX_TTS_DURATION")):
+      audiodb.insert_or_update(text, chatid, None, "aws", language, is_correct=0, duration=duration)
+      return None
+    else:
+      #sound.duration_seconds == duration
+      memoryBuff = BytesIO()
+      sound.export(memoryBuff, format='mp3', bitrate="256")
+      memoryBuff.seek(0)
+      audiodb.insert_or_update(text, chatid, filesave, "aws", language, duration=duration)
+      return True
+    #return memoryBuff
+    #return fp
 
 def populate_tts_google(text: str, chatid="000000", language="it"):
   data = audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
@@ -518,7 +616,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       voice_to_use = get_random_voice(lang=language)
     else:
       voice_to_use = voice
-    if voice_to_use != "google":
+    if voice_to_use != "google" and voice_to_use != "aws":
       datafy = audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
       if datafy is not None:
         return datafy
@@ -556,10 +654,14 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
               return out
         elif voice == "random" or voice == "google":
           return get_tts_google(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
+        elif voice == "aws":
+          return get_tts_aws(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
         else:
           return None
       else:
         return get_tts_google(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
+    elif voice == "aws":
+      return get_tts_aws(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
     else:
       return get_tts_google(text.strip(), chatid=chatid, language=language, save=save, limit=limit, user=user)
   except AudioLimitException as el:
@@ -581,7 +683,7 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
       voice_to_use = get_random_voice(lang=language)
     else:
       voice_to_use = voice
-    if voice_to_use != "google": 
+    if voice_to_use != "google" and voice_to_use != "aws": 
       datafy = audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
       if datafy is not None:
         return False
@@ -619,6 +721,8 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
             audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration)
             return True
         raise Exception("FakeYou Generation KO")
+    elif voice == "aws":
+      return populate_tts_aws(text.strip(), chatid=chatid, language=language)
     else:
       return populate_tts_google(text.strip(), chatid=chatid, language=language)
   except Exception as e:
@@ -632,7 +736,7 @@ def get_random_voice(lang="it"):
   title, token = random.choice(list(localvoices.items()))
   return token
 
-@lru_cache(maxsize=128)
+#@lru_cache(maxsize=128)
 def list_fakeyou_voices(lang:str):
   foundvoices = None
   try:
@@ -680,6 +784,7 @@ def list_fakeyou_voices(lang:str):
 
       
       foundvoices["google"] = "google"
+      foundvoices["Giorgio"] = "aws"
       
       with open(file_path, "w") as write_file:
         json_string = json.dumps(foundvoices, ensure_ascii=False, indent=4).encode('utf-8').decode('utf-8')
@@ -696,6 +801,7 @@ def list_fakeyou_voices(lang:str):
       
       foundvoices = {}
       foundvoices["google"] = "google"
+      foundvoices["Giorgio"] = "aws"
 
     return foundvoices
   except Exception as e:
