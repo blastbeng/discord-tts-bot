@@ -761,7 +761,7 @@ def list_fakeyou_voices(lang:str):
       foundvoices = {}
 
 
-      inclusion_file_path = "./config-external/voices_inclusions_"+lang+".json"
+      inclusion_file_path = "./config/voices_inclusions_"+lang+".json"
 
       if os.path.exists(inclusion_file_path):
         with open(inclusion_file_path) as inclusion_file:

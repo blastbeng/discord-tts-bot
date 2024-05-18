@@ -5,7 +5,7 @@ import json
 import time
 import utils
 import socket
-import random
+import random as randompy
 import urllib
 import logging
 import pathlib
@@ -36,16 +36,15 @@ load_dotenv(dotenv_path)
 GUILD_ID = discord.Object(id=os.environ.get("GUILD_ID"))
 
 def get_api_url():
-    return os.environ.get("API_URL")
-    #try:
-    #    url = os.environ.get("REMOTE_API_URL")+os.environ.get("API_PATH_UTILS")+"/healthcheck"
-    #    response = requests.get(url, timeout=1)
-    #    if response.status_code == 200:
-    #        return os.environ.get("REMOTE_API_URL")
-    #    else:
-    #        return os.environ.get("API_URL")
-    #except:
-    #    return os.environ.get("API_URL")
+    try:
+        url = os.environ.get("REMOTE_API_URL")+os.environ.get("API_PATH_UTILS")+"/healthcheck"
+        response = requests.get(url, timeout=0)
+        if response.status_code == 200:
+            return os.environ.get("REMOTE_API_URL")
+        else:
+            return os.environ.get("API_URL")
+    except:
+        return os.environ.get("API_URL")
 
 class TrackUser:
     def __init__(self, name, guildid, whatsapp):
@@ -1095,7 +1094,7 @@ async def leave(interaction: discord.Interaction):
 @app_commands.describe(voice="The voice to use")
 @app_commands.autocomplete(voice=rps_autocomplete)
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
-async def speak(interaction: discord.Interaction, text: str, voice: str = "google"):
+async def speak(interaction: discord.Interaction, text: str, voice: str = "random"):
     """Repeat a sentence"""
     is_deferred=True
     try:
@@ -1114,8 +1113,10 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "googl
             
             lang_to_use = utils.get_guild_language(currentguildid)
 
-            if voice != "google":
+            if voice != "random":
                 voice = await listvoices_api(language=lang_to_use, filter=voice)
+            else:
+                voice = randompy.choice(['google', 'aws'])
 
             if voice is not None:
                 url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/user/"+urllib.parse.quote(str(interaction.user.name))+"/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
