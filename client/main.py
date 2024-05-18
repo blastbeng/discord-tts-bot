@@ -27,6 +27,7 @@ import aiohttp
 import io
 from threading import Thread
 from random import randint
+import requests.exceptions
 
 from utils import FFmpegPCMAudioBytesIO
 
@@ -38,13 +39,14 @@ GUILD_ID = discord.Object(id=os.environ.get("GUILD_ID"))
 def get_api_url():
     try:
         url = os.environ.get("REMOTE_API_URL")+os.environ.get("API_PATH_UTILS")+"/healthcheck"
-        response = requests.get(url, timeout=0)
-        if response.status_code == 200:
-            return os.environ.get("REMOTE_API_URL")
-        else:
-            return os.environ.get("API_URL")
-    except:
+        r = requests.get(url)
+        r.raise_for_status()
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         return os.environ.get("API_URL")
+    except requests.exceptions.HTTPError:
+        return os.environ.get("API_URL")
+    else:
+        return os.environ.get("REMOTE_API_URL")
 
 class TrackUser:
     def __init__(self, name, guildid, whatsapp):
@@ -200,7 +202,7 @@ class SaveButton(discord.ui.Button["InteractionRoles"]):
         try:
             await interaction.response.defer(thinking=True, ephemeral=True)
             currentguildid = get_current_guild_id(interaction.guild.id)
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "repeat/learn/" + urllib.parse.quote(self.message) + "/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/"
+            url = get_api_url() + os.environ.get("API_PATH_TEXT") + "repeat/learn/" + urllib.parse.quote(self.message) + "/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/"
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if (response.status == 200):
@@ -326,7 +328,7 @@ async def listvoices_api(language="it", filter=None):
     try:
         global fakeyou_voices
         if fakeyou_voices is None or len(fakeyou_voices) == 0 or len(fakeyou_voices) == 1:
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/fakeyou/listvoices/" + language
+            url = get_api_url() + os.environ.get("API_PATH_UTILS") + "/fakeyou/listvoices/" + language
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if (response.status == 200):
@@ -430,8 +432,8 @@ async def send_error(e, interaction, from_generic=False, is_deferred=False):
         voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
         await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
         lang_to_use = utils.get_guild_language(currentguildid)
-        #url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/Vaffanculo%20Valeriu/google/"
-        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/Disagio/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
+        #url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/Vaffanculo%20Valeriu/google/"
+        url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/learn/Disagio/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
                 
         await do_play(url, interaction, currentguildid)
 
@@ -623,7 +625,7 @@ class PlayAudioLoop:
             if channelfound is not None and channeluserfound is not None:
                 await connect_bot_by_voice_client(voice_client, channelfound, None)
                 if voice_client and hasattr(voice_client, 'play') and voice_client.is_connected() and not voice_client.is_playing():
-                    url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"random/random/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/"
+                    url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"random/random/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/"
                     connector = aiohttp.TCPConnector(force_close=True)
                     async with aiohttp.ClientSession(connector=connector) as session:
                         async with session.get(url) as response:
@@ -730,7 +732,7 @@ class PopulatorLoop:
             
             connector = aiohttp.TCPConnector(force_close=True)
             async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(os.environ.get("API_URL")+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/2/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/0" + "/") as response:
+                async with session.get(get_api_url()+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/2/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/0" + "/") as response:
                     if (response.status == 200):
                         logging.info("populator_loop - " + str(response.text))
                     else:
@@ -751,7 +753,7 @@ class GeneratorLoop:
     async def generator_loop(self):
         try:
             currentguildid = get_current_guild_id(str(self.guildid))
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/initgenerator/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid)
+            url = get_api_url() + os.environ.get("API_PATH_UTILS") + "/initgenerator/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid)
             
             connector = aiohttp.TCPConnector(force_close=True)
             async with aiohttp.ClientSession(connector=connector) as session:
@@ -809,7 +811,7 @@ async def change_presence_loop():
 #            guildid = get_current_guild_id(self.guildid)
 #            urls = await utils.select_subito_urls(guildid)
 #            for url in urls:
-#                urlapi = os.environ.get("API_URL") + "/subito/search"
+#                urlapi = get_api_url() + "/subito/search"
 #                params = {'url': url}
 #                response = requests.post(urlapi, data=params, timeout=60)
 #                if (response.status_code == 200):
@@ -902,7 +904,7 @@ async def on_guild_available(guild):
         await listvoices_api(language=lang, filter=None)  
 
     
-        url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/backup/chatbot/" + urllib.parse.quote(currentguildid)
+        url = get_api_url() + os.environ.get("API_PATH_DATABASE") + "/backup/chatbot/" + urllib.parse.quote(currentguildid)
         
         connector = aiohttp.TCPConnector(force_close=True)
         async with aiohttp.ClientSession(connector=connector) as session:
@@ -913,7 +915,7 @@ async def on_guild_available(guild):
                     logging.error("Backup on chatid " + currentguildid + " failed")
             await session.close()  
 
-        url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/init/" + urllib.parse.quote(currentguildid) + "/" + urllib.parse.quote(lang)
+        url = get_api_url() + os.environ.get("API_PATH_UTILS") + "/init/" + urllib.parse.quote(currentguildid) + "/" + urllib.parse.quote(lang)
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 if (response.status != 200):
@@ -1032,7 +1034,7 @@ async def on_guild_remove(guild):
     try:
         if str(interaction.guild.id) != str(os.environ.get("GUILD_ID")):
             utils.delete_guild(str(guild.id))
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/reset/" +urllib.parse.quote(str(guild.id)) + "/"
+            url = get_api_url() + os.environ.get("API_PATH_DATABASE") + "/reset/" +urllib.parse.quote(str(guild.id)) + "/"
             async with aiohttp.ClientSession(connector=connector) as session:
                 async with session.get(url) as response:
                     if (response.status != 200):
@@ -1119,7 +1121,7 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "rando
                 voice = randompy.choice(['google', 'aws'])
 
             if voice is not None:
-                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/user/"+urllib.parse.quote(str(interaction.user.name))+"/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
+                url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/learn/user/"+urllib.parse.quote(str(interaction.user.name))+"/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
                 worker = PlayAudioWorker(url, interaction)
                 worker.play_audio_worker.start()
                 await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm starting to generate the audio for:") + "\n" + text + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
@@ -1150,7 +1152,7 @@ async def wikipedia(interaction: discord.Interaction, text: str):
         elif voice_client:
 
             currentguildid = get_current_guild_id(interaction.guild.id)
-            url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"search/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
+            url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"search/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
             worker = PlayAudioWorker(url, interaction)
             worker.play_audio_worker.start()
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm searching on wikipedia:"), + "\n" + text + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
@@ -1182,14 +1184,14 @@ async def wikipedia(interaction: discord.Interaction, text: str):
 #        elif voice_client:
 #            currentguildid = get_current_guild_id(interaction.guild.id)
 #
-#            url = os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "askgooglebard/" + urllib.parse.quote(str(text)) + "/"
+#            url = get_api_url() + os.environ.get("API_PATH_TEXT") + "askgooglebard/" + urllib.parse.quote(str(text)) + "/"
 #            async with aiohttp.ClientSession() as session:
 #                async with session.get(url) as response:
 #                    if (response.status == 200):
 #                        message = await response.text()
 #                        text = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
 #                        await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any results "), ephemeral = True) 
-#                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
+#                        url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
 #                        await do_play(url, interaction, currentguildid, name=message)      
 #                    else:
 #                        await interaction.followup.send("Google Bard Error" + "\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later"), ephemeral = True)        
@@ -1258,12 +1260,12 @@ async def generate(interaction: discord.Interaction):
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
         else:
             currentguildid = get_current_guild_id(interaction.guild.id)
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/sentences/generate/" + urllib.parse.quote(currentguildid) + "/0"
+            url = get_api_url() + os.environ.get("API_PATH_UTILS") + "/sentences/generate/" + urllib.parse.quote(currentguildid) + "/0"
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if (response.status == 200):
                         text = await response.text()
-                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+                        url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
                         worker = PlayAudioWorker(url, interaction)
                         worker.play_audio_worker.start()
                         await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm generating a random text")  + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
@@ -1294,12 +1296,12 @@ async def story(interaction: discord.Interaction):
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
         else:
             currentguildid = get_current_guild_id(interaction.guild.id)
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_UTILS") + "/paragraph/generate/" + urllib.parse.quote(currentguildid) + "/"
+            url = get_api_url() + os.environ.get("API_PATH_UTILS") + "/paragraph/generate/" + urllib.parse.quote(currentguildid) + "/"
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if (response.status == 200):
                         text = await response.text()
-                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid) + "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
+                        url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid) + "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
                         worker = PlayAudioWorker(url, interaction)
                         worker.play_audio_worker.start()
                         await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm generating a random story")  + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
@@ -1335,7 +1337,7 @@ async def insult(interaction: discord.Interaction, member: Optional[discord.Memb
             if voice_client and (not hasattr(voice_client, 'play') or not voice_client.is_connected()):
                 await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
             else:
-                insulturl=os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"insult"
+                insulturl=get_api_url()+os.environ.get("API_PATH_AUDIO")+"insult"
                 if member:
                     name = None
                     if member.nick is not None:
@@ -1428,7 +1430,7 @@ async def curse(interaction: discord.Interaction):
                             else:
                                 
 
-                                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"curse/"+urllib.parse.quote(currentguildid)+ "/" + utils.get_guild_language(currentguildid) + "/"
+                                url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"curse/"+urllib.parse.quote(currentguildid)+ "/" + utils.get_guild_language(currentguildid) + "/"
                                 worker = PlayAudioWorker(url, interaction)
                                 worker.play_audio_worker.start()
                                 await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm creating a random blasphemy")  + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
@@ -1474,7 +1476,7 @@ async def delete(interaction: discord.Interaction, text: str):
         currentguildid = get_current_guild_id(interaction.guild.id)
 
         async with aiohttp.ClientSession() as session:
-            async with session.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/download/sentences/" + urllib.parse.quote(currentguildid)) as response:
+            async with session.get(get_api_url() + os.environ.get("API_PATH_DATABASE") + "/download/sentences/" + urllib.parse.quote(currentguildid)) as response:
                 if (response.status == 200):
 
                     textdl = await response.text()
@@ -1497,7 +1499,7 @@ async def delete(interaction: discord.Interaction, text: str):
                         #await channel.send(await utils.translate(currentguildid,"Here's the backup."), file = discord.File(filename=nameout, fp=open(filepath, "rb")))
 
                         async with aiohttp.ClientSession() as session2:
-                            async with session2.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/forcedelete/bytext/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid)) as response:
+                            async with session2.get(get_api_url() + os.environ.get("API_PATH_DATABASE") + "/forcedelete/bytext/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid)) as response:
                                 if (response.status == 200):
                                     #text = await response.text()
                                     #await interaction.followup.send(text, ephemeral = True) 
@@ -1533,7 +1535,7 @@ async def download(interaction: discord.Interaction):
             currentguildid = get_current_guild_id(interaction.guild.id)
 
             async with aiohttp.ClientSession() as session:
-                async with session.get(os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/download/sentences/" + urllib.parse.quote(currentguildid)) as response:
+                async with session.get(get_api_url() + os.environ.get("API_PATH_DATABASE") + "/download/sentences/" + urllib.parse.quote(currentguildid)) as response:
                     if (response.status == 200):
 
                         text = await response.text()
@@ -1742,10 +1744,10 @@ async def translate(interaction: discord.Interaction, text: str, language_to: ap
             
 
             async with aiohttp.ClientSession() as session:
-                async with session.get(os.environ.get("API_URL") + os.environ.get("API_PATH_TEXT") + "translate/" + urllib.parse.quote(lang_to_use_from) + "/" + urllib.parse.quote(language_to.value) + "/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid) + "/") as response:
+                async with session.get(get_api_url() + os.environ.get("API_PATH_TEXT") + "translate/" + urllib.parse.quote(lang_to_use_from) + "/" + urllib.parse.quote(language_to.value) + "/" + urllib.parse.quote(text) + "/" + urllib.parse.quote(currentguildid) + "/") as response:
                     if (response.status == 200):
                         translated_text = await response.text()
-                        url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(translated_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(language_to.value) + "/"
+                        url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(translated_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(language_to.value) + "/"
                         worker = PlayAudioWorker(url, interaction)
                         worker.play_audio_worker.start()
                         await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm translating:") + "\n" + text + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
@@ -1779,7 +1781,7 @@ async def youtube(interaction: discord.Interaction, url: str):
             if "watch?v=" in url:
                 currentguildid = get_current_guild_id(interaction.guild.id)
 
-                urlapi = os.environ.get("API_URL")+os.environ.get("API_PATH_MUSIC")+"youtube/get/"+(url.split("watch?v=",1)[1])+"/"+urllib.parse.quote(currentguildid)
+                urlapi = get_api_url()+os.environ.get("API_PATH_MUSIC")+"youtube/get/"+(url.split("watch?v=",1)[1])+"/"+urllib.parse.quote(currentguildid)
                 await do_play(urlapi, interaction, currentguildid, ephermeal = False)
             else:
                 await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"URL must match something like https://www.youtube.com/watch?v=1abcd2efghi"), ephemeral = True)
@@ -1975,7 +1977,7 @@ async def soundrandom(interaction: discord.Interaction, text: Optional[str] = "r
         elif voice_client:
             currentguildid = get_current_guild_id(interaction.guild.id)
 
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_SOUNDBOARD") + "/random/" + urllib.parse.quote(str(text)) + "/" + urllib.parse.quote(currentguildid)
+            url = get_api_url() + os.environ.get("API_PATH_SOUNDBOARD") + "/random/" + urllib.parse.quote(str(text)) + "/" + urllib.parse.quote(currentguildid)
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if (response.status == 200):
@@ -2018,7 +2020,7 @@ async def soundsearch(interaction: discord.Interaction, text: Optional[str] = "r
         #elif not voice_client.is_playing():
         currentguildid = get_current_guild_id(interaction.guild.id)
         is_deferred=True            
-        url = os.environ.get("API_URL") + os.environ.get("API_PATH_SOUNDBOARD") + "/query/" + urllib.parse.quote(str(text)) + "/" + urllib.parse.quote(currentguildid)
+        url = get_api_url() + os.environ.get("API_PATH_SOUNDBOARD") + "/query/" + urllib.parse.quote(str(text)) + "/" + urllib.parse.quote(currentguildid)
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 if (response.status == 200):
@@ -2171,7 +2173,7 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
             await interaction.followup.send(await utils.translate(currentguildid,"Please upload a valid text file.") + " (.txt)", ephemeral = True)     
         else:
         
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/upload/trainfile/txt"
+            url = get_api_url() + os.environ.get("API_PATH_DATABASE") + "/upload/trainfile/txt"
             form_data = {'chatid': str(currentguildid),
                         'lang': utils.get_guild_language(currentguildid)
                         }
@@ -2218,7 +2220,7 @@ async def reset(interaction: discord.Interaction):
         
         if interaction.user.guild_permissions.administrator:
             currentguildid = get_current_guild_id(interaction.guild.id)
-            url = os.environ.get("API_URL") + os.environ.get("API_PATH_DATABASE") + "/reset/" +urllib.parse.quote(currentguildid)
+            url = get_api_url() + os.environ.get("API_PATH_DATABASE") + "/reset/" +urllib.parse.quote(currentguildid)
 
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:

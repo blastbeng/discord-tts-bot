@@ -203,8 +203,7 @@ def get_tts_aws(text: str, chatid="000000", language="it", save=True, limit=True
       sound = AudioSegment.from_mp3(filesave)
     else:      
       url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
-      fp = BytesIO()
-      tts.write_to_fp(fp)
+      fp = BytesIO(stream)
       fp.seek(0)
       form_data = {'filename': urllib.parse.quote(hashtext)}
       response = requests.post(url, data=form_data, files={"mp3": fp})
@@ -288,8 +287,7 @@ def populate_tts_aws(text: str, chatid="000000", language="it"):
       sound = AudioSegment.from_mp3(filesave)
     else:
       url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
-      fp = BytesIO()
-      tts.write_to_fp(fp)
+      fp = BytesIO(stream)
       fp.seek(0)
       form_data = {'filename': urllib.parse.quote(hashtext)}
       response = requests.post(url, data=form_data, files={"mp3": fp})
