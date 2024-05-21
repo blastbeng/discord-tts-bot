@@ -79,7 +79,7 @@ fy=fakeyou.FakeYou()
 
 polly = client('polly', aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), 
                         aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"), 
-                        region_name='eu-west-1')
+                        region_name='eu-central-1')
 
 try:
   fy.login(FAKEYOU_USER,FAKEYOU_PASS)
@@ -193,78 +193,48 @@ def get_tts_aws(text: str, chatid="000000", language="it", save=True, limit=True
             VoiceId='Giorgio')
 
     stream = response.get('AudioStream')
-    hashtext = hashlib.md5((text+"_aws").encode('utf-8')).hexdigest()
-    filesave = ""
-    if int(os.environ.get("MASTER")) == 1:
-      filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
-      with open(filesave, 'wb') as f:
-          data = stream.read()
-          f.write(data)
-      sound = AudioSegment.from_mp3(filesave)
-    else:      
-      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
-      fp = BytesIO(stream)
-      fp.seek(0)
-      form_data = {'filename': urllib.parse.quote(hashtext)}
-      response = requests.post(url, data=form_data, files={"mp3": fp})
-      if response.status_code != 200:
-        raise Exception("Error on Slave saving mp3 to Master")
-      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"getmp3/" + hashtext + ".mp3"
-      response = requests.get(url)
-      memoryBuff = BytesIO(response.content)
-      sound = AudioSegment.from_mp3(memoryBuff)
-    duration = (len(sound) / 1000.0)
-    if limit and duration > int(os.environ.get("MAX_TTS_DURATION")):
-      audiodb.insert_or_update(text, chatid, None, "aws", language, is_correct=0, duration=duration, user=user)
-      if int(os.environ.get("MASTER")) == 1:
-        os.remove(filesave)
-      raise AudioLimitException
-    else:
-      memoryBuff = BytesIO()
-      sound.export(memoryBuff, format='mp3', bitrate="256")
-      memoryBuff.seek(0)
-      if save:
-        audiodb.insert_or_update(text, chatid, filesave, "aws", language, duration=duration, user=user)
-      return memoryBuff
+    mp3_bytes = stream.read()
+    mp3_fp = BytesIO(mp3_bytes)
+    stream.close()
+    if save:      
+      threading.Thread(target=lambda: thread_save_aws(text, mp3_fp, chatid=chatid, language=language, user=user)).start()
+    return mp3_fp
+
+def thread_save_aws(text: str, mp3_fp, chatid="000000", language="it", user=None):
+  hashtext = hashlib.md5((text+"_aws").encode('utf-8')).hexdigest()
+  dirsave = "." + get_slashes() + 'audios' + get_slashes() + get_random_string(2)
+  if not os.path.exists(dirsave):
+    os.makedirs(dirsave)
+  filesave = dirsave + get_slashes() + hashtext + ".mp3"
+  with open(filesave, 'wb') as f:
+    f.write(mp3_fp.getbuffer())
+  sound = AudioSegment.from_mp3(filesave)
+  duration = (len(sound) / 1000.0)
+  audiodb.insert_or_update(text, chatid, filesave, "aws", language, duration=duration, user=user)
 
 def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=True, user=None):
   data = audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
   if data is not None:
     return data
   else:
+    mp3_fp = BytesIO()
     tts = gTTS(text=text, lang=language, slow=False)
+    if save:      
+      threading.Thread(target=lambda: thread_save_google(text, tts, chatid=chatid, language=language, user=user)).start()
+    tts.write_to_fp(mp3_fp)
+    mp3_fp.seek(0)
+    return mp3_fp
+
+def thread_save_google(text: str, tts, chatid="000000", language="it", user=None):
     hashtext = hashlib.md5((text+"_google").encode('utf-8')).hexdigest()
-    filesave = ""
-    if int(os.environ.get("MASTER")) == 1:
-      filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
-      tts.save(filesave)
-      sound = AudioSegment.from_mp3(filesave)
-    else:      
-      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
-      fp = BytesIO()
-      tts.write_to_fp(fp)
-      fp.seek(0)
-      form_data = {'filename': urllib.parse.quote(hashtext)}
-      response = requests.post(url, data=form_data, files={"mp3": fp})
-      if response.status_code != 200:
-        raise Exception("Error on Slave saving mp3 to Master")
-      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"getmp3/" + hashtext + ".mp3"
-      response = requests.get(url)
-      memoryBuff = BytesIO(response.content)
-      sound = AudioSegment.from_mp3(memoryBuff)
+    dirsave = "." + get_slashes() + 'audios' + get_slashes() + get_random_string(2)
+    if not os.path.exists(dirsave):
+      os.makedirs(dirsave)
+    filesave = dirsave + get_slashes() + hashtext + ".mp3"
+    tts.save(filesave)
+    sound = AudioSegment.from_mp3(filesave)
     duration = (len(sound) / 1000.0)
-    if limit and duration > int(os.environ.get("MAX_TTS_DURATION")):
-      audiodb.insert_or_update(text, chatid, None, "google", language, is_correct=0, duration=duration, user=user)
-      if int(os.environ.get("MASTER")) == 1:
-        os.remove(filesave)
-      raise AudioLimitException
-    else:
-      memoryBuff = BytesIO()
-      sound.export(memoryBuff, format='mp3', bitrate="256")
-      memoryBuff.seek(0)
-      if save:
-        audiodb.insert_or_update(text, chatid, filesave, "google", language, duration=duration, user=user)
-      return memoryBuff
+    audiodb.insert_or_update(text, chatid, filesave, "google", language, duration=duration, user=user)
 
 def populate_tts_aws(text: str, chatid="000000", language="it"):
   data = audiodb.select_by_name_chatid_voice_language(text, chatid, "aws", language)
@@ -278,25 +248,14 @@ def populate_tts_aws(text: str, chatid="000000", language="it"):
 
     stream = response.get('AudioStream')
     hashtext = hashlib.md5((text+"_aws").encode('utf-8')).hexdigest()
-    filesave = ""
-    if int(os.environ.get("MASTER")) == 1:
-      filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
-      with open(filesave, 'wb') as f:
-          data = stream.read()
-          f.write(data)
-      sound = AudioSegment.from_mp3(filesave)
-    else:
-      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
-      fp = BytesIO(stream)
-      fp.seek(0)
-      form_data = {'filename': urllib.parse.quote(hashtext)}
-      response = requests.post(url, data=form_data, files={"mp3": fp})
-      if response.status_code != 200:
-        raise Exception("Error on Slave saving mp3 to Master")
-      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"getmp3/" + hashtext + ".mp3"
-      response = requests.get(url)
-      memoryBuff = BytesIO(response.content)
-      sound = AudioSegment.from_mp3(memoryBuff) 
+    dirsave = "." + get_slashes() + 'audios' + get_slashes() + get_random_string(2)
+    if not os.path.exists(dirsave):
+      os.makedirs(dirsave)
+    filesave = dirsave + get_slashes() + hashtext + ".mp3"
+    with open(filesave, 'wb') as f:
+      data = stream.read()
+      f.write(data)
+    sound = AudioSegment.from_mp3(filesave) 
     duration = (len(sound) / 1000.0)
     if duration > int(os.environ.get("MAX_TTS_DURATION")):
       audiodb.insert_or_update(text, chatid, None, "aws", language, is_correct=0, duration=duration)
@@ -318,24 +277,12 @@ def populate_tts_google(text: str, chatid="000000", language="it"):
   else:
     tts = gTTS(text=text, lang="it", slow=False)
     hashtext = hashlib.md5((text+"_google").encode('utf-8')).hexdigest()
-    filesave = ""
-    if int(os.environ.get("MASTER")) == 1:
-      filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
-      tts.save(filesave)
-      sound = AudioSegment.from_mp3(filesave)
-    else:
-      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
-      fp = BytesIO()
-      tts.write_to_fp(fp)
-      fp.seek(0)
-      form_data = {'filename': urllib.parse.quote(hashtext)}
-      response = requests.post(url, data=form_data, files={"mp3": fp})
-      if response.status_code != 200:
-        raise Exception("Error on Slave saving mp3 to Master")
-      url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"getmp3/" + hashtext + ".mp3"
-      response = requests.get(url)
-      memoryBuff = BytesIO(response.content)
-      sound = AudioSegment.from_mp3(memoryBuff) 
+    dirsave = "." + get_slashes() + 'audios' + get_slashes() + get_random_string(2)
+    if not os.path.exists(dirsave):
+      os.makedirs(dirsave)
+    filesave = dirsave + get_slashes() + hashtext + ".mp3"
+    tts.save(filesave)
+    sound = AudioSegment.from_mp3(filesave)
     duration = (len(sound) / 1000.0)
     if duration > int(os.environ.get("MAX_TTS_DURATION")):
       audiodb.insert_or_update(text, chatid, None, "google", language, is_correct=0, duration=duration)
@@ -600,8 +547,7 @@ def save_mp3(mp3, name):
   filesave = None
   try:
     sound = AudioSegment.from_mp3(mp3)
-    filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + name + ".mp3"
-    sound.export(filesave, format='mp3', bitrate="256")
+    sound.export(name, format='mp3', bitrate="256")
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -623,33 +569,12 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
         wav = fy.say(text.strip(), voice_to_use)
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
-          duration = (len(sound) / 1000.0)
-          if limit and duration > int(os.environ.get("MAX_TTS_DURATION")):
-            audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=0, duration=duration, user=user)
-            raise AudioLimitException
-          else:
-            if save:
-              hashtext = hashlib.md5((text+"_"+voice_to_use).encode('utf-8')).hexdigest()
-              filesave = ""
-              if int(os.environ.get("MASTER")) == 1:
-                filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
-                sound.export(filesave, format='mp3', bitrate="256")
-              else:
-                url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
-                audio = BytesIO()
-                sound.export(audio, format='mp3', bitrate="256")
-                audio.seek(0)
-                form_data = {'filename': urllib.parse.quote(hashtext)}
-                response = requests.post(url, data=form_data, files={"mp3": audio})
-                if response.status_code != 200:
-                  raise Exception("Error on Slave saving mp3 to Master")
-              audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration, user=user)
-              return audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
-            else:
-              out = BytesIO()
-              sound.export(out, format='mp3', bitrate="256")
-              out.seek(0)
-              return out
+          out = BytesIO()
+          sound.export(out, format='mp3', bitrate="256")
+          out.seek(0)
+          if save:
+            threading.Thread(target=lambda: thread_save_fakeyou(text, sound, chatid=chatid, language=language, user=user)).start()
+          return out
         elif voice == "random" or voice == "google":
           return get_tts_google(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
         elif voice == "aws":
@@ -674,9 +599,19 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=1, user=user)
       raise Exception(e)
 
+def thread_save_fakeyou(text: str, sound, chatid="000000", language="it", user=None): 
+  duration = (len(sound) / 1000.0)
+  hashtext = hashlib.md5((text+"_"+voice_to_use).encode('utf-8')).hexdigest()
+  dirsave = "." + get_slashes() + 'audios' + get_slashes() + get_random_string(2)
+  if not os.path.exists(dirsave):
+    os.makedirs(dirsave)
+  filesave = dirsave + get_slashes() + hashtext + ".mp3"
+  sound.export(filesave, format='mp3', bitrate="256")
+  audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration, user=user)
+
 @run_with_timer(max_execution_time=300)
 def populate_tts(text: str, chatid="000000", voice=None, israndom=False, language="it"):
-  try:
+  try:  
     if voice is None or voice == "null" or voice == "random":
       voice_to_use = get_random_voice(lang=language)
     else:
@@ -703,19 +638,11 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
           else:
             #sound.duration_seconds == duration
             hashtext = hashlib.md5((text+"_"+voice_to_use).encode('utf-8')).hexdigest()
-            filesave = ""
-            if int(os.environ.get("MASTER")) == 1:
-              filesave = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + hashtext + ".mp3"
-              sound.export(filesave, format='mp3', bitrate="256")
-            else:
-              url = os.environ.get("API_URL")+os.environ.get("API_PATH_AUDIO")+"putmp3"
-              audio = BytesIO()
-              sound.export(audio, format='mp3', bitrate="256")
-              audio.seek(0)
-              form_data = {'filename': urllib.parse.quote(hashtext)}
-              response = requests.post(url, data=form_data, files={"mp3": audio})
-              if response.status_code != 200:
-                raise Exception("Error on Slave saving mp3 to Master")
+            dirsave = "." + get_slashes() + 'audios' + get_slashes() + get_random_string(2)
+            if not os.path.exists(dirsave):
+              os.makedirs(dirsave)
+            filesave = dirsave + get_slashes() + hashtext + ".mp3"
+            sound.export(filesave, format='mp3', bitrate="256")
             audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration)
             return True
         raise Exception("FakeYou Generation KO")
@@ -1115,7 +1042,7 @@ def reset(chatid: str):
 
     audiodb.delete_by_chatid(chatid)    
 
-    folder = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes()
+    folder = "." + get_slashes() + 'audios' + get_slashes()
     for filename in os.listdir(folder):
         file_path = os.path.join(folder, filename)
         if os.path.isfile(file_path) or os.path.islink(file_path):
@@ -1185,8 +1112,7 @@ def delete_tts(limit=100):
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
-def get_mp3(filename):
-  file = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'audios' + get_slashes() + filename
+def get_mp3(file):
   if os.path.isfile(file):      
     sound = AudioSegment.from_mp3(file)
     memoryBuff = BytesIO()

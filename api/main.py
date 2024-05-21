@@ -154,8 +154,7 @@ class TextRepeatLearnClass(Resource):
   def get (self, text: str, chatid = "000000", lang = "it"):
     response = get_response_str(text)
     chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-    daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
-    daemon.start()
+    threading.Thread(target=lambda: chatbot.get_response(text), name="repeat-learn"+utils.get_random_string(24)).start()
     return response
 
 
@@ -166,8 +165,8 @@ class AudioRepeatLearnUserClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, user: str, text: str, chatid = "000000", lang = "it"):
     chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-    daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
-    daemon.start()
+
+    threading.Thread(target=lambda: chatbot.get_response(text), name="repeat-learn-user"+utils.get_random_string(24)).start()
 
     audiodb.insert_or_update(text.strip(), chatid, None, "google", lang, is_correct=1, user=user)
 
@@ -494,8 +493,7 @@ class AudioRepeatLearnClass(Resource):
         response = send_file(tts_out, attachment_filename=filename, mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
         chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-        daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
-        daemon.start()
+        threading.Thread(target=lambda: chatbot.get_response(text), name="repeat-learn-user"+utils.get_random_string(24)).start()
         return response
       else:
         @after_this_request
@@ -528,8 +526,7 @@ class AudioRepeatLearnUserClass(Resource):
         response = send_file(tts_out, attachment_filename=filename, mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
         chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-        daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
-        daemon.start()
+        threading.Thread(target=lambda: chatbot.get_response(text), name="repeat-learn-user"+utils.get_random_string(24)).start()
         return response
       else:
         @after_this_request
@@ -855,8 +852,7 @@ class SentencesGenerateClass(Resource):
       text = utils.generate_sentence(chatid)
       if learn == 1:
         chatbot = get_chatbot_by_id(chatid)
-        daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="sentences-generate"+utils.get_random_string(24))
-        daemon.start()
+        threading.Thread(target=lambda: chatbot.get_response(text), name="sentences-generate"+utils.get_random_string(24)).start()
       return make_response(text, 200)
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -962,8 +958,7 @@ class DatabaseTrainFile(Resource):
         trf.save(trainfile)
         #threading.Timer(0, utils.train_txt, args=[trainfile, get_chatbot_by_id(chatid, lang), lang, chatid]).start()
         chatbot = get_chatbot_by_id(chatid, lang)
-        daemon = Thread(target=utils.train_txt, args=(trainfile,chatbot, lang, chatid,), daemon=True, name="trainer_thread")
-        daemon.start()
+        threading.Thread(target=lambda: utils.train_txt(trainfile,chatbot, lang, chatid), name="trainer_thread").start()
 
         return get_response_str("Done. Watch the logs for errors.")
     except Exception as e:
@@ -1031,9 +1026,8 @@ def delete_tts():
 chatbots_dict = {}
 cache.init_app(app)
 limiter.init_app(app)
-if int(os.environ.get("MASTER")) == 1:
-  scheduler.init_app(app)
-  scheduler.start()
+scheduler.init_app(app)
+scheduler.start()
 
 if __name__ == '__main__':
   app.run()

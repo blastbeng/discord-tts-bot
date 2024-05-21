@@ -1,21 +1,27 @@
-import enchant
+from string import ascii_lowercase, ascii_uppercase, punctuation, digits
+from itertools import product
 import string
+import random
 
-# create dictionary for the language
-# in use(en_US here)
-dict = enchant.Dict("it_IT")
+minimum_length = 2
+maximum_length = 2
 
-# list of words
-words = "A natale puoi, fare quello che non puoi fare mai! A natale vai di anale e con Claudiu si puo'! A natale vai d'anale anche con blast si puo'!".translate(str.maketrans('', '', string.punctuation)).split(" ")
+ALLOWED_CHARACTERS = ascii_lowercase
 
-# find those words that may be misspelled
-misspelled =[]
-for word in words:
-  if dict.check(word) == False:
-    misspelled.append(word)
-print("The misspelled words are : " + str(misspelled))
+count = 0
 
-# suggest the correct spelling of
-# the misspelled words
-for word in misspelled:
-  print("Suggestion for " + word + " : " + str(dict.suggest(word)))
+for length in range(minimum_length, maximum_length + 1):
+    for combo in product(ALLOWED_CHARACTERS, repeat=length):
+        print(''.join(combo))
+        count=count+1
+
+print(str(count))
+
+
+def get_random_string(length):
+    # choose from all lowercase letter
+    letters = string.ascii_lowercase
+    result_str = ''.join(random.choice(letters) for i in range(length))
+    return result_str
+
+print(get_random_string(2))

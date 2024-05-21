@@ -28,6 +28,7 @@ import io
 from threading import Thread
 from random import randint
 import requests.exceptions
+import psutil
 
 from utils import FFmpegPCMAudioBytesIO
 
@@ -237,6 +238,34 @@ class PlayButton(discord.ui.Button["InteractionRoles"]):
                 
         except Exception as e:
             await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+
+class PlayWorkerButton(discord.ui.Button["InteractionRoles"]):
+
+    def __init__(self, urlapi, text, message_id):
+        super().__init__(style=discord.ButtonStyle.green, label="Play")
+        self.urlapi = urlapi
+        self.text = text
+        self.message_id = message_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        is_deferred=True
+        try:
+            await interaction.response.defer(thinking=True, ephemeral=True)
+                    
+            check_permissions(interaction)
+
+            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+            await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
+            
+            if voice_client.is_playing():
+                voice_client.stop() 
+
+            voice_client.play(discord.FFmpegPCMAudio(self.urlapi, executable='/usr/bin/ffmpeg'), after=lambda e: logging.info("play_audio_worker - " + self.text))
+            msg = await interaction.followup.send(self.text, ephemeral = True)
+            await msg.delete()
+                
+        except Exception as e:
+            await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
             
 class StopButton(discord.ui.Button["InteractionRoles"]):
 
@@ -395,6 +424,7 @@ truefalsemenu = get_true_false_menu()
 audio_count_queue = 0
 
 async def send_error(e, interaction, from_generic=False, is_deferred=False):
+    logging.error(e)
     currentguildid=get_current_guild_id(interaction.guild.id)
     if isinstance(e, app_commands.CommandOnCooldown):
         try:
@@ -468,7 +498,7 @@ async def send_error(e, interaction, from_generic=False, is_deferred=False):
     else:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error("[GUILDID : %s] %s %s %s", currentguildid, exc_type, fname, exc_tb.tb_lineno)
+        logging.error("[GUILDID : %s] %s %s %s", currentguildid, exc_type, fname, exc_tb.tb_lineno, e.args[0])
         if is_deferred:
             await interaction.followup.send("Discord API Error, " + await utils.translate(currentguildid,"please try again later"), ephemeral = True)
         else:
@@ -574,7 +604,7 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
                     await interaction.followup.send(message, ephemeral = ephermeal)
                 elif response.status == 400:
                     logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(get_current_guild_id(interaction.guild.id)))
-                    message = message + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Error. Can't reproduce audio.\nThe Generated TTS is longer than the maximum limit. ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
+                    message = message + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Error. Can't reproduce audio. The Generated TTS is longer than the maximum limit. ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
                     await interaction.followup.send(message, ephemeral = ephermeal)
                 elif response.status == 406:
                     logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(get_current_guild_id(interaction.guild.id)))
@@ -645,77 +675,100 @@ class PlayAudioLoop:
 
 class PlayAudioWorker:
     
-    def __init__(self, url, interaction, ephermeal = True, show_save = False):
+    def __init__(self, url, interaction, text, message, ephermeal = True, show_save = False):
         global audio_count_queue
         audio_count_queue = audio_count_queue + 1
         self.interaction = interaction
+        self.text = text
         self.url = url
         self.ephermeal = ephermeal
         self.show_save = show_save
+        self.message = message
 
     @tasks.loop(seconds=0.1, count=1)
     async def play_audio_worker(self):
         global audio_count_queue
         currentguildid = get_current_guild_id(str(self.interaction.guild.id))
         try:
-            voice_client = get_voice_client_by_guildid(client.voice_clients, self.interaction.guild.id)
-            connector = aiohttp.TCPConnector(force_close=True)
-            async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(self.url) as response:
-                    message = ""
-                    if "X-Generated-Text" in response.headers:
-                        message = response.headers["X-Generated-Text"]
-                    if (response.status == 200):
-                        content = await response.content.read()
-                        if not voice_client:
-                            raise ClientException("voice_client is None")
-                        if voice_client.is_playing():
-                            voice_client.stop()                                    
+            voice_client = get_voice_client_by_guildid(client.voice_clients, self.interaction.guild.id)            
+            if not voice_client:
+                raise ClientException("voice_client is None")
+            if voice_client.is_playing():
+                voice_client.stop()                                    
 
-                        view = discord.ui.View()
-                        view.add_item(PlayButton(content, message))
-                        view.add_item(StopButton())
-                        if self.show_save:
-                            view.add_item(SaveButton(message))
-                            
-                        if not voice_client.is_connected():
-                            await voice_client.channel.connect()
-                            time.sleep(10)
-                            
-                        voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info("play_audio_worker - " + message))
-                        #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
+            view = discord.ui.View()
+            view.add_item(PlayWorkerButton(self.url, self.text, self.message.id))
+            view.add_item(StopButton())
+            if self.show_save:
+                view.add_item(SaveButton(message))
                 
-                        if "X-Generated-Response-Text" in response.headers:
-                            message = response.headers["X-Generated-Response-Text"]
-                        await self.interaction.followup.send(message, view = view, ephemeral = True)
-                    elif response.status == 204:
-                        logging.info("[GUILDID : %s] do_play - Audio not found", str(currentguildid))
-                        message = await utils.translate(currentguildid,"I haven't found any audio for this text: " + message + ".")
-                        await self.interaction.followup.send(message, ephemeral = self.ephermeal)
-                    elif response.status == 400:
-                        logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(currentguildid))
-                        message = message + "\n\n" + await utils.translate(currentguildid,"Error. Can't reproduce audio.\nThe Generated TTS is longer than the maximum limit. ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
-                        await self.interaction.followup.send(message, ephemeral = self.ephermeal)
-                    elif response.status == 406:
-                        logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(currentguildid))
-                        message = await utils.translate(currentguildid,"Error. The sentence contains a word that is blocked by filters.") + " ["+ str(message) +"]"
-                        await self.interaction.followup.send(message, ephemeral = self.ephermeal)
-                    else:
-                        logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(currentguildid))
-                        await self.interaction.followup.send(await utils.translate(currentguildid,"An audio generation error occurred.") + "\n" + await utils.translate(currentguildid,"If a modified voice has been selected, remember that with too much spam the bot may be blocked from FakeYou.com for some minutes.") + "\n" + await utils.translate(currentguildid,"You can check service status and the TTS queue at this address:") + "https://fakeyou.com/", ephemeral = self.ephermeal)
-        
-                                    
-                await session.close()
-        except aiohttp.ClientConnectionError as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-            await self.interaction.followup.send(await utils.translate(currentguildid,"An audio generation error occurred.") + "\n" + await utils.translate(currentguildid,"If a modified voice has been selected, remember that with too much spam the bot may be blocked from FakeYou.com for some minutes.") + "\n" + await utils.translate(currentguildid,"You can check service status and the TTS queue at this address:") + "https://fakeyou.com/", ephemeral = self.ephermeal)
+            if not voice_client.is_connected():
+                await voice_client.channel.connect()
+                time.sleep(10)
+
+            voice_client.play(discord.FFmpegPCMAudio(self.url, executable='/usr/bin/ffmpeg'), after=lambda e: logging.info("play_audio_worker - " + self.text))
+
+            await self.interaction.followup.edit_message(message_id=self.message.id,content=self.text, view = view)
+            #await self.interaction.followup.send(self.text, view = view, ephemeral = True)
+            
+        #    connector = aiohttp.TCPConnector(force_close=True)
+        #    async with aiohttp.ClientSession(connector=connector) as session:
+        #        async with session.get(self.url) as response:
+        #            message = ""
+        #            if "X-Generated-Text" in response.headers:
+        #                message = response.headers["X-Generated-Text"]
+        #            if (response.status == 200):
+        #                content = await response.content.read()
+        #                if not voice_client:
+        #                    raise ClientException("voice_client is None")
+        #                if voice_client.is_playing():
+        #                    voice_client.stop()            
+        #                view = discord.ui.View()
+        #                view.add_item(PlayButton(content, message))
+        #                view.add_item(StopButton())
+        #                if self.show_save:
+        #                    view.add_item(SaveButton(message))
+        #                    
+        #                if not voice_client.is_connected():
+        #                    await voice_client.channel.connect()
+        #                    time.sleep(10)
+        #                discord.FFmpegPCMAudio(url, executable='C:/programs/ffmpeg.exe')
+        #                voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info("play_audio_worker - " + message))
+        #                if "X-Generated-Response-Text" in response.headers:
+        #                    message = response.headers["X-Generated-Response-Text"]
+        #                await self.interaction.followup.send(message, view = view, ephemeral = True)
+        #            elif response.status == 204:
+        #                logging.info("[GUILDID : %s] do_play - Audio not found", str(currentguildid))
+        #                message = await utils.translate(currentguildid,"I haven't found any audio for this text: " + message + ".")
+        #                await self.interaction.followup.send(message, ephemeral = self.ephermeal)
+        #            elif response.status == 400:
+        #                logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(currentguildid))
+        #                message = message + "\n\n" + await utils.translate(currentguildid,"Error. Can't reproduce audio. The Generated TTS is longer than the maximum limit. ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
+        #                await self.interaction.followup.send(message, ephemeral = self.ephermeal)
+        #            elif response.status == 406:
+        #                logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(currentguildid))
+        #                message = await utils.translate(currentguildid,"Error. The sentence contains a word that is blocked by filters.") + " ["+ str(message) +"]"
+        #                await self.interaction.followup.send(message, ephemeral = self.ephermeal)
+        #            else:
+        #                logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(currentguildid))
+        #                await self.interaction.followup.send(await utils.translate(currentguildid,"An audio generation error occurred.") + "\n" + await utils.translate(currentguildid,"If a modified voice has been selected, remember that with too much spam the bot may be blocked from FakeYou.com for some minutes.") + "\n" + await utils.translate(currentguildid,"You can check service status and the TTS queue at this address:") + "https://fakeyou.com/", ephemeral = self.ephermeal)                    
+        #        await session.close()
+        #except aiohttp.ClientConnectionError as e:
+        #    exc_type, exc_obj, exc_tb = sys.exc_info()
+        #    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        #    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+        #    await self.interaction.followup.send(await utils.translate(currentguildid,"An audio generation error occurred.") + "\n" + await utils.translate(currentguildid,"If a modified voice has been selected, remember that with too much spam the bot may be blocked from FakeYou.com for some minutes.") + "\n" + await utils.translate(currentguildid,"You can check service status and the TTS queue at this address:") + "https://fakeyou.com/", ephemeral = self.ephermeal)
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
             logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-            await self.interaction.interaction.followup.send("Discord API Error, " + await utils.translate(currentguildid,"please try again later"), ephemeral = True) 
+            exceptmsg = await utils.translate(currentguildid,"I can't reproduce this audio, the reasons can be:")
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"The generated TTS is longer than the maximum limit allowed ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Text contains a word blocked by filters")
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"An audio generation error occurred")
+            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"Remember that with too much spam the bot may be blocked for some minutes.") 
+            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
+            await self.interaction.followup.edit_message(message_id=self.message.id,content=self.exceptmsg)
             
         if audio_count_queue > 0:
             audio_count_queue = audio_count_queue - 1
@@ -769,6 +822,16 @@ class GeneratorLoop:
             logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 
+
+async def get_queue_message(guildid: str):
+    global audio_count_queue
+    message = "\n\n"
+    message = message + await utils.translate(guildid,"If the server is overloaded, it may take some time")
+    message = message + "\n"
+    message = message + "*CPU: " + str(psutil.cpu_percent()) + "% - RAM: " + str(psutil.virtual_memory()[2]) + "%*"
+    message = message + "\n"
+    message = message + "**" + await utils.translate(guildid,"TTS in queue:") + " " + str(0 if audio_count_queue == 0 else audio_count_queue - 1) + "**"
+    return message
 
 @tasks.loop(hours=6)
 async def change_presence_loop():
@@ -1101,7 +1164,6 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "rando
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        global audio_count_queue
         check_permissions(interaction)
         
         voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
@@ -1122,15 +1184,15 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "rando
 
             if voice is not None:
                 url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/learn/user/"+urllib.parse.quote(str(interaction.user.name))+"/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
-                worker = PlayAudioWorker(url, interaction)
+                
+                message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm starting to generate the audio for:") + " **" + text + "**" + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
+                worker = PlayAudioWorker(url, interaction, text, message)
                 worker.play_audio_worker.start()
-                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm starting to generate the audio for:") + "\n" + text + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)      
                  
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
-
 
 @client.tree.command()
 @app_commands.rename(text='text')
@@ -1141,7 +1203,6 @@ async def wikipedia(interaction: discord.Interaction, text: str):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        global audio_count_queue
         check_permissions(interaction)
         
         voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
@@ -1153,10 +1214,10 @@ async def wikipedia(interaction: discord.Interaction, text: str):
 
             currentguildid = get_current_guild_id(interaction.guild.id)
             url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"search/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
-            worker = PlayAudioWorker(url, interaction)
+            
+            message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm searching on wikipedia:"), + " **" + text + "**" + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
+            worker = PlayAudioWorker(url, interaction, text, message)
             worker.play_audio_worker.start()
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm searching on wikipedia:"), + "\n" + text + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
-
         else:
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)            
         
@@ -1215,7 +1276,6 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        global audio_count_queue
         check_permissions(interaction)
         
         voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
@@ -1232,9 +1292,10 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
 
             if voice is not None:
                 url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"ask/user/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(str(interaction.user.name))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
-                worker = PlayAudioWorker(url, interaction)
+                
+                message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm looking for an answer to:") + " **" + text + "**" + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
+                worker = PlayAudioWorker(url, interaction, text, message)
                 worker.play_audio_worker.start()
-                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm looking for an answer to:") + "\n" + text + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True) 
                    
@@ -1248,7 +1309,6 @@ async def generate(interaction: discord.Interaction):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        global audio_count_queue
         check_permissions(interaction)
         
 
@@ -1266,9 +1326,10 @@ async def generate(interaction: discord.Interaction):
                     if (response.status == 200):
                         text = await response.text()
                         url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
-                        worker = PlayAudioWorker(url, interaction)
+                        
+                        message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm generating a random text")  + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
+                        worker = PlayAudioWorker(url, interaction, text, message)
                         worker.play_audio_worker.start()
-                        await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm generating a random text")  + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
                     else:
                         logging.error("[GUILDID : %s] generate - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)))
                         await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),'Error. The generator database is still empty, try again later.\nNOTE: If you just invited the bot, this feature will be available in 12 hours if you continue to use the "speak" command.'), ephemeral = True)     
@@ -1285,7 +1346,6 @@ async def story(interaction: discord.Interaction):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        global audio_count_queue
         check_permissions(interaction)
         
         voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
@@ -1302,9 +1362,10 @@ async def story(interaction: discord.Interaction):
                     if (response.status == 200):
                         text = await response.text()
                         url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/google/"+urllib.parse.quote(currentguildid) + "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))
-                        worker = PlayAudioWorker(url, interaction)
+                        
+                        message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm generating a random story")  + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
+                        worker = PlayAudioWorker(url, interaction, text, message)
                         worker.play_audio_worker.start()
-                        await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm generating a random story")  + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
                     else:
                         logging.error("[GUILDID : %s] story - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)))
                         await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),'Error. The generator database is still empty, try again later.\nNOTE: If you just invited the bot, this feature will be available in 12 hours if you continue to use the "speak" command.'), ephemeral = True)         
@@ -1324,7 +1385,6 @@ async def insult(interaction: discord.Interaction, member: Optional[discord.Memb
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        global audio_count_queue
         check_permissions(interaction)
         
         currentguildid = get_current_guild_id(interaction.guild.id)
@@ -1347,10 +1407,10 @@ async def insult(interaction: discord.Interaction, member: Optional[discord.Memb
                     insulturl=insulturl +"?text="+urllib.parse.quote(name) + "&chatid="+urllib.parse.quote(get_current_guild_id(interaction.guild.id))
                 else:
                     insulturl=insulturl +"?chatid="+urllib.parse.quote(get_current_guild_id(interaction.guild.id)) + "&lang=" + urllib.parse.quote(utils.get_guild_language(currentguildid))
-                worker = PlayAudioWorker(insulturl, interaction)
+                
+                message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm generating a random insult")  + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
+                worker = PlayAudioWorker(insulturl, interaction, await utils.translate(get_current_guild_id(interaction.guild.id),"I'm saying a random insult"), message)
                 worker.play_audio_worker.start()
-                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm generating a random insult")  + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
-            
          
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
@@ -1369,7 +1429,6 @@ async def random(interaction: discord.Interaction, voice: str = "random", text: 
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        global audio_count_queue
         check_permissions(interaction)
         
         voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
@@ -1388,9 +1447,10 @@ async def random(interaction: discord.Interaction, voice: str = "random", text: 
                 url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"random/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(currentguildid) + "/" + utils.get_guild_language(currentguildid) + "/"
                 if text != "":
                     url = url + text
-                worker = PlayAudioWorker(url, interaction)
+                message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm searching a random sentence")  + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
+                
+                worker = PlayAudioWorker(url, interaction, await utils.translate(get_current_guild_id(interaction.guild.id),"I'm saying a random sentence"), message)
                 worker.play_audio_worker.start()
-                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm searching a random text")  + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)
         else:
@@ -1409,7 +1469,6 @@ async def curse(interaction: discord.Interaction):
     is_deferred=True
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        global audio_count_queue
         check_permissions(interaction)
         
         async with aiohttp.ClientSession() as session:
@@ -1431,10 +1490,10 @@ async def curse(interaction: discord.Interaction):
                                 
 
                                 url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"curse/"+urllib.parse.quote(currentguildid)+ "/" + utils.get_guild_language(currentguildid) + "/"
-                                worker = PlayAudioWorker(url, interaction)
-                                worker.play_audio_worker.start()
-                                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm creating a random blasphemy")  + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
+                                message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm creating a random blasphemy")  + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
                             
+                                worker = PlayAudioWorker(url, interaction, await utils.translate(get_current_guild_id(interaction.guild.id),"I'm saying a random blasphemy"), message)
+                                worker.play_audio_worker.start()
                     except Exception as e:
                         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
             await session.close() 
@@ -1723,7 +1782,6 @@ async def translate(interaction: discord.Interaction, text: str, language_to: ap
     
     try:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        global audio_count_queue
         check_permissions(interaction)
         
         voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
@@ -1748,9 +1806,10 @@ async def translate(interaction: discord.Interaction, text: str, language_to: ap
                     if (response.status == 200):
                         translated_text = await response.text()
                         url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/learn/"+urllib.parse.quote(str(translated_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(language_to.value) + "/"
-                        worker = PlayAudioWorker(url, interaction)
+                        
+                        message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm translating:") + " **" + text + "**" + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
+                        worker = PlayAudioWorker(url, interaction, await utils.translate(get_current_guild_id(interaction.guild.id),"I have translated:") + " **" + text + "**" + await get_queue_message(get_current_guild_id(interaction.guild.id)), message)
                         worker.play_audio_worker.start()
-                        await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm translating:") + "\n" + text + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"TTS in queue:") + " " + str(audio_count_queue - 1), ephemeral = True)
                     else:
                         logging.error("[GUILDID : %s] translate - Received bad response from APIs", str(get_current_guild_id(interaction.guild.id)))
                         await interaction.followup.send("API Timeout, " + await utils.translate(currentguildid,"please try again later"), ephemeral = True)
@@ -2236,6 +2295,49 @@ async def reset(interaction: discord.Interaction):
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
+@client.tree.command()
+@app_commands.rename(text='text')
+@app_commands.describe(text="The sentence to repeat")
+@app_commands.rename(voice='voice')
+@app_commands.describe(voice="The voice to use")
+@app_commands.autocomplete(voice=rps_autocomplete)
+async def test(interaction: discord.Interaction, text: str, voice: str = "random"):
+    """Test command"""
+    is_deferred=True
+    try:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        #check_permissions(interaction)
+        
+        if interaction.user.guild_permissions.administrator:
+            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+            await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
+
+            if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
+                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Retry in a moment, I'm initializing the voice connection..."), ephemeral = True)
+            else:
+
+                currentguildid = get_current_guild_id(interaction.guild.id)
+                
+                lang_to_use = utils.get_guild_language(currentguildid)
+
+                if voice != "random":
+                    voice = await listvoices_api(language=lang_to_use, filter=voice)
+                else:
+                    voice = randompy.choice(['google', 'aws'])
+
+                if voice is not None:
+                    url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
+                    message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm starting to generate the audio for:") + " **" + text + "**" + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
+                    worker = PlayAudioWorker(url, interaction, text)
+                    worker.play_audio_worker.start()
+                    
+                else:
+                    await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)   
+        else:        
+            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
+            
+    except Exception as e:
+        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
 @admin.error
 @accept.error
@@ -2260,6 +2362,7 @@ async def reset(interaction: discord.Interaction):
 @soundsearch.error
 @speak.error
 @story.error
+@test.error
 @timer.error
 @train.error
 #@trackuser.error
