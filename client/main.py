@@ -693,17 +693,17 @@ class PlayAudioWorker:
                     elif response.status == 204:
                         logging.info("[GUILDID : %s] do_play - Audio not found", str(get_current_guild_id(interaction.guild.id)))
                         message = await utils.translate(get_current_guild_id(interaction.guild.id),"I haven't found any audio for this text: " + message + ".")
-                        await self.interaction.followup.edit_message(message_id=self.message.id,content=message, ephemeral = ephermeal)
+                        await self.interaction.followup.edit_message(message_id=self.message.id,content=message, ephemeral = self.ephermeal)
                     elif response.status == 400:
-                        logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(get_current_guild_id(interaction.guild.id)))
+                        logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(get_current_guild_id(self.interaction.guild.id)))
                         message = message + "\n\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Error. Can't reproduce audio. The Generated TTS is longer than the maximum limit. ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
-                        await self.interaction.followup.edit_message(message_id=self.message.id,content=message, ephemeral = ephermeal)
+                        await self.interaction.followup.edit_message(message_id=self.message.id,content=message, ephemeral = self.ephermeal)
                     elif response.status == 406:
-                        logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(get_current_guild_id(interaction.guild.id)))
+                        logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(get_current_guild_id(self.interaction.guild.id)))
                         message = await utils.translate(get_current_guild_id(interaction.guild.id),"Error. The sentence contains a word that is blocked by filters.") + " ["+ str(message) +"]"
-                        await self.interaction.followup.edit_message(message_id=self.message.id,content=message, ephemeral = ephermeal)
+                        await self.interaction.followup.edit_message(message_id=self.message.id,content=message, ephemeral = self.ephermeal)
                     else:
-                        logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(get_current_guild_id(interaction.guild.id)))
+                        logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(get_current_guild_id(self.interaction.guild.id)))
                         raise Exception("play_audio_worker - Error! - " + text)
                 await session.close()
 
