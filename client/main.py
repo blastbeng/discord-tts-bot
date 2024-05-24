@@ -704,7 +704,7 @@ class PlayAudioWorker:
                         await self.interaction.followup.edit_message(message_id=self.message.id,content=message, ephemeral = self.ephermeal)
                     else:
                         logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(get_current_guild_id(self.interaction.guild.id)))
-                        raise Exception("play_audio_worker - Error! - " + text)
+                        raise Exception("play_audio_worker - Error! - ")
                 await session.close()
 
             
