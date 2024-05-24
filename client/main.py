@@ -767,7 +767,7 @@ class PlayAudioWorker:
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"An audio generation error occurred")
             exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"Remember that with too much spam the bot may be blocked for some minutes.") 
             exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
-            await self.interaction.followup.edit_message(message_id=self.message.id,content=self.exceptmsg)
+            await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
             
         if audio_count_queue > 0:
             audio_count_queue = audio_count_queue - 1
