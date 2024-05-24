@@ -5,9 +5,24 @@ import shlex
 import urllib
 import io
 import random
+import logging
 from discord.opus import Encoder
 import discord
 import aiohttp
+from io import BytesIO
+from pathlib import Path
+from os.path import join, dirname
+from dotenv import load_dotenv
+
+dotenv_path = join(dirname(__file__), '.env')
+load_dotenv(dotenv_path)
+
+logging.basicConfig(
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        level=int(os.environ.get("LOG_LEVEL")),
+        datefmt='%Y-%m-%d %H:%M:%S')
+log = logging.getLogger('werkzeug')
+log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 class FFmpegPCMAudioBytesIO(discord.AudioSource):
     def __init__(self, source, *, executable='ffmpeg', pipe=False, stderr=None, before_options=None, options=None):

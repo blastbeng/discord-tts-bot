@@ -198,6 +198,7 @@ def get_tts_aws(text: str, chatid="000000", language="it", save=True, limit=True
     stream.close()
     if save:      
       threading.Thread(target=lambda: thread_save_aws(text, mp3_fp, chatid=chatid, language=language, user=user)).start()
+    mp3_fp.seek(0)
     return mp3_fp
 
 def thread_save_aws(text: str, mp3_fp, chatid="000000", language="it", user=None):
@@ -573,7 +574,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
           sound.export(out, format='mp3', bitrate="256")
           out.seek(0)
           if save:
-            threading.Thread(target=lambda: thread_save_fakeyou(text, sound, chatid=chatid, language=language, user=user)).start()
+            threading.Thread(target=lambda: thread_save_fakeyou(text, sound, voice_to_use, chatid=chatid, language=language, user=user)).start()
           return out
         elif voice == "random" or voice == "google":
           return get_tts_google(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
@@ -599,7 +600,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=1, user=user)
       raise Exception(e)
 
-def thread_save_fakeyou(text: str, sound, chatid="000000", language="it", user=None): 
+def thread_save_fakeyou(text: str, sound, voice_to_use, chatid="000000", language="it", user=None): 
   duration = (len(sound) / 1000.0)
   hashtext = hashlib.md5((text+"_"+voice_to_use).encode('utf-8')).hexdigest()
   dirsave = "." + get_slashes() + 'audios' + get_slashes() + get_random_string(2)

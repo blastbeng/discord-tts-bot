@@ -1,5 +1,5 @@
 #/bin/sh
-export TMPDIR=/mnt/media/tmp
+export TMPDIR=/home/blast/tmp
 mkdir -p $TMPDIR
 /usr/bin/python3 -m venv .venv
 source .venv/bin/activate; pip3 install -r requirements.txt

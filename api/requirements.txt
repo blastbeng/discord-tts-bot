@@ -17,7 +17,7 @@ wikipedia
 gtts
 git+https://github.com/yt-dlp/yt-dlp
 redis==4.3.4
-Flask-Caching==2.0.1
+Flask-Caching==2.3.0
 libretranslatepy
 Flask-APScheduler==1.12.4
 Tweepy==4.12.1
