@@ -38,16 +38,7 @@ load_dotenv(dotenv_path)
 GUILD_ID = discord.Object(id=os.environ.get("GUILD_ID"))
 
 def get_api_url():
-    try:
-        url = os.environ.get("REMOTE_API_URL")+os.environ.get("API_PATH_UTILS")+"/healthcheck"
-        r = requests.get(url)
-        r.raise_for_status()
-    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-        return os.environ.get("API_URL")
-    except requests.exceptions.HTTPError:
-        return os.environ.get("API_URL")
-    else:
-        return os.environ.get("REMOTE_API_URL")
+    return os.environ.get("API_URL")
 
 class TrackUser:
     def __init__(self, name, guildid, whatsapp):
