@@ -2,6 +2,10 @@
 version: "3.3"
 services:
   discord-tts-bot-redis:
+    dns:
+    - 192.168.1.160
+    - 8.8.8.8
+    - 172.17.0.1
     image: redis
     container_name: discord-tts-bot-redis
     ports:
@@ -10,6 +14,10 @@ services:
     volumes:
       - redisdata:/data
   discord-tts-bot-api:
+    dns:
+    - 192.168.1.160
+    - 8.8.8.8
+    - 172.17.0.1
     pull_policy: build
     build:
       context: ./api
@@ -39,6 +47,10 @@ services:
       retries: 12
     network_mode: host
   discord-tts-bot-client:
+    dns:
+    - 192.168.1.160
+    - 8.8.8.8
+    - 172.17.0.1
     pull_policy: build
     build:
       context: ./client
