@@ -4,7 +4,8 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
          locales \
          ffmpeg \
-         net-tools
+         net-tools \
+         curl
 
 RUN sed -i '/it_IT.UTF-8/s/^# //g' /etc/locale.gen && \
     locale-gen
