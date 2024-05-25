@@ -67,7 +67,7 @@ def ask(update: Update, context: CallbackContext):
         if strid:
             message = update.message.text[5:].strip();
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
-                url = API_URL + API_PATH_TEXT + "ask/" + urllib.parse.quote(str(update.message.chat.id)) + "/1/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid)
+                url = API_URL + API_PATH_TEXT + "ask/" + urllib.parse.quote(str(update.message.chat.id)) + "/1/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid) + "/"
 
                 response = requests.get(url)
                 if (response.status_code == 200):
@@ -99,7 +99,7 @@ def curse(update: Update, context: CallbackContext):
         if strid:
             message = update.message.text[5:].strip();
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
-                url = API_URL + API_PATH_TEXT + "curse/" + urllib.parse.quote(strid)
+                url = API_URL + API_PATH_TEXT + "curse/" + urllib.parse.quote(strid) + "/"
 
                 response = requests.get(url)
                 if (response.status_code == 200):
@@ -128,7 +128,7 @@ def generate(update: Update, context: CallbackContext):
         #else:
         #    strid = chatid
         if strid:
-            url = API_URL + API_PATH_UTILS + "/sentences/generate/" + urllib.parse.quote(strid) + "/1"
+            url = API_URL + API_PATH_UTILS + "/sentences/generate/" + urllib.parse.quote(strid) + "/1" + "/"
             response = requests.get(url)
             if (response.status_code == 200):
                 context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
@@ -151,7 +151,7 @@ def story(update: Update, context: CallbackContext):
         #else:
         #    strid = chatid
         if strid:
-            url = API_URL + API_PATH_UTILS + "/paragraph/generate/" + urllib.parse.quote(strid)
+            url = API_URL + API_PATH_UTILS + "/paragraph/generate/" + urllib.parse.quote(strid) + "/"
             response = requests.get(url)
             if (response.status_code == 200):
                 context.bot.send_message(chat_id=update.effective_chat.id, text=response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
@@ -177,7 +177,7 @@ def echo(update: Update, context: CallbackContext):
         if strid:
             message = update.message.text
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
-                url = API_URL + API_PATH_TEXT + "ask/user/" + urllib.parse.quote(str(update.message.chat.id)) + "/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid)
+                url = API_URL + API_PATH_TEXT + "ask/user/" + urllib.parse.quote(str(update.message.chat.id)) + "/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid) + "/"
 
                 response = requests.get(url)
                 if (response.status_code == 200):
@@ -207,7 +207,7 @@ def askaudio(update: Update, context: CallbackContext):
         if strid:
             message = update.message.text[10:].strip();
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
-                url = API_URL + API_PATH_AUDIO + "ask/" + urllib.parse.quote(str(update.message.chat.id)) + "/1/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid)
+                url = API_URL + API_PATH_AUDIO + "ask/" + urllib.parse.quote(str(update.message.chat.id)) + "/1/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(strid) + "/"
 
                 response = requests.get(url)
                 if (response.status_code == 200):
@@ -243,7 +243,7 @@ def speak(update: Update, context: CallbackContext):
             message = splitted[0].strip()
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
 
-                url = API_URL + API_PATH_UTILS + "/fakeyou/listvoices/it/0"
+                url = API_URL + API_PATH_UTILS + "/fakeyou/listvoices/it"
 
                 voices = None
                 voice = "google"
@@ -262,7 +262,7 @@ def speak(update: Update, context: CallbackContext):
                             voice = voices[voice_rest]
                             break
 
-                url = API_URL + API_PATH_AUDIO + "repeat/learn/user/" + urllib.parse.quote(str(update.message.chat.id)) + "/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(strid) 
+                url = API_URL + API_PATH_AUDIO + "repeat/learn/user/" + urllib.parse.quote(str(update.message.chat.id)) + "/" + urllib.parse.quote(message) + "/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(strid) + "/"
 
                 response = requests.get(url)
                 if (response.status_code == 200):
@@ -300,7 +300,7 @@ def curseaudio(update: Update, context: CallbackContext):
         #    strid = chatid
         if strid:
 
-            url = API_URL + API_PATH_AUDIO + "curse/google/" + urllib.parse.quote(strid) 
+            url = API_URL + API_PATH_AUDIO + "curse/google/" + urllib.parse.quote(strid) + "/"
 
             response = requests.get(url)
             if (response.status_code == 200):
@@ -332,7 +332,7 @@ def listvoices(update: Update, context: CallbackContext):
        # else:
        #     strid = chatid
         if strid:
-            url = API_URL + API_PATH_UTILS + "/fakeyou/listvoices/it/0"
+            url = API_URL + API_PATH_UTILS + "/fakeyou/listvoices/it"
 
             response = requests.get(url)
             if (response.status_code == 200):
@@ -352,40 +352,6 @@ def listvoices(update: Update, context: CallbackContext):
            
 dispatcher.add_handler(CommandHandler('listvoices', listvoices))
 
-def image(update: Update, context: CallbackContext):
-    try:
-        chatid = str(update.effective_chat.id)
-        if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
-            strid = "000000"
-        #else:
-        #    strid = chatid
-        if strid:
-            message = update.message.text[7:].strip();
-            if(message != "" and len(message) <= 500  and not message.endswith('bot')):
-
-                img_url = API_URL + API_PATH_IMAGES + "search/" + urllib.parse.quote(message)
-
-                response = requests.get(img_url, stream=True)
-                if (response.status_code == 200):
-                    context.bot.send_photo(chat_id=update.effective_chat.id, photo=response.content, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False, filename=get_random_string(12)+ "image.jpeg")
-                else:
-                    context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                
-                                      
-            else:
-                context.bot.send_message(chat_id=update.effective_chat.id, text="se vuoi che cerco un immagine devi scrivere qualcosa dopo /image (massimo 500 caratteri)", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-               
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
-      context.bot.send_message(chat_id=update.effective_chat.id, text="nessun risultato trovato", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-
-          
-dispatcher.add_handler(CommandHandler('image', image))
-
-
-
 
 def search(update: Update, context: CallbackContext):
     try:
@@ -397,7 +363,7 @@ def search(update: Update, context: CallbackContext):
         if strid:
             message = update.message.text[8:].strip();
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
-                url = API_URL + API_PATH_TEXT + "search/" + urllib.parse.quote(message)
+                url = API_URL + API_PATH_TEXT + "search/" + urllib.parse.quote(message) + "/"
 
                 response = requests.get(url)
                 if (response.status_code == 200):
@@ -426,7 +392,7 @@ def searchaudio(update: Update, context: CallbackContext):
         if strid:
             message = update.message.text[13:].strip();
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
-                url = API_URL + API_PATH_AUDIO + "search/" + urllib.parse.quote(message)
+                url = API_URL + API_PATH_AUDIO + "search/" + urllib.parse.quote(message) + "/"
 
                 response = requests.get(url)
                 if (response.status_code == 200):
@@ -478,53 +444,6 @@ def insult(update: Update, context: CallbackContext):
 dispatcher.add_handler(CommandHandler('insult', insult))
 
 
-def text2image(update: Update, context: CallbackContext):
-    try:
-        chatid = str(update.effective_chat.id)
-        if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
-            strid = "000000"
-        #else:
-        #    strid = chatid
-        if strid:
-            try:
-                r = requests.get(os.environ.get("STABLE_DIFFUSION_API_URL"))
-                r.raise_for_status()  # Raises a HTTPError if the status is 4xx, 5xxx
-            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-                context.bot.send_message(chat_id=update.effective_chat.id, text="Le API remote sono offline", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-            else:
-                text = update.message.text[12:].strip();
-                if(text != "" and len(text) <= 500  and not text.endswith('bot')):
-                    payload = {
-                        "prompt": text,
-                        "steps": 50,
-                        "width": 512,
-                        "height": 512,
-                        "batch_size": 1,
-                        "sampler_index": "Euler",
-                    }
-                    url = os.environ.get("STABLE_DIFFUSION_API_URL") + os.environ.get("STABLE_DIFFUSION_API_TEXT_2_IMG")
-                    response = requests.post(url, json=payload)
-                    if (response.status_code == 200 and response.text != "Internal Server Error"):
-                        r = response.json()
-                        for i in r['images']:
-                            image = Image.open(BytesIO(base64.b64decode(i.split(",",1)[0])))
-                        with BytesIO() as image_binary:
-                            image.save(image_binary, 'PNG')
-                            image_binary.seek(0)
-                            context.bot.send_photo(chat_id=update.effective_chat.id, photo=image_binary, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                    else:
-                        context.bot.send_message(chat_id=update.effective_chat.id, text="si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                else:
-                    context.bot.send_message(chat_id=update.effective_chat.id, text="se vuoi che genero un immagine devi scrivere qualcosa dopo /text2image (massimo 500 caratteri)", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-               
-                        
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
-      context.bot.send_message(chat_id=update.effective_chat.id, text="Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-
-dispatcher.add_handler(CommandHandler('text2image', text2image))
 
 def insultaudio(update: Update, context: CallbackContext):
     try:
@@ -705,7 +624,6 @@ def help(update: Update, context: CallbackContext):
     text = text + "curse - Curse. (audio)\n"
     text = text + "curseaudio - Curse. (audio)\n"
     text = text + "generate - genera frasi casuali\n"
-    text = text + "image - ricerca immagini\n"
     text = text + "insult - genera insulti (text)\n"
     text = text + "insultaudio - genera insulti (audio)\n"
     text = text + "help - visualizza i comandi\n"
@@ -717,7 +635,6 @@ def help(update: Update, context: CallbackContext):
     text = text + "setalarmdaily - allarme giornaliero\n"
     text = text + "speak - ripete il messaggio via audio\n"
     text = text + "story - genera storie casuali\n"
-    text = text + "text2image - genera immagini da un testo\n"
     text = text + "unsetalarm - rimuove un allarme\n";
 
     context.bot.send_message(chat_id=update.effective_chat.id, text=text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)

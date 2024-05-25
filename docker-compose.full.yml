@@ -2,10 +2,6 @@
 version: "3.3"
 services:
   discord-tts-bot-redis:
-    dns:
-    - 192.168.1.160
-    - 8.8.8.8
-    - 172.17.0.1
     image: redis
     container_name: discord-tts-bot-redis
     ports:
@@ -14,10 +10,6 @@ services:
     volumes:
       - redisdata:/data
   discord-tts-bot-api:
-    dns:
-    - 192.168.1.160
-    - 8.8.8.8
-    - 172.17.0.1
     pull_policy: build
     build:
       context: ./api
@@ -47,10 +39,6 @@ services:
       retries: 12
     network_mode: host
   discord-tts-bot-client:
-    dns:
-    - 192.168.1.160
-    - 8.8.8.8
-    - 172.17.0.1
     pull_policy: build
     build:
       context: ./client
@@ -70,6 +58,25 @@ services:
       - "/tmp/discord-tts-bot-discord:/tmp/discord-tts-bot-discord"
     image: "blastbeng/discord-tts-bot-client:1.0.0"
     restart: always
-
+  discord-tts-bot-telegram:
+    pull_policy: build
+    build:
+      context: ./telegram
+      dockerfile: Dockerfile.telegram
+    container_name: discord-tts-bot-telegram
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Rome
+    depends_on:
+      discord-tts-bot-api:
+        condition: service_healthy
+    volumes:
+      - ".env:/app/.env"
+      - "./config:/app/config"
+      - "/tmp/discord-tts-bot-api:/tmp/discord-tts-bot-api"
+      - "/tmp/discord-tts-bot-discord:/tmp/discord-tts-bot-discord"
+    image: "blastbeng/discord-tts-bot-telegram:1.0.0"
+    restart: always
 volumes:
   redisdata:
