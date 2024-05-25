@@ -82,7 +82,6 @@ polly = client('polly', aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
                         region_name='eu-central-1')
 
 try:
-  logging.info("fakeyou creds %s %s",FAKEYOU_USER,FAKEYOU_PASS)
   fy.login(FAKEYOU_USER,FAKEYOU_PASS)
 except Exception as e:
   exc_type, exc_obj, exc_tb = sys.exc_info()
