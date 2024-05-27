@@ -203,7 +203,7 @@ def get_tts_aws(text: str, chatid="000000", language="it", save=True, limit=True
 
 def thread_save_aws(text: str, mp3_fp, chatid="000000", language="it", user=None):
   hashtext = hashlib.md5((text+"_aws").encode('utf-8')).hexdigest()
-  dirsave = "." + get_slashes() + 'audios' + get_slashes() + get_random_string(2)
+  dirsave = "." + get_slashes() + 'audios'
   if not os.path.exists(dirsave):
     os.makedirs(dirsave)
   filesave = dirsave + get_slashes() + hashtext + ".mp3"
@@ -228,7 +228,7 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=T
 
 def thread_save_google(text: str, tts, chatid="000000", language="it", user=None):
     hashtext = hashlib.md5((text+"_google").encode('utf-8')).hexdigest()
-    dirsave = "." + get_slashes() + 'audios' + get_slashes() + get_random_string(2)
+    dirsave = "." + get_slashes() + 'audios'
     if not os.path.exists(dirsave):
       os.makedirs(dirsave)
     filesave = dirsave + get_slashes() + hashtext + ".mp3"
@@ -249,7 +249,7 @@ def populate_tts_aws(text: str, chatid="000000", language="it"):
 
     stream = response.get('AudioStream')
     hashtext = hashlib.md5((text+"_aws").encode('utf-8')).hexdigest()
-    dirsave = "." + get_slashes() + 'audios' + get_slashes() + get_random_string(2)
+    dirsave = "." + get_slashes() + 'audios'
     if not os.path.exists(dirsave):
       os.makedirs(dirsave)
     filesave = dirsave + get_slashes() + hashtext + ".mp3"
@@ -278,7 +278,7 @@ def populate_tts_google(text: str, chatid="000000", language="it"):
   else:
     tts = gTTS(text=text, lang="it", slow=False)
     hashtext = hashlib.md5((text+"_google").encode('utf-8')).hexdigest()
-    dirsave = "." + get_slashes() + 'audios' + get_slashes() + get_random_string(2)
+    dirsave = "." + get_slashes() + 'audios'
     if not os.path.exists(dirsave):
       os.makedirs(dirsave)
     filesave = dirsave + get_slashes() + hashtext + ".mp3"
@@ -603,7 +603,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
 def thread_save_fakeyou(text: str, sound, voice_to_use, chatid="000000", language="it", user=None): 
   duration = (len(sound) / 1000.0)
   hashtext = hashlib.md5((text+"_"+voice_to_use).encode('utf-8')).hexdigest()
-  dirsave = "." + get_slashes() + 'audios' + get_slashes() + get_random_string(2)
+  dirsave = "." + get_slashes() + 'audios'
   if not os.path.exists(dirsave):
     os.makedirs(dirsave)
   filesave = dirsave + get_slashes() + hashtext + ".mp3"
@@ -639,7 +639,7 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
           else:
             #sound.duration_seconds == duration
             hashtext = hashlib.md5((text+"_"+voice_to_use).encode('utf-8')).hexdigest()
-            dirsave = "." + get_slashes() + 'audios' + get_slashes() + get_random_string(2)
+            dirsave = "." + get_slashes() + 'audios'
             if not os.path.exists(dirsave):
               os.makedirs(dirsave)
             filesave = dirsave + get_slashes() + hashtext + ".mp3"
