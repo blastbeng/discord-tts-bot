@@ -782,7 +782,7 @@ def populate_audiodb_limited(limit: int, chatid: str, lang: str):
   try:
     populate_audiodb(limit, chatid, lang)
   except TimeExceededException as et:
-    logging.info("populate_audiodb - ENDED POPULATION\n         REACHED UP MAX EXECUTION TIME\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
+    logging.debug("populate_audiodb - ENDED POPULATION\n         REACHED UP MAX EXECUTION TIME\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
   finally:
     delete_tts(limit=limit)
 
@@ -793,7 +793,7 @@ def populate_audiodb(limit: int, chatid: str, lang: str):
 def populate_audiodb_internal(limit: int, chatid: str, lang: str):  
 
   try:
-    logging.info("populate_audiodb - STARTED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
+    logging.debug("populate_audiodb - STARTED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
 
     voices = list_fakeyou_voices(lang)
     listvoices = list(voices.items())
@@ -801,7 +801,7 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
 
     process_population(limit, chatid, lang, listvoices)    
     
-    logging.info("populate_audiodb - ENDED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
+    logging.debug("populate_audiodb - ENDED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -830,7 +830,7 @@ def process_population(limit, chatid, lang, listvoices):
       for row in cursor:
         sentence = row['text']
       if sentence == "":
-        logging.info("populate_audiodb - NO RECORDS FOUND!\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
+        logging.debug("populate_audiodb - NO RECORDS FOUND!\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
         break
 
       language = audiodb.select_distinct_language_by_name_chatid(sentence, chatid)
@@ -846,7 +846,7 @@ def process_population(limit, chatid, lang, listvoices):
       elif result is True:
         inserted="Done (Inserted in DB)"
         counter_inserted = counter_inserted + 1
-        logging.info("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+        logging.debug("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
         time.sleep(randint(5,120))
       elif result is False:
         counter_skipped_failed = counter_skipped_failed + 1

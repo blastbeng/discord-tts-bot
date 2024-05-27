@@ -124,6 +124,7 @@ def insert_or_update(name: str, chatid: str, filesave: str, voice: str, language
                           "tms_update": datetime.datetime.now() }
                   }
       audiotable.update_one(query, record)
+      logging.debug("Audiodb - Updating: %s -> %s", str(query), str(record))
 
     else:
 
@@ -140,6 +141,7 @@ def insert_or_update(name: str, chatid: str, filesave: str, voice: str, language
                 "tms_update": datetime.datetime.now() }
       
       audiotable.insert_one(record)
+      logging.debug("Audiodb - Inserting: %s",str(record))
 
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
