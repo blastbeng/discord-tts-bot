@@ -195,10 +195,12 @@ def get_tts_aws(text: str, chatid="000000", language="it", save=True, limit=True
     stream = response.get('AudioStream')
     mp3_bytes = stream.read()
     mp3_fp = BytesIO(mp3_bytes)
-    stream.close()
-    if save:      
-      threading.Thread(target=lambda: thread_save_aws(text, mp3_fp, chatid=chatid, language=language, user=user)).start()
     mp3_fp.seek(0)
+    stream.close()
+    
+    if save:      
+      #threading.Thread(target=lambda: thread_save_aws(text, mp3_fp, chatid=chatid, language=language, user=user)).start()
+      audiodb.insert_or_update(text.strip(), chatid, None, "aws", language, is_correct=1, user=user)
     return mp3_fp
 
 def thread_save_aws(text: str, mp3_fp, chatid="000000", language="it", user=None):
@@ -206,10 +208,9 @@ def thread_save_aws(text: str, mp3_fp, chatid="000000", language="it", user=None
   dirsave = "." + get_slashes() + 'audios'
   if not os.path.exists(dirsave):
     os.makedirs(dirsave)
-  filesave = dirsave + get_slashes() + hashtext + ".mp3"
-  with open(filesave, 'wb') as f:
-    f.write(mp3_fp.getbuffer())
-  sound = AudioSegment.from_mp3(filesave)
+  filesave = dirsave + get_slashes() + hashtext + ".mp3"  
+  sound = AudioSegment.from_mp3(mp3_fp)
+  sound.export(filesave, format='mp3', bitrate="256")
   duration = (len(sound) / 1000.0)
   audiodb.insert_or_update(text, chatid, filesave, "aws", language, duration=duration, user=user)
 
@@ -221,7 +222,8 @@ def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=T
     mp3_fp = BytesIO()
     tts = gTTS(text=text, lang=language, slow=False)
     if save:      
-      threading.Thread(target=lambda: thread_save_google(text, tts, chatid=chatid, language=language, user=user)).start()
+      #threading.Thread(target=lambda: thread_save_google(text, tts, chatid=chatid, language=language, user=user)).start()
+      audiodb.insert_or_update(text.strip(), chatid, None, "google", language, is_correct=1, user=user)
     tts.write_to_fp(mp3_fp)
     mp3_fp.seek(0)
     return mp3_fp
@@ -252,11 +254,9 @@ def populate_tts_aws(text: str, chatid="000000", language="it"):
     dirsave = "." + get_slashes() + 'audios'
     if not os.path.exists(dirsave):
       os.makedirs(dirsave)
-    filesave = dirsave + get_slashes() + hashtext + ".mp3"
-    with open(filesave, 'wb') as f:
-      data = stream.read()
-      f.write(data)
-    sound = AudioSegment.from_mp3(filesave) 
+    filesave = dirsave + get_slashes() + hashtext + ".mp3"    
+    sound = AudioSegment.from_mp3(BytesIO(stream.read()))
+    sound.export(filesave, format='mp3', bitrate="256")
     duration = (len(sound) / 1000.0)
     if duration > int(os.environ.get("MAX_TTS_DURATION")):
       audiodb.insert_or_update(text, chatid, None, "aws", language, is_correct=0, duration=duration)
@@ -574,7 +574,8 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
           sound.export(out, format='mp3', bitrate="256")
           out.seek(0)
           if save:
-            threading.Thread(target=lambda: thread_save_fakeyou(text, sound, voice_to_use, chatid=chatid, language=language, user=user)).start()
+            audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=1, user=user)
+            #threading.Thread(target=lambda: thread_save_fakeyou(text, sound, voice_to_use, chatid=chatid, language=language, user=user)).start()
           return out
         elif voice == "random" or voice == "google":
           return get_tts_google(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
