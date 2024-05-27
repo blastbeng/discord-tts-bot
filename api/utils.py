@@ -210,7 +210,7 @@ def thread_save_aws(text: str, mp3_fp, chatid="000000", language="it", user=None
     os.makedirs(dirsave)
   filesave = dirsave + get_slashes() + hashtext + ".mp3"  
   sound = AudioSegment.from_mp3(mp3_fp)
-  sound.export(filesave, format='mp3', bitrate="256")
+  sound.export(filesave, format='mp3', bitrate="256k")
   duration = (len(sound) / 1000.0)
   audiodb.insert_or_update(text, chatid, filesave, "aws", language, duration=duration, user=user)
 
@@ -256,7 +256,7 @@ def populate_tts_aws(text: str, chatid="000000", language="it"):
       os.makedirs(dirsave)
     filesave = dirsave + get_slashes() + hashtext + ".mp3"    
     sound = AudioSegment.from_mp3(BytesIO(stream.read()))
-    sound.export(filesave, format='mp3', bitrate="256")
+    sound.export(filesave, format='mp3', bitrate="256k")
     duration = (len(sound) / 1000.0)
     if duration > int(os.environ.get("MAX_TTS_DURATION")):
       audiodb.insert_or_update(text, chatid, None, "aws", language, is_correct=0, duration=duration)
@@ -264,7 +264,7 @@ def populate_tts_aws(text: str, chatid="000000", language="it"):
     else:
       #sound.duration_seconds == duration
       memoryBuff = BytesIO()
-      sound.export(memoryBuff, format='mp3', bitrate="256")
+      sound.export(memoryBuff, format='mp3', bitrate="256k")
       memoryBuff.seek(0)
       audiodb.insert_or_update(text, chatid, filesave, "aws", language, duration=duration)
       return True
@@ -291,7 +291,7 @@ def populate_tts_google(text: str, chatid="000000", language="it"):
     else:
       #sound.duration_seconds == duration
       memoryBuff = BytesIO()
-      sound.export(memoryBuff, format='mp3', bitrate="256")
+      sound.export(memoryBuff, format='mp3', bitrate="256k")
       memoryBuff.seek(0)
       audiodb.insert_or_update(text, chatid, filesave, "google", language, duration=duration)
       return True
@@ -548,7 +548,7 @@ def save_mp3(mp3, name):
   filesave = None
   try:
     sound = AudioSegment.from_mp3(mp3)
-    sound.export(name, format='mp3', bitrate="256")
+    sound.export(name, format='mp3', bitrate="256k")
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -571,7 +571,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
           out = BytesIO()
-          sound.export(out, format='mp3', bitrate="256")
+          sound.export(out, format='mp3', bitrate="256k")
           out.seek(0)
           if save:
             audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=1, user=user)
@@ -608,7 +608,7 @@ def thread_save_fakeyou(text: str, sound, voice_to_use, chatid="000000", languag
   if not os.path.exists(dirsave):
     os.makedirs(dirsave)
   filesave = dirsave + get_slashes() + hashtext + ".mp3"
-  sound.export(filesave, format='mp3', bitrate="256")
+  sound.export(filesave, format='mp3', bitrate="256k")
   audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration, user=user)
 
 @run_with_timer(max_execution_time=300)
@@ -644,7 +644,7 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
             if not os.path.exists(dirsave):
               os.makedirs(dirsave)
             filesave = dirsave + get_slashes() + hashtext + ".mp3"
-            sound.export(filesave, format='mp3', bitrate="256")
+            sound.export(filesave, format='mp3', bitrate="256k")
             audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration)
             return True
         raise Exception("FakeYou Generation KO")
@@ -1118,7 +1118,7 @@ def get_mp3(file):
   if os.path.isfile(file):      
     sound = AudioSegment.from_mp3(file)
     memoryBuff = BytesIO()
-    sound.export(memoryBuff, format='mp3', bitrate="256")
+    sound.export(memoryBuff, format='mp3', bitrate="256k")
     memoryBuff.seek(0)
     return memoryBuff
   else:
