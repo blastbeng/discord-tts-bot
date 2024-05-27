@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from io import BytesIO
 from pytz import timezone
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
 load_dotenv()
 
@@ -33,12 +33,38 @@ logging.basicConfig(
         level=int(os.environ.get("LOG_LEVEL")),
         datefmt='%Y-%m-%d %H:%M:%S')
 
-dispatcher = ApplicationBuilder().token(TOKEN).build()
+application = ApplicationBuilder().token(TOKEN).build()
 
 def get_random_string(length):
     letters = string.ascii_lowercase
     return ''.join(random.choice(letters) for i in range(length))
 
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        chatid = str(update.effective_chat.id)
+        if(CHAT_ID == chatid):
+            strid = "000000"
+        if strid:
+            message = update.message.text[5:].strip();
+            if(message != "" and len(message) <= 500  and not message.endswith('bot')):
+                url = API_URL + API_PATH_TEXT + "ask/" + urllib.parse.quote(message) + "/000000/it"
+
+                response = requests.get(url)
+                if (response.status_code == 200):
+                    await update.message.reply_text(response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                else:
+                    await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                
+            else:
+                await update.message.reply_text("se vuoi dirmi o chiedermi qualcosa devi scrivere una frase dopo /ask (massimo 500 caratteri)", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      print(exc_type, fname, exc_tb.tb_lineno)
+      await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
 async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -66,7 +92,7 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
       await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
           
-dispatcher.add_handler(CommandHandler('ask', ask))
+application.add_handler(CommandHandler('ask', ask))
 
 
 
@@ -127,7 +153,7 @@ async def speak(update: Update, context: ContextTypes.DEFAULT_TYPE):
       await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
           
-dispatcher.add_handler(CommandHandler('speak', speak))
+application.add_handler(CommandHandler('speak', speak))
 
 
 async def listvoices(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -157,7 +183,7 @@ async def listvoices(update: Update, context: ContextTypes.DEFAULT_TYPE):
       print(exc_type, fname, exc_tb.tb_lineno)
       await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
            
-dispatcher.add_handler(CommandHandler('listvoices', listvoices))
+application.add_handler(CommandHandler('listvoices', listvoices))
 
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -174,7 +200,7 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
       await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
 
-dispatcher.add_handler(CommandHandler('restart', restart))
+application.add_handler(CommandHandler('restart', restart))
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -186,7 +212,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
            
-dispatcher.add_handler(CommandHandler('help', help))
+application.add_handler(CommandHandler('help', help))
 
 
-dispatcher.run_polling()
+application.run_polling()

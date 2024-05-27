@@ -24,11 +24,11 @@ from chatterbot import languages
 from chatterbot.conversation import Statement
 from custom_trainer import CustomListTrainer
 from custom_trainer import CustomTrainer
-from chatterbot.comparisons import LevenshteinDistance
-#from chatterbot.comparisons import SpacySimilarity
+#from chatterbot.comparisons import LevenshteinDistance
+from chatterbot.comparisons import SpacySimilarity
 #from chatterbot.comparisons import JaccardSimilarity
-from chatterbot.response_selection import get_random_response
-#from chatterbot.response_selection import get_most_frequent_response
+#from chatterbot.response_selection import get_random_response
+from chatterbot.response_selection import get_most_frequent_response
 from gtts import gTTS
 from io import BytesIO
 from pathlib import Path
@@ -334,8 +334,8 @@ def get_chatterbot(chatid: str, train: False, lang = "it"):
       storage_adapter='custom_mongo_adapter.CustomMongoAdapter',
       database_uri='mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/',
       database_name=dbfile,
-      statement_comparison_function = LevenshteinDistance,
-      response_selection_method = get_random_response,
+      statement_comparison_function = SpacySimilarity,
+      response_selection_method = get_most_frequent_response,
       tagger_language=language,
       logic_adapters=[
           {
