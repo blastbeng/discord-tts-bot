@@ -45,9 +45,9 @@ GUILD_ID = discord.Object(id=os.environ.get("GUILD_ID"))
 def get_api_url():
     return os.environ.get("API_URL")
 
-class MyClient(discord.AutoShardedClient):
+class MyClient(discord.Client):
     def __init__(self, *, intents: discord.Intents):
-        super().__init__(intents=intents)
+        super().__init__(intents=intents, shard_id=0)
         self.tree = app_commands.CommandTree(self)
 
 class AdminPermissionError(Exception):
@@ -285,6 +285,7 @@ class DeclineButton(discord.ui.Button["InteractionRoles"]):
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"You have disabled NSFW content."), ephemeral = True)
         except Exception as e:
             await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
+
 
 intents = discord.Intents.all()
 client = MyClient(intents=intents)
