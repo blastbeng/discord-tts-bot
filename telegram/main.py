@@ -45,18 +45,18 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if(CHAT_ID == chatid):
             strid = "000000"
         if strid:
-            message = update.message.text[5:].strip();
-            if(message != "" and len(message) <= 500  and not message.endswith('bot')):
+            message = update.message.text.strip()
+            if(message != ""    ):
                 url = API_URL + API_PATH_TEXT + "ask/" + urllib.parse.quote(message) + "/000000/it"
 
                 response = requests.get(url)
                 if (response.status_code == 200):
-                    await update.message.reply_text(response.text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                    await update.message.reply_text(response.text, disable_notification=True, protect_content=False)
                 else:
-                    await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                    await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, protect_content=False)
                 
             else:
-                await update.message.reply_text("se vuoi dirmi o chiedermi qualcosa devi scrivere una frase dopo /ask (massimo 500 caratteri)", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                await update.message.reply_text("se vuoi dirmi o chiedermi qualcosa devi scrivere una frase dopo /ask (massimo 500 caratteri)", disable_notification=True, protect_content=False)
 
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
