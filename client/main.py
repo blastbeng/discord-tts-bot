@@ -47,7 +47,7 @@ def get_api_url():
 
 class MyClient(discord.Client):
     def __init__(self, *, intents: discord.Intents):
-        super().__init__(intents=intents, shard_id=os.environ.get("SHARD_ID"))
+        super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
 
 class AdminPermissionError(Exception):
