@@ -688,7 +688,7 @@ class PlayAudioWorker:
                     
                     elif response.status == 204:
                         logging.info("[GUILDID : %s] do_play - Audio not found", str(get_current_guild_id(self.interaction.guild.id)))
-                        exceptmsg = await utils.translate(get_current_guild_id(self.interaction.guild.id),"I haven't found any audio for this text: " + text + ".")
+                        exceptmsg = await utils.translate(get_current_guild_id(self.interaction.guild.id),"I haven't found any audio containing the requested text.")
                         await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
                     elif response.status == 400:
                         logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(get_current_guild_id(self.interaction.guild.id)))
