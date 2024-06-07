@@ -837,23 +837,31 @@ def process_population(limit, chatid, lang, listvoices):
       if language is None:
         language = lang
       inserted = ""
-      result = populate_tts(sentence, chatid=chatid, voice=voice, language=language)
-      if result is None:
-        inserted="Skipped (TTS lenght limit exceeded)"
-        counter_skipped_failed = counter_skipped_failed + 1
-        logging.warning("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
-        time.sleep(randint(5,120))
-      elif result is True:
-        inserted="Done (Inserted in DB)"
-        counter_inserted = counter_inserted + 1
-        logging.debug("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
-        time.sleep(randint(5,120))
-      elif result is False:
-        counter_skipped_failed = counter_skipped_failed + 1
-        inserted="Skipped (Already in DB)"
-        logging.debug("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+
+      counter = audiodb.select_count_by_name_chatid_voice_language(sentence, chatid, voice, language)
+      
+      if counter >= int(os.environ.get("COUNTER_LIMIT")):
+          inserted="Skipped (Counter Limit)"
+          logging.debug("populate_audiodb - SKIPPED  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+      else:
+        result = populate_tts(sentence, chatid=chatid, voice=voice, language=language)
+        if result is None:
+          inserted="Skipped (TTS lenght limit exceeded)"
+          counter_skipped_failed = counter_skipped_failed + 1
+          logging.warning("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+          time.sleep(randint(5,120))
+        elif result is True:
+          inserted="Done (Inserted in DB)"
+          counter_inserted = counter_inserted + 1
+          logging.debug("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+          time.sleep(randint(5,120))
+        elif result is False:
+          counter_skipped_failed = counter_skipped_failed + 1
+          inserted="Skipped (Already in DB)"
+          logging.debug("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
     except Exception as e:
-      if audiodb.select_count_by_name_chatid_voice_language(sentence, chatid, voice, language) > 0:
+      counter = audiodb.select_count_by_name_chatid_voice_language(sentence, chatid, voice, language)
+      if counter > 0:
         audiodb.increment_counter(sentence, chatid, voice, language, int(os.environ.get("COUNTER_LIMIT")))
       else:
         audiodb.insert(sentence, chatid, None, voice, language, is_correct=1)
