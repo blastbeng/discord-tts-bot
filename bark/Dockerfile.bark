@@ -1,0 +1,80 @@
+FROM python:3.10-slim-bullseye
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        build-essential \
+        curl \
+        git \
+        libbz2-dev \
+        libncurses5-dev \
+        libncursesw5-dev \
+        libreadline-dev \
+        libssl-dev \
+        llvm \
+        make \
+        tk-dev \
+        wget \
+        xz-utils \
+        zlib1g-dev \
+        gcc \
+        ffmpeg \
+        locales \
+        libffi-dev \
+        python3-venv \
+        python3-dev \
+        procps \
+        python3-enchant \
+        libpcre3-dev \
+        libpcre3 \
+        hunspell-it \
+        iputils-ping \
+        wget \
+        net-tools \
+        curl
+
+RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+RUN apt-get install -y ./google-chrome-stable_current_amd64.deb
+        
+RUN echo 'vm.overcommit_memory=1' >> /etc/sysctl.conf
+
+RUN sed -i '/it_IT.UTF-8/s/^# //g' /etc/locale.gen && \
+    locale-gen
+ENV LANG it_IT.UTF-8  
+ENV LANGUAGE it_IT:it  
+ENV LC_ALL it_IT.UTF-8
+
+ENV PATH="/home/uwsgi/.local/bin:${PATH}"
+
+COPY requirements.txt .
+
+
+RUN pip3 install --no-cache --upgrade pip setuptools
+RUN pip3 install wheel
+RUN pip3 install -r requirements.txt
+
+RUN spacy download en_core_web_sm
+RUN spacy download fr_core_news_sm
+RUN spacy download de_core_news_sm
+RUN spacy download it_core_news_sm
+RUN spacy download pt_core_news_sm
+RUN spacy download es_core_news_sm
+
+WORKDIR /app
+
+COPY data data
+COPY libretranslator.py .
+COPY utils.py .
+COPY audiodb.py .
+COPY custom_trainer.py .
+COPY insults.py .
+COPY image.py .
+COPY main.py .
+COPY exceptions.py .
+COPY custom_mongo_adapter.py .
+COPY subito_wrapper.py .
+COPY config.py .
+COPY entrypoint.sh .
+COPY uwsgi.ini .
+RUN chmod +x entrypoint.sh
+
+CMD ["./entrypoint.sh"]
