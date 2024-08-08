@@ -542,14 +542,18 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
         #if defer:
         #    await interaction.response.defer(thinking=True, ephemeral = ephermeal)
         
+        message = None
+        voice = None
         connector = aiohttp.TCPConnector(force_close=True)
         async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(url) as response:
-                message = ""
                 if name is not None:
                     message = name
                 elif "X-Generated-Text" in response.headers:
                     message = response.headers["X-Generated-Text"]
+                if "X-Generated-Voice" in response.headers:
+                    voice_code = response.headers["X-Generated-Voice"]
+                    voice = {i for i in dic if dic[i]==fakeyou_voices}
                 if (response.status == 200):
                     content = await response.content.read()
                     voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
@@ -588,13 +592,17 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        exceptmsg = await utils.translate(currentguildid,"I can't reproduce this audio, the reasons can be:")
-        exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"The generated TTS is longer than the maximum limit allowed ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
-        exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Text contains a word blocked by filters")
-        exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"An audio generation error occurred")
-        exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"Remember that with too much spam the bot may be blocked for some minutes.") 
-        exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
-        await self.interaction.followup.edit_message(message_id=self.message.id,content=self.exceptmsg)
+        exceptmsg = ""
+        if message is not None:
+            exceptmsg = exceptmsg + "\n- " + message
+            exceptmsg = exceptmsg + "\n"
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"I can't reproduce this audio, the reasons can be:")
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"The generated TTS is longer than the maximum limit allowed ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Text contains a word blocked by filters")
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"An audio generation error occurred")
+            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"Remember that with too much spam the bot may be blocked for some minutes.") 
+            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
+            await self.interaction.followup.edit_message(message_id=self.message.id,content=self.exceptmsg)
 
 class PlayAudioLoop:
     
@@ -658,12 +666,16 @@ class PlayAudioWorker:
         global audio_count_queue
         currentguildid = get_current_guild_id(str(self.interaction.guild.id))
         try:   
-
+            text = None
+            voice = None
             connector = aiohttp.TCPConnector(force_close=True)
             async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(self.url) as response:
+                async with session.get(self.url, timeout=7400) as response:
                     if "X-Generated-Text" in response.headers:
                         text = response.headers["X-Generated-Text"]
+                    if "X-Generated-Voice" in response.headers:
+                        voice_code = response.headers["X-Generated-Voice"]
+                        voice = {i for i in dic if dic[i]==fakeyou_voices}
                     if (response.status == 200):
                         content = await response.content.read()
 
@@ -757,13 +769,19 @@ class PlayAudioWorker:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
             logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-            exceptmsg = await utils.translate(currentguildid,"I can't reproduce this audio, the reasons can be:")
-            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"The generated TTS is longer than the maximum limit allowed ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
-            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Text contains a word blocked by filters")
-            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"An audio generation error occurred")
-            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"Remember that with too much spam the bot may be blocked for some minutes.") 
-            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
-            await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
+            exceptmsg = ""
+            if text is not None:
+                exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Sentence") + ": " + text
+                if voice is not None:
+                    exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Voice") + ": " + voice
+                exceptmsg = exceptmsg + "\n"
+                exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"I can't reproduce this audio, the reasons can be:")
+                exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"The generated TTS is longer than the maximum limit allowed ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
+                exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Text contains a word blocked by filters")
+                exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"An audio generation error occurred")
+                exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"Remember that with too much spam the bot may be blocked for some minutes.") 
+                exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
+                await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
             
         if audio_count_queue > 0:
             audio_count_queue = audio_count_queue - 1
