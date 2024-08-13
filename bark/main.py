@@ -1,7 +1,7 @@
 import os
+import voice
 import logging
-import utils
-import bark
+import voice
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask import Flask, request, send_file, Response, jsonify, make_response, after_this_request, g
@@ -23,10 +23,6 @@ log = logging.getLogger('werkzeug')
 log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 TMP_DIR = os.environ.get("TMP_DIR")
-ADMIN_USER = os.environ.get("ADMIN_USER")
-ADMIN_PASS = os.environ.get("ADMIN_PASS")
-API_USER = os.environ.get("API_USER")
-API_PASS = os.environ.get("API_PASS")
 
 app = Flask(__name__)
 class Config:    
@@ -36,9 +32,7 @@ class Config:
     CACHE_REDIS_DB = os.environ['CACHE_REDIS_DB']
     CACHE_REDIS_URL = os.environ['CACHE_REDIS_URL']
     CACHE_DEFAULT_TIMEOUT = os.environ['CACHE_DEFAULT_TIMEOUT']
-    SCHEDULER_API_ENABLED = True
-
-scheduler = APScheduler()
+    SCHEDULER_API_ENABLED = False
 
 limiter = Limiter(
     key_func=get_remote_address,
@@ -61,16 +55,35 @@ api = Api(app)
 
 nsvoice = api.namespace('voice', 'Bark Voice APIs')
 
-@nsvoice.route('/voiceclone/<string:output>')
-class VoiceCloneClass(Resource):
+@nsvoice.route('/clone/<string:output>')
+class CloneClass(Resource):
   @cache.cached(timeout=5, query_string=True)
   def get (self, output: str):
     try:
-      bark.voice_clone(output)
+      voice.voice_clone(output)
       return make_response("Cloned!", 200)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
       def clear_cache(response):
-        cache.delete_memoized(VoiceCloneClass.get, self, str)
+        cache.delete_memoized(CloneClass.get, self, str)
+        return make_response(g.get('request_error'), 500)
+
+@nsvoice.route('/talk/<string:model>/<string:text>')
+class TalkClass(Resource):
+  @cache.cached(timeout=5, query_string=True)
+  def get (self, model: str, text: str):
+    try:
+      tts_out = voice.talk(model, text)
+      filename = "audio.mp3"
+      response = send_file(tts_out, attachment_filename=filename, mimetype='audio/mpeg')
+      response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+      if voice is not None:
+        response.headers['X-Generated-Voice'] = voice.encode('utf-8').decode('latin-1')
+      return response
+    except Exception as e:
+      g.request_error = str(e)
+      @after_this_request
+      def clear_cache(response):
+        cache.delete_memoized(TalkClass.get, self, str)
         return make_response(g.get('request_error'), 500)

@@ -566,6 +566,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       if datafy is not None:
         return datafy
       elif call_fy:
+        wav=None
         for x in range(6):
           try:
             fy.login(FAKEYOU_USER,FAKEYOU_PASS)
