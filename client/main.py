@@ -2337,50 +2337,6 @@ async def reset(interaction: discord.Interaction):
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
-@client.tree.command()
-@app_commands.rename(text='text')
-@app_commands.describe(text="The sentence to repeat")
-@app_commands.rename(voice='voice')
-@app_commands.describe(voice="The voice to use")
-@app_commands.autocomplete(voice=rps_autocomplete)
-async def test(interaction: discord.Interaction, text: str, voice: str = "random"):
-    """Test command"""
-    is_deferred=True
-    try:
-        await interaction.response.defer(thinking=True, ephemeral=True)
-        #check_permissions(interaction)
-        
-        if interaction.user.guild_permissions.administrator:
-            voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
-            await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
-
-            if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
-                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later, I'm initializing the voice connection..."), ephemeral = True)
-            else:
-
-                currentguildid = get_current_guild_id(interaction.guild.id)
-                
-                lang_to_use = utils.get_guild_language(currentguildid)
-
-                if voice != "random":
-                    voice = await listvoices_api(language=lang_to_use, filter=voice)
-                else:
-                    voice = randompy.choice(['google', 'aws'])
-
-                if voice is not None:
-                    url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
-                    message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm starting to generate the audio for:") + " **" + text + "**" + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
-                    worker = PlayAudioWorker(url, interaction, text)
-                    worker.play_audio_worker.start()
-                    
-                else:
-                    await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)   
-        else:        
-            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Only administrators can use this command"), ephemeral = True)
-            
-    except Exception as e:
-        await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
-
 @admin.error
 @accept.error
 @avatar.error
@@ -2404,7 +2360,6 @@ async def test(interaction: discord.Interaction, text: str, voice: str = "random
 @soundsearch.error
 @speak.error
 @story.error
-@test.error
 @timer.error
 @train.error
 #@trackuser.error
