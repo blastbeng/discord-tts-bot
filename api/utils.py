@@ -566,8 +566,13 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       if datafy is not None:
         return datafy
       elif call_fy:
-        fy.login(FAKEYOU_USER,FAKEYOU_PASS)
-        wav = fy.say(text.strip(), voice_to_use)
+        for x in range(6):
+          try:
+            fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+            wav = fy.say(text.strip(), voice_to_use)
+          except:
+            logging.error("get_tts - FAKEYOU ERROR \n         CHATID: %s\n         VOICE: %s\n         SENTENCE: %s\n         SLEEPING 120 SECONDS, COUNTER IS AT: %s", chatid, voice_to_use, text, str(x))
+            time.sleep(120)
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
           out = BytesIO()

@@ -492,6 +492,8 @@ class AudioRepeatLearnClass(Resource):
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename=filename, mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+        if voice is not None:
+          response.headers['X-Generated-Voice'] = voice.encode('utf-8').decode('latin-1')
         chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
         threading.Thread(target=lambda: chatbot.get_response(text), name="repeat-learn-user"+utils.get_random_string(24)).start()
         return response
@@ -499,7 +501,11 @@ class AudioRepeatLearnClass(Resource):
         @after_this_request
         def clear_cache(response):
           cache.delete_memoized(AudioRepeatLearnClass.get, self, str, str, str)
-          return make_response("TTS Generation Error!", 500)
+          response = make_response("TTS Generation Error!", 500)
+          response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+          if voice is not None:
+            response.headers['X-Generated-Voice'] = voice.encode('utf-8').decode('latin-1')
+          return response
     except AudioLimitException:
       return get_response_limit_error(text)
     except Exception as e:
