@@ -791,14 +791,14 @@ class PopulatorLoop:
     def __init__(self, guildid):  
         self.guildid = guildid
 
-    @tasks.loop(minutes=int(600))
+    @tasks.loop(minutes=int(240))
     async def populator_loop(self):
         try:
             currentguildid = get_current_guild_id(str(self.guildid))
             
             connector = aiohttp.TCPConnector(force_close=True)
             async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(get_api_url()+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/2/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/0" + "/") as response:
+                async with session.get(get_api_url()+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/4/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/0" + "/") as response:
                     if (response.status == 200):
                         logging.info("populator_loop - " + str(response.text))
                     else:

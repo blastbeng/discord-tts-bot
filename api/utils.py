@@ -201,7 +201,7 @@ def get_tts_aws(text: str, chatid="000000", language="it", save=True, limit=True
     if save:      
       #threading.Thread(target=lambda: thread_save_aws(text, mp3_fp, chatid=chatid, language=language, user=user)).start()
       audiodb.insert_or_update(text.strip(), chatid, None, "aws", language, is_correct=1, user=user)
-    return mp3_fp
+    return mp3_fpp
 
 def thread_save_aws(text: str, mp3_fp, chatid="000000", language="it", user=None):
   hashtext = hashlib.md5((text+"_aws").encode('utf-8')).hexdigest()
@@ -567,9 +567,9 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
         return datafy
       elif call_fy:
         wav=None
-        for x in range(6):
+        for x in range(5):
           try:
-            fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+            #fy.login(FAKEYOU_USER,FAKEYOU_PASS)
             wav = fy.say(text.strip(), voice_to_use)
           except:
             logging.error("get_tts - FAKEYOU ERROR \n         CHATID: %s\n         VOICE: %s\n         SENTENCE: %s\n         SLEEPING 120 SECONDS, COUNTER IS AT: %s", chatid, voice_to_use, text, str(x))
@@ -635,7 +635,7 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
         #else:
         #  proxies = {}
         #  fy.session.proxies.update(proxies)
-        fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+        #fy.login(FAKEYOU_USER,FAKEYOU_PASS)
         wav = fy.say(text.strip(), voice_to_use)
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
@@ -1115,7 +1115,7 @@ def login_google():
 
 def delete_tts(limit=100):
   try:
-    fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+    #fy.login(FAKEYOU_USER,FAKEYOU_PASS)
     user = fy.get_user(FAKEYOU_USER,limit=limit)
     if user is not None and user.ttsResults is not None and user.ttsResults.json is not None:
       for tokenJson in user.ttsResults.json:
