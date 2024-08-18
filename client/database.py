@@ -2,12 +2,13 @@ import os
 import sys
 import logging
 from sqlalchemy import create_engine
-from sqlalchemy import create_engine, insert, select, update, Table, Column, Integer, String, MetaData
+from sqlalchemy import create_engine, insert, select, update, delete, Table, Column, Integer, String, MetaData
 
 SQLITE          = 'sqlite'
 GUILDCONFIG     = 'guildconfig'
 TRANSLATIONS    = 'translations'
-TRACKEDUSERS    = 'trackedusers'
+SUBITO          = 'subito'
+#TRACKEDUSERS    = 'trackedusers'
 
 class Database:
   DB_ENGINE = {
@@ -36,6 +37,19 @@ class Database:
                 Column('dest_lang', String(50), nullable=False),
                 Column('key', String(500), nullable=False),
                 Column('value', String(500), nullable=False)
+                )
+
+  subito = Table(SUBITO, metadata,
+                Column('id', Integer, primary_key=True, autoincrement=True),
+                Column('guildid', String(50), nullable=False),
+                Column('url', String(500), nullable=False),
+                Column('title', String(500), nullable=False),
+                Column('link', String(500), nullable=False),
+                Column('price', String(500), nullable=True),
+                Column('location', String(500), nullable=True),
+                Column('date', String(500), nullable=True),
+                Column('image', String(500), nullable=True),
+                Column('channel', String(500), nullable=True)
                 )
 
   #trackedusers = Table(TRACKEDUSERS, metadata,
@@ -154,6 +168,92 @@ def select_translation(self, from_lang: str, dest_lang: str, key: str):
 
       for row in records:
         value   =  row[0]
+        cursor.close()
+      
+      return value
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    return None
+
+def insert_subito(self, guildid: str, url: str, title: str, link: str, price: str, location: str, date: str, image: str, channel: str):
+  try:
+    stmt = insert(self.subito).values(guildid=guildid, url=url, title=title, link=link, price=price, location=location, date=date, image=image, channel=channel).prefix_with('OR IGNORE')
+    compiled = stmt.compile()
+    with self.db_engine.connect() as conn:
+      result = conn.execute(stmt)
+      conn.commit()
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+def delete_subito_url(self, guildid: str, url: str):
+  try:
+    stmt = delete(self.subito).where(self.subito.c.guildid==guildid, self.subito.c.url==url,self.subito.c.title=='',self.subito.c.link=='',self.subito.c.price=='',self.subito.c.location=='')
+    compiled = stmt.compile()
+    with self.db_engine.connect() as conn:
+      result = conn.execute(stmt)
+      conn.commit()
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+def select_subito(self,guildid: str,  url: str, title: str, link: str, price: str, location: str):
+  try:
+    value = None
+    stmt = select(self.subito.c.id).where(self.subito.c.guildid==guildid, self.subito.c.url==url,self.subito.c.title==title,self.subito.c.link==link,self.subito.c.price==price,self.subito.c.location==location)
+    compiled = stmt.compile()
+    with self.db_engine.connect() as conn:
+      cursor = conn.execute(stmt)
+      records = cursor.fetchall()
+
+      for row in records:
+        value   =  row[0]
+        cursor.close()
+      
+      return value
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    return None
+
+
+def select_subito_urls(self, guildid: str):
+  try:
+    value = []
+    stmt = select(self.subito.c.url).where(self.subito.c.guildid==guildid, self.subito.c.title=='',self.subito.c.link=='',self.subito.c.price=='',self.subito.c.location=='').distinct()
+    compiled = stmt.compile()
+    with self.db_engine.connect() as conn:
+      cursor = conn.execute(stmt)
+      records = cursor.fetchall()
+
+      for row in records:
+        value.append(str(row[0]))
+        cursor.close()
+      
+      return value
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    return None
+
+
+def select_subito_channel(self, guildid: str, url: str):
+  try:
+    value = None
+    stmt = select(self.subito.c.channel).where(self.subito.c.guildid==guildid, self.subito.c.url==url,self.subito.c.title=='',self.subito.c.link=='',self.subito.c.price=='',self.subito.c.location=='').distinct()
+    compiled = stmt.compile()
+    with self.db_engine.connect() as conn:
+      cursor = conn.execute(stmt)
+      records = cursor.fetchall()
+
+      for row in records:
+        value = (str(row[0]))
         cursor.close()
       
       return value

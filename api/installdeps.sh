@@ -1,7 +1,7 @@
 #/usr/bin/bash
 export TMPDIR=/home/blast/tmp/python
 mkdir -p $TMPDIR
-/usr/bin/python3 -m venv .venv
+/home/blast/.pyenv/versions/3.10.13/bin/python3 -m venv .venv
 source .venv/bin/activate; pip3 install wheel
 source .venv/bin/activate; pip3 install -r requirements.txt
 source .venv/bin/activate; spacy download en_core_web_sm

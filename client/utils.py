@@ -5,9 +5,24 @@ import shlex
 import urllib
 import io
 import random
+import logging
 from discord.opus import Encoder
 import discord
 import aiohttp
+from io import BytesIO
+from pathlib import Path
+from os.path import join, dirname
+from dotenv import load_dotenv
+
+dotenv_path = join(dirname(__file__), '.env')
+load_dotenv(dotenv_path)
+
+logging.basicConfig(
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        level=int(os.environ.get("LOG_LEVEL")),
+        datefmt='%Y-%m-%d %H:%M:%S')
+log = logging.getLogger('werkzeug')
+log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 class FFmpegPCMAudioBytesIO(discord.AudioSource):
     def __init__(self, source, *, executable='ffmpeg', pipe=False, stderr=None, before_options=None, options=None):
@@ -17,9 +32,9 @@ class FFmpegPCMAudioBytesIO(discord.AudioSource):
             args.extend(shlex.split(before_options))
         args.append('-i')
         args.append('-' if pipe else source)
-        #args.extend(('-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'warning'))
+        args.extend(('-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'panic'))
         #args.extend(('-af', 'loudnorm=I=-14:LRA=11:TP=-1', '-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'error'))
-        args.extend(('-af', 'dynaudnorm=p=1/sqrt(2):m=100:s=12:g=15', '-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'error'))
+        #args.extend(('-af', 'dynaudnorm=p=1/sqrt(2):m=100:s=12:g=15', '-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'error'))
         if isinstance(options, str):
             args.extend(shlex.split(options))
         args.append('pipe:1')
@@ -52,6 +67,23 @@ class FFmpegPCMAudioBytesIO(discord.AudioSource):
 
 dbms = database.Database(database.SQLITE, dbname='client.sqlite3')
 database.create_db_tables(dbms)
+
+
+async def search_subito_db(guildid: str, url: str, title: str, link: str, price: str, location: str):
+    return database.select_subito(dbms, guildid, url, title, link, price, location)
+
+async def delete_subito_url(guildid: str, url: str):
+    return database.delete_subito_url(dbms, guildid, url)
+
+async def select_subito_urls(guildid: str):
+    return database.select_subito_urls(dbms, guildid)
+
+async def select_subito_channel(guildid: str, channel: str):
+    return database.select_subito_channel(dbms, guildid, channel)
+
+async def insert_subito_db(guildid: str, url: str, title: str, link: str, price: str, location: str, date: str, image: str, channel: str):
+    if database.select_subito(dbms, guildid, url, title, link, price, location) is None:
+        database.insert_subito(dbms, guildid, url, title, link, price, location, date, image, channel)
 
 async def translate(guildid: str, text: str):
     tolang=database.select_guildconfig_lang(dbms, guildid, value = "it")

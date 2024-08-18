@@ -2,12 +2,13 @@ import re
 import shutil
 import random
 import wikipedia
-import sqlite3
 import json
 import requests
 import sys
+import threading
 import os
 import urllib
+import pymongo
 import yt_dlp
 from functools import lru_cache
 import string
@@ -15,17 +16,19 @@ import fakeyou
 import time
 import logging
 import audiodb
-import filtersdb
+import hashlib
+import dotenv
+import custom_mongo_adapter
 from chatterbot import ChatBot
 from chatterbot import languages
 from chatterbot.conversation import Statement
 from custom_trainer import CustomListTrainer
 from custom_trainer import CustomTrainer
-from chatterbot.comparisons import LevenshteinDistance
-#from chatterbot.comparisons import SpacySimilarity
+#from chatterbot.comparisons import LevenshteinDistance
+from chatterbot.comparisons import SpacySimilarity
 #from chatterbot.comparisons import JaccardSimilarity
-from chatterbot.response_selection import get_random_response
-#from chatterbot.response_selection import get_most_frequent_response
+#from chatterbot.response_selection import get_random_response
+from chatterbot.response_selection import get_most_frequent_response
 from gtts import gTTS
 from io import BytesIO
 from pathlib import Path
@@ -42,6 +45,16 @@ from exceptions import AudioLimitException
 from exceptions import TimeExceededException
 import multiprocessing
 from functools import wraps
+from undetected_chromedriver import Chrome, ChromeOptions
+from selenium.webdriver.common.by  import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support    import expected_conditions as EC
+from selenium import webdriver
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+from random import randint
+from boto3 import client
 
 
 dotenv_path = join(dirname(__file__), '.env')
@@ -63,6 +76,10 @@ log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 
 fy=fakeyou.FakeYou()
+
+polly = client('polly', aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), 
+                        aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"), 
+                        region_name='eu-central-1')
 
 try:
   fy.login(FAKEYOU_USER,FAKEYOU_PASS)
@@ -148,6 +165,7 @@ def run_with_timer(func, max_execution_time):
 
     return wrapper
 
+
 def wiki_summary(testo: str, lang: str):
   try:
     wikipedia.set_lang(lang)
@@ -164,31 +182,92 @@ def generate(filename: str):
           yield data
           data = fmp3.read(1024)
 
+def get_tts_aws(text: str, chatid="000000", language="it", save=True, limit=True, user=None):
+  data = audiodb.select_by_name_chatid_voice_language(text, chatid, "aws", language)
+  if data is not None:
+    return data
+  else:
+    response = polly.synthesize_speech(
+            Text=text,
+            OutputFormat='mp3',
+            VoiceId='Giorgio')
+
+    stream = response.get('AudioStream')
+    mp3_bytes = stream.read()
+    mp3_fp = BytesIO(mp3_bytes)
+    mp3_fp.seek(0)
+    stream.close()
+    
+    if save:      
+      #threading.Thread(target=lambda: thread_save_aws(text, mp3_fp, chatid=chatid, language=language, user=user)).start()
+      audiodb.insert_or_update(text.strip(), chatid, None, "aws", language, is_correct=1, user=user)
+    return mp3_fpp
+
+def thread_save_aws(text: str, mp3_fp, chatid="000000", language="it", user=None):
+  hashtext = hashlib.md5((text+"_aws").encode('utf-8')).hexdigest()
+  dirsave = "." + get_slashes() + 'audios'
+  if not os.path.exists(dirsave):
+    os.makedirs(dirsave)
+  filesave = dirsave + get_slashes() + hashtext + ".mp3"  
+  sound = AudioSegment.from_mp3(mp3_fp)
+  sound.export(filesave, format='mp3', bitrate="256k")
+  duration = (len(sound) / 1000.0)
+  audiodb.insert_or_update(text, chatid, filesave, "aws", language, duration=duration, user=user)
+
 def get_tts_google(text: str, chatid="000000", language="it", save=True, limit=True, user=None):
   data = audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
   if data is not None:
     return data
   else:
+    mp3_fp = BytesIO()
     tts = gTTS(text=text, lang=language, slow=False)
-    fp = BytesIO()
-    tts.write_to_fp(fp)
-    fp.seek(0)
-    sound = AudioSegment.from_mp3(fp)
+    if save:      
+      #threading.Thread(target=lambda: thread_save_google(text, tts, chatid=chatid, language=language, user=user)).start()
+      audiodb.insert_or_update(text.strip(), chatid, None, "google", language, is_correct=1, user=user)
+    tts.write_to_fp(mp3_fp)
+    mp3_fp.seek(0)
+    return mp3_fp
+
+def thread_save_google(text: str, tts, chatid="000000", language="it", user=None):
+    hashtext = hashlib.md5((text+"_google").encode('utf-8')).hexdigest()
+    dirsave = "." + get_slashes() + 'audios'
+    if not os.path.exists(dirsave):
+      os.makedirs(dirsave)
+    filesave = dirsave + get_slashes() + hashtext + ".mp3"
+    tts.save(filesave)
+    sound = AudioSegment.from_mp3(filesave)
     duration = (len(sound) / 1000.0)
-    if limit and duration > int(os.environ.get("MAX_TTS_DURATION")):
-      audiodb.insert_or_update(text, chatid, None, "google", language, is_correct=0, duration=duration, user=user)
-      raise AudioLimitException
+    audiodb.insert_or_update(text, chatid, filesave, "google", language, duration=duration, user=user)
+
+def populate_tts_aws(text: str, chatid="000000", language="it"):
+  data = audiodb.select_by_name_chatid_voice_language(text, chatid, "aws", language)
+  if data is not None:
+    return False
+  else:
+    response = polly.synthesize_speech(
+            Text=text,
+            OutputFormat='mp3',
+            VoiceId='Giorgio')
+
+    stream = response.get('AudioStream')
+    hashtext = hashlib.md5((text+"_aws").encode('utf-8')).hexdigest()
+    dirsave = "." + get_slashes() + 'audios'
+    if not os.path.exists(dirsave):
+      os.makedirs(dirsave)
+    filesave = dirsave + get_slashes() + hashtext + ".mp3"    
+    sound = AudioSegment.from_mp3(BytesIO(stream.read()))
+    sound.export(filesave, format='mp3', bitrate="256k")
+    duration = (len(sound) / 1000.0)
+    if duration > int(os.environ.get("MAX_TTS_DURATION")):
+      audiodb.insert_or_update(text, chatid, None, "aws", language, is_correct=0, duration=duration)
+      return None
     else:
       #sound.duration_seconds == duration
       memoryBuff = BytesIO()
-      sound.export(memoryBuff, format='mp3', bitrate="256")
+      sound.export(memoryBuff, format='mp3', bitrate="256k")
       memoryBuff.seek(0)
-      #if chatid == "000000" and save:
-      if save:
-        audiodb.insert_or_update(text, chatid, memoryBuff, "google", language, duration=duration, user=user)
-        return audiodb.select_by_name_chatid_voice_language(text, chatid, "google", language)
-      else:
-        return memoryBuff
+      audiodb.insert_or_update(text, chatid, filesave, "aws", language, duration=duration)
+      return True
     #return memoryBuff
     #return fp
 
@@ -198,10 +277,13 @@ def populate_tts_google(text: str, chatid="000000", language="it"):
     return False
   else:
     tts = gTTS(text=text, lang="it", slow=False)
-    fp = BytesIO()
-    tts.write_to_fp(fp)
-    fp.seek(0)
-    sound = AudioSegment.from_mp3(fp)
+    hashtext = hashlib.md5((text+"_google").encode('utf-8')).hexdigest()
+    dirsave = "." + get_slashes() + 'audios'
+    if not os.path.exists(dirsave):
+      os.makedirs(dirsave)
+    filesave = dirsave + get_slashes() + hashtext + ".mp3"
+    tts.save(filesave)
+    sound = AudioSegment.from_mp3(filesave)
     duration = (len(sound) / 1000.0)
     if duration > int(os.environ.get("MAX_TTS_DURATION")):
       audiodb.insert_or_update(text, chatid, None, "google", language, is_correct=0, duration=duration)
@@ -209,9 +291,9 @@ def populate_tts_google(text: str, chatid="000000", language="it"):
     else:
       #sound.duration_seconds == duration
       memoryBuff = BytesIO()
-      sound.export(memoryBuff, format='mp3', bitrate="256")
+      sound.export(memoryBuff, format='mp3', bitrate="256k")
       memoryBuff.seek(0)
-      audiodb.insert_or_update(text, chatid, memoryBuff, "google", language, duration=duration)
+      audiodb.insert_or_update(text, chatid, filesave, "google", language, duration=duration)
       return True
     #return memoryBuff
     #return fp
@@ -234,16 +316,9 @@ def get_class( kls ):
 
 def get_chatterbot(chatid: str, train: False, lang = "it"):
 
-  dbfile=chatid+"-db.sqlite3"
+  dbfile=chatid+"-db"
 
   spacymodel = lang+"_core_news_sm"
-
-  fle = Path('./config/'+dbfile)
-  fle.touch(exist_ok=True)
-  f = open(fle)
-  f.close()
-
-  #nlp = spacy.load(spacymodel)
 
   language = None
 
@@ -256,10 +331,11 @@ def get_chatterbot(chatid: str, train: False, lang = "it"):
 
   chatbot = ChatBot(
       'PezzenteCapo',
-      storage_adapter='chatterbot.storage.SQLStorageAdapter',
-      database_uri='sqlite:///config/'+dbfile,
-      statement_comparison_function = LevenshteinDistance,
-      response_selection_method = get_random_response,
+      storage_adapter='custom_mongo_adapter.CustomMongoAdapter',
+      database_uri='mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/',
+      database_name=dbfile,
+      statement_comparison_function = SpacySimilarity,
+      response_selection_method = get_most_frequent_response,
       tagger_language=language,
       logic_adapters=[
           {
@@ -343,69 +419,24 @@ def get_random_date():
   return date
 
 
-
-def extract_sentences_from_audiodb(filename, language="it", chatid="000000"):
-  try:
-
-    sqliteConnection = sqlite3.connect('./config/audiodb.sqlite3')
-    cursor = sqliteConnection.cursor()
-
-    sqlite_select_sentences_query = """SELECT DISTINCT name FROM audio WHERE chatid = ? and language = ? ORDER BY RANDOM()"""
-
-    data = (chatid, language,)
-
-    cursor.execute(sqlite_select_sentences_query, data)
-    records = cursor.fetchall()
-
-    
-    records_len = len(records)-1
-
-
-    with open(filename, 'w') as sentence_file:
-      for row in records:
-        logging.info('extract_sentences_from_audiodb - [chatid:' + chatid + ',lang:' + language + '] - "' + row[0] + '"')
-        sentence_file.write(row[0])
-        sentence_file.write("\n")
-        
-    cursor.close()
-  except Exception as e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-    return False
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
-  return True
-
 def extract_sentences_from_chatbot(filename, chatid="000000"):
   try:    
 
-    sqliteConnection = sqlite3.connect('./config/' + chatid + '-db.sqlite3')
-    cursor = sqliteConnection.cursor()
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    statements = chatbotdb["statements"]
 
-    sqlite_select_sentences_query = """SELECT DISTINCT text FROM statement ORDER BY text"""
-
-    data = ()
-
-    cursor.execute(sqlite_select_sentences_query, data)
-    records = cursor.fetchall()
-
-    
-    records_len = len(records)-1
-
-
-    with open(filename, 'a') as sentence_file:
-      for row in records:
-        logging.info('extract_sentences_from_chatbot - [chatid:' + chatid + '] - "' + row[0] + '"')
-        sentence_file.write(row[0])
+    with open(filename, 'a', encoding="utf8") as sentence_file:      
+      for row in statements.distinct('text'): 
+        logging.debug('extract_sentences_from_chatbot - [chatid:' + chatid + '] - "' + row + '"')
+        sentence_file.write(row)
         sentence_file.write("\n")
 
-    cursor.close()
 
-    lines = open(filename, 'r').readlines()
+    lines = open(filename, 'r', encoding="utf8").readlines()
     lines_set = set(lines)
-    out  = open(filename, 'w')
+    out  = open(filename, 'w', encoding="utf8")
     for line in lines_set:
         out.write(line)
 
@@ -414,9 +445,6 @@ def extract_sentences_from_chatbot(filename, chatid="000000"):
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return False
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
   return True
 
 def get_random_string(length):
@@ -427,15 +455,15 @@ def get_random_string(length):
 
 
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in "txt"
+def allowed_file(filename, extension="txt"):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in extension
 
 def train_txt(trainfile, chatbot: ChatBot, lang: str, chatid: str):
   try:
       logging.info("Loading: %s", trainfile)
       trainer = CustomListTrainer(chatbot)
       trainfile_array = []
-      with open(trainfile) as file:
+      with open(trainfile, encoding="utf-8") as file:
           for line in file:
               trainfile_array.append(line.strip())
       if len(trainfile_array) > 0:
@@ -458,82 +486,57 @@ def train_txt(trainfile, chatbot: ChatBot, lang: str, chatid: str):
 
 def clean_duplicates(chatid: str):
   try:
-    dbfile='./config/'+chatid+"-db.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
-
-    sqlite_delete_query = """DELETE FROM statement
-                             WHERE EXISTS (
-                               SELECT 1 FROM statement s2
-                               WHERE (statement.text = s2.text 
-                                  OR statement.text = SUBSTR(s2.text, 1,LENGTH(s2.text)-1)
-                                  OR s2.text = SUBSTR(statement.text, 1,LENGTH(statement.text)-1))
-                               AND statement.id > s2.id
-                             );"""
     
-    data_tuple = ()
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    statements = chatbotdb["statements"]
 
-    logging.info("clean_duplicates - Executing: %s", sqlite_delete_query)
+    statements.aggregate(
+      [ 
+          { "$sort": { "_id": 1 } }, 
+          { "$group": { 
+              "_id": "$text", 
+              "doc": { "$first": "$$ROOT" } 
+          }}, 
+          { "$replaceRoot": { "newRoot": "$doc" } },
+          { "$out": "collection" }
+      ]
 
-    cursor.execute(sqlite_delete_query, data_tuple)
+    )
+    logging.info("clean_duplicates - Done!")
 
-    sqliteConnection.commit()
-    cursor.close()
-  except sqlite3.Error as error:
-    logging.error("Failed to delete data from sqlite", exc_info=1)
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return("Errore!")
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
-
-def vacuum_chatbot_db(chatid: str):
-  try:
-    dbfile='./config/'+chatid+"-db.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
-
-    cursor.execute("VACUUM")
-
-    cursor.close()
-  except sqlite3.Error as error:
-    logging.error("Failed to Execute VACUUM", exc_info=1)
-  finally:
-    if sqliteConnection:
-      sqliteConnection.close()
 
 def delete_by_text(chatid: str, text: str, force = False):
   try:
-    backupdb(chatid, "sqlite3")
-    filename = os.path.dirname(os.path.realpath(__file__)) + '/config/' + chatid + '-db.txt'
+    filename = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'config' + get_slashes() + chatid + '-db.txt'
     if extract_sentences_from_chatbot(filename, chatid=chatid):
       backupdb(chatid, "txt")
     
-    dbfile='./config/'+chatid+"-db.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
+    
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    statements = chatbotdb["statements"]
 
-    sqlite_delete_query1 = "DELETE FROM Statement WHERE text like ? OR text like ? OR text LIKE ? OR text = ? COLLATE NOCASE"
-    sqlite_delete_query2 = "DELETE FROM Statement WHERE in_response_to like ? OR in_response_to like ? OR in_response_to LIKE ? OR in_response_to = ? COLLATE NOCASE"
+    rgx = re.compile('.*' + text + '.*', re.IGNORECASE)  # compile the regex
+    statements.delete_many({'text':rgx})
 
-    data_tuple = (text+"%","%"+text,"%"+text+"%",text,)
+    rgx_2 = re.compile('.*' + text + '.*', re.IGNORECASE)  # compile the regex
+    statements.delete_many({'in_response_to':rgx_2})
 
-    logging.info("delete_by_text - Executing: %s", sqlite_delete_query1)
+    logging.info("delete_by_text - Deleting: %s", text)
 
-    cursor.execute(sqlite_delete_query1, data_tuple)
-
-    logging.info("delete_by_text - Executing: %s", sqlite_delete_query2)
-
-    cursor.execute(sqlite_delete_query2, data_tuple)
-
-
-    sqliteConnection.commit()
-    cursor.close()
-  except sqlite3.Error as error:
-    logging.error("Failed to delete data from sqlite", exc_info=1)
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return("Errore!")
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
   if force:
     #delete_from_audiodb_by_text(chatid, text)
     audiodb.update_is_correct_by_word(text, chatid, 0, True)
@@ -541,29 +544,16 @@ def delete_by_text(chatid: str, text: str, force = False):
   else:
     return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot!')
 
-
-
-def delete_from_audiodb_by_text(chatid: str, text: str):
+def save_mp3(mp3, name):
+  filesave = None
   try:
-    dbfile="./config/audiodb.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
-
-    sqlite_delete_query = "DELETE FROM Audio WHERE chatid = '" + chatid + "' and (name like ?' OR name like ? OR name LIKE ? OR name = ?) COLLATE NOCASE"
-
-    data_tuple = (text+"%","%"+text,"%"+text+"%",text,)
-
-    logging.info("delete_from_audiodb_by_text - Executing:  %s", sqlite_delete_query)
-
-    cursor.execute(sqlite_delete_query, data_tuple)
-    sqliteConnection.commit()
-    cursor.close()
-
-  except sqlite3.Error as error:
-    logging.error("Failed to delete data from sqlite", exc_info=1)
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
+    sound = AudioSegment.from_mp3(mp3)
+    sound.export(name, format='mp3', bitrate="256k")
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+  return filesave
 
 def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it", save=True, call_fy=True, limit=True, user=None):
   try:
@@ -571,35 +561,38 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       voice_to_use = get_random_voice(lang=language)
     else:
       voice_to_use = voice
-    if voice_to_use != "google":
+    if voice_to_use != "google" and voice_to_use != "aws":
       datafy = audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
       if datafy is not None:
         return datafy
       elif call_fy:
-        fy.login(FAKEYOU_USER,FAKEYOU_PASS)
-        wav = fy.say(text.strip(), voice_to_use)
+        wav=None
+        for x in range(5):
+          try:
+            #fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+            wav = fy.say(text.strip(), voice_to_use)
+          except:
+            logging.error("get_tts - FAKEYOU ERROR \n         CHATID: %s\n         VOICE: %s\n         SENTENCE: %s\n         SLEEPING 120 SECONDS, COUNTER IS AT: %s", chatid, voice_to_use, text, str(x))
+            time.sleep(120)
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
-          duration = (len(sound) / 1000.0)
-          if limit and duration > int(os.environ.get("MAX_TTS_DURATION")):
-            audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=0, duration=duration, user=user)
-            raise AudioLimitException
-          else:
-            #sound.duration_seconds == duration
-            out = BytesIO()
-            sound.export(out, format='mp3', bitrate="256")
-            out.seek(0)
-            if save:
-              audiodb.insert_or_update(text.strip(), chatid, out, voice_to_use, language, duration=duration, user=user)
-              return audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
-            else:
-              return out
+          out = BytesIO()
+          sound.export(out, format='mp3', bitrate="256k")
+          out.seek(0)
+          if save:
+            audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=1, user=user)
+            #threading.Thread(target=lambda: thread_save_fakeyou(text, sound, voice_to_use, chatid=chatid, language=language, user=user)).start()
+          return out
         elif voice == "random" or voice == "google":
           return get_tts_google(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
+        elif voice == "aws":
+          return get_tts_aws(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
         else:
           return None
       else:
         return get_tts_google(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
+    elif voice == "aws":
+      return get_tts_aws(text.strip(), chatid=chatid, language="it", save=save, limit=limit, user=user)
     else:
       return get_tts_google(text.strip(), chatid=chatid, language=language, save=save, limit=limit, user=user)
   except AudioLimitException as el:
@@ -614,23 +607,24 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       audiodb.insert_or_update(text.strip(), chatid, None, voice_to_use, language, is_correct=1, user=user)
       raise Exception(e)
 
-    
-def download_tts(id: int):
-  try:
-    return audiodb.select_audio_by_id(id)
-  except Exception as e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-    raise Exception(e)
+def thread_save_fakeyou(text: str, sound, voice_to_use, chatid="000000", language="it", user=None): 
+  duration = (len(sound) / 1000.0)
+  hashtext = hashlib.md5((text+"_"+voice_to_use).encode('utf-8')).hexdigest()
+  dirsave = "." + get_slashes() + 'audios'
+  if not os.path.exists(dirsave):
+    os.makedirs(dirsave)
+  filesave = dirsave + get_slashes() + hashtext + ".mp3"
+  sound.export(filesave, format='mp3', bitrate="256k")
+  audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration, user=user)
 
+@run_with_timer(max_execution_time=300)
 def populate_tts(text: str, chatid="000000", voice=None, israndom=False, language="it"):
-  try:
+  try:  
     if voice is None or voice == "null" or voice == "random":
       voice_to_use = get_random_voice(lang=language)
     else:
       voice_to_use = voice
-    if voice_to_use != "google": 
+    if voice_to_use != "google" and voice_to_use != "aws": 
       datafy = audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
       if datafy is not None:
         return False
@@ -641,7 +635,7 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
         #else:
         #  proxies = {}
         #  fy.session.proxies.update(proxies)
-        fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+        #fy.login(FAKEYOU_USER,FAKEYOU_PASS)
         wav = fy.say(text.strip(), voice_to_use)
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
@@ -651,12 +645,17 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
             return None
           else:
             #sound.duration_seconds == duration
-            out = BytesIO()
-            sound.export(out, format='mp3', bitrate="256")
-            out.seek(0)
-            audiodb.insert_or_update(text.strip(), chatid, out, voice_to_use, language, duration=duration)
+            hashtext = hashlib.md5((text+"_"+voice_to_use).encode('utf-8')).hexdigest()
+            dirsave = "." + get_slashes() + 'audios'
+            if not os.path.exists(dirsave):
+              os.makedirs(dirsave)
+            filesave = dirsave + get_slashes() + hashtext + ".mp3"
+            sound.export(filesave, format='mp3', bitrate="256k")
+            audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration)
             return True
         raise Exception("FakeYou Generation KO")
+    elif voice == "aws":
+      return populate_tts_aws(text.strip(), chatid=chatid, language=language)
     else:
       return populate_tts_google(text.strip(), chatid=chatid, language=language)
   except Exception as e:
@@ -695,7 +694,7 @@ def list_fakeyou_voices(lang:str):
       foundvoices = {}
 
 
-      inclusion_file_path = "./config-external/voices_inclusions_"+lang+".json"
+      inclusion_file_path = "./config/voices_inclusions_"+lang+".json"
 
       if os.path.exists(inclusion_file_path):
         with open(inclusion_file_path) as inclusion_file:
@@ -718,6 +717,7 @@ def list_fakeyou_voices(lang:str):
 
       
       foundvoices["google"] = "google"
+      foundvoices["Giorgio"] = "aws"
       
       with open(file_path, "w") as write_file:
         json_string = json.dumps(foundvoices, ensure_ascii=False, indent=4).encode('utf-8').decode('utf-8')
@@ -734,6 +734,7 @@ def list_fakeyou_voices(lang:str):
       
       foundvoices = {}
       foundvoices["google"] = "google"
+      foundvoices["Giorgio"] = "aws"
 
     return foundvoices
   except Exception as e:
@@ -745,40 +746,38 @@ def list_fakeyou_voices(lang:str):
 
 def get_random_from_bot(chatid: str, text: str):
   try:
-    dbfile=chatid+"-db.sqlite3"
-    sqliteConnection = sqlite3.connect('./config/'+dbfile)
-    cursor = sqliteConnection.cursor()
-
-    data = ()
-    
-    sqlite_select_sentences_query = "SELECT text FROM statement "
-    if text is not None:
-      sqlite_select_sentences_query = sqlite_select_sentences_query + " where (text like ? OR text like ? OR text LIKE ? OR text = ?) COLLATE NOCASE "
-      data = (text+"%","%"+text,"%"+text+"%",text,)
-    sqlite_select_sentences_query = sqlite_select_sentences_query + " ORDER BY RANDOM() LIMIT 1;"
-
-    cursor.execute(sqlite_select_sentences_query, data)
-    records = cursor.fetchall()
-
-    count = 0
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    statements = chatbotdb["statements"]
 
     sentence = None
 
-    for row in records:
-      sentence = row[0]
+    if text is not None:
+      rgx = re.compile('.*' + text + '.*', re.IGNORECASE)  # compile the regex
+      cursor = statements.find({"text": rgx})
+      textlist = list(cursor)
+      sizel = len(textlist)
+      if sizel > 0:
+        random_index = int(random.random() * sizel)
+        sentence = textlist[random_index]['text']
+    else:
+      cursor = statements.aggregate([
+        {
+          "$sample": {
+            "size": 1
+          }
+        }
+      ])
+      for row in cursor:    
+        sentence = row['text']
 
-    cursor.close()
     return sentence
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     raise Exception(e)
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
-
-
     
 
 def populate_audiodb_unlimited(limit: int, chatid: str, lang: str):  
@@ -789,7 +788,7 @@ def populate_audiodb_limited(limit: int, chatid: str, lang: str):
   try:
     populate_audiodb(limit, chatid, lang)
   except TimeExceededException as et:
-    logging.info("populate_audiodb - ENDED POPULATION\n         REACHED UP MAX EXECUTION TIME\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
+    logging.debug("populate_audiodb - ENDED POPULATION\n         REACHED UP MAX EXECUTION TIME\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
   finally:
     delete_tts(limit=limit)
 
@@ -806,85 +805,9 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
     listvoices = list(voices.items())
     #random.shuffle(listvoices)
 
-    records = None
-
-    try:
-
-      file = chatid + "-db.sqlite3"
-
-      dbfile=os.path.join('./config/', file)
-
-      sqliteConnection = sqlite3.connect(dbfile)
-      cursor = sqliteConnection.cursor()
+    process_population(limit, chatid, lang, listvoices)    
     
-      cursor.execute("ATTACH DATABASE ? AS audiodb",("./config/audiodb.sqlite3",))
-
-      sentences = []
-
-      sqlite_select_sentences_query1 = " SELECT * FROM (SELECT DISTINCT statement.text as name FROM statement WHERE statement.text NOT IN (SELECT audiodb.audio.name from audiodb.audio) ORDER BY RANDOM() LIMIT " + str(limit) + ")"
-      log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query1)
-      cursor.execute(sqlite_select_sentences_query1, ())
-      records1 = cursor.fetchall()
-
-      for row1 in records1:
-        sentences.append(row1[0])
-      
-      sqlite_select_sentences_query2 = " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = '" + chatid + "' and COUNTER > 0 and COUNTER < " + str(os.environ.get("COUNTER_LIMIT")) + " and IS_CORRECT = 1 GROUP BY audio.name HAVING COUNT(audio.name) < " + str(len(listvoices)) + " ORDER BY RANDOM() LIMIT " + str(limit) + ")"
-      log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query2)
-      cursor.execute(sqlite_select_sentences_query2, ())
-      records2 = cursor.fetchall()
-
-      for row2 in records2:
-        sentences.append(row2[0])
-      
-      sqlite_select_sentences_query3 = " SELECT * FROM (SELECT DISTINCT audiodb.audio.name as name from audiodb.audio WHERE CHATID = '" + chatid + "' and COUNTER > 0 and COUNTER < " + str(os.environ.get("COUNTER_LIMIT")) + " and IS_CORRECT = 1 AND DATA IS NULL ORDER BY RANDOM() LIMIT " + str(limit) + ")"
-      log.info("populate_audiodb\n         Executing SQL: %s", sqlite_select_sentences_query3)
-      cursor.execute(sqlite_select_sentences_query3, ())
-      records3 = cursor.fetchall()
-
-      for row3 in records3:
-        sentences.append(row3[0])
-
-      
-
-      cursor.close()
-    except Exception as e:
-      raise Exception(e)
-    finally:
-      if 'sqliteConnection' in locals() and sqliteConnection:
-        sqliteConnection.close()
-    if len(sentences) > 0:
-      for sentence in sentences:
-        key, voice = random.choice(listvoices)
-        language = audiodb.select_distinct_language_by_name_chatid(sentence, chatid)
-        if language is None:
-          language = lang
-        result = False
-        try:
-          #logging.info("populate_audiodb - START ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s", chatid, voice, key, sentence)
-          generation = ""
-          inserted = ""
-          result = populate_tts(sentence, chatid=chatid, voice=voice, language=language)
-          if result is None:
-            inserted="Skipped (TTS lenght limit exceeded)"
-          elif result is True:
-            inserted="Done (Inserted in DB)"
-          elif result is False:
-            inserted="Skipped (Already in DB)"
-          logging.info("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
-        except Exception as e:
-          if audiodb.select_count_by_name_chatid_voice_language(sentence, chatid, voice, language) > 0:
-            audiodb.increment_counter(sentence, chatid, voice, language, int(os.environ.get("COUNTER_LIMIT")))
-          else:
-            audiodb.insert(sentence, chatid, None, voice, language, is_correct=1)
-          inserted="Failed (" + str(e) + ")"
-          logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
-          #raise Exception(e)
-          time.sleep(30)
-    else:
-      logging.info("populate_audiodb - NO RECORDS FOUND!\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
-    
-    logging.info("populate_audiodb - ENDED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
+    logging.debug("populate_audiodb - ENDED POPULATION\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -892,12 +815,73 @@ def populate_audiodb_internal(limit: int, chatid: str, lang: str):
     logging.error("populate_audiodb - ENDED POPULATION WITH ERROR\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
     raise Exception(e)
 
+def process_population(limit, chatid, lang, listvoices):
+
+  
+  result = False
+
+  counter_inserted = 0
+  counter_skipped_failed = 0
+  while counter_inserted < limit or counter_skipped_failed < (limit*10):
+    try:
+      key, voice = random.choice(listvoices)
+      sentence = ""
+      dbfile = chatid + "-db"
+      myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+      chatbotdb = myclient[dbfile]
+      statement = chatbotdb["statements"]     
+      cursor = statement.aggregate(
+          [ { "$sample": { "size" : 1 } } ]
+      )
+      for row in cursor:
+        sentence = row['text']
+      if sentence == "":
+        logging.debug("populate_audiodb - NO RECORDS FOUND!\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
+        break
+
+      language = audiodb.select_distinct_language_by_name_chatid(sentence, chatid)
+      if language is None:
+        language = lang
+      inserted = ""
+
+      counter = audiodb.select_count_by_name_chatid_voice_language(sentence, chatid, voice, language)
+      
+      if counter >= int(os.environ.get("COUNTER_LIMIT")):
+          inserted="Skipped (Counter Limit)"
+          logging.debug("populate_audiodb - SKIPPED  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+      else:
+        result = populate_tts(sentence, chatid=chatid, voice=voice, language=language)
+        if result is None:
+          inserted="Skipped (TTS lenght limit exceeded)"
+          counter_skipped_failed = counter_skipped_failed + 1
+          logging.warning("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+          time.sleep(randint(5,120))
+        elif result is True:
+          inserted="Done (Inserted in DB)"
+          counter_inserted = counter_inserted + 1
+          logging.debug("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+          time.sleep(randint(5,120))
+        elif result is False:
+          counter_skipped_failed = counter_skipped_failed + 1
+          inserted="Skipped (Already in DB)"
+          logging.debug("populate_audiodb - SUCCESS ELAB  \n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+    except Exception as e:
+      counter = audiodb.select_count_by_name_chatid_voice_language(sentence, chatid, voice, language)
+      if counter > 0:
+        audiodb.increment_counter(sentence, chatid, voice, language, int(os.environ.get("COUNTER_LIMIT")))
+      else:
+        audiodb.insert(sentence, chatid, None, voice, language, is_correct=1)
+      inserted="Failed (" + str(e) + ")"
+      logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+      counter_skipped_failed = counter_skipped_failed + 1
+      time.sleep(randint(5,120))
+
 
 
 def backupdb(chatid: str, extension: str):  
   try:
-    dbfile="./config/" + chatid + "-db." + extension
-    dst="./backups/" + chatid + "-db_backup_" + str(time.time()) + "." + extension
+    dbfile=os.path.dirname(os.path.realpath(__file__)) + get_slashes() + "config" + get_slashes() + chatid + "-db." + extension
+    dst=os.path.dirname(os.path.realpath(__file__)) + get_slashes() + "backups" + get_slashes() + chatid + "-db_backup_" + str(time.time()) + "." + extension
     shutil.copyfile(dbfile, dst)
 
     current_time = time.time()
@@ -921,39 +905,6 @@ def backupdb(chatid: str, extension: str):
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     raise Exception(e)
 
-def restore(chatid: str, text: str):
-  sentences = ""
-  try:
-    dbfile="./config/audiodb.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
-
-    sqlite_select_query = """SELECT DISTINCT name FROM Audio"""
-    data_tuple = ()
-
-    if(text is not None):
-      
-      data_tuple = (text+"%","%"+text,"%"+text+"%",text,)
-      sqlite_select_query = sqlite_select_query + " WHERE chatid = '" + chatid + "' and (name like ? OR name like ? OR name LIKE ?' OR name = ?) COLLATE NOCASE"
-
-    cursor.execute(sqlite_select_query, data_tuple)
-    records = cursor.fetchall()
-
-    logging.info("restore - Executing: %s", sqlite_select_query)
-    
-    for row in records:\
-      sentences = sentences + "\n" + row[0] 
-
-    cursor.close()
-
-  except sqlite3.Error as error:
-    logging.error("Failed to select data from sqlite", exc_info=1)
-    return("Errore!")
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
-  return BytesIO(bytes(sentences,'utf-8'))
-
 def init_generator_models(chatid, language):
 
   logging.info("START -- essential_generators - [chatid:" + chatid + ",lang:" + language + "] - Models Generator")
@@ -962,7 +913,7 @@ def init_generator_models(chatid, language):
 
   filename = dir_path + '/config/sentences_'+chatid+'.txt'
   
-  if extract_sentences_from_audiodb(filename, language=language, chatid=chatid):
+  if audiodb.extract_sentences_from_audiodb(filename, language=language, chatid=chatid):
 
     text_model_path = dir_path + '/config/markov_textgen_'+chatid+'.json'
     word_model_path = dir_path + '/config/markov_wordgen_'+chatid+'.json'
@@ -1084,39 +1035,6 @@ def query_myinstants_sound(query: str):
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return []
 
-def clean_audio_zip():
-  dirname = "./config/download_audio_zip"
-  if os.path.exists(dirname):
-    rmdir(dirname)
-
-def download_audio_zip(chatid: str):
-  try:
-    dirname = "./config/download_audio_zip"
-    if not os.path.exists(dirname):
-      os.mkdir(dirname)
-      voices = list_fakeyou_voices("it")
-      datas = audiodb.select_data_name_voice_by_chatid(chatid)
-      audios = []
-      for data in datas:
-        audio = BytesIO(data[0])
-        name  = data[1].replace(" ", "_")
-        voice = ([k for k, v in voices.items() if v == data[2]][0]).replace(" ", "_")
-
-        if(len(name) > 40):
-          name = name[0:40]
-
-        filename_tmp1 = name + "_" + voice
-        filename_tmp2 = ''.join(e for e in filename_tmp1 if e.isalnum() or e == "_")
-        filename = dirname + "/" + filename_tmp2 +".mp3"
-        with open(filename, "wb") as outfile:
-            outfile.write(audio.getbuffer())
-    shutil.make_archive(dirname, 'zip', dirname)
-  except Exception as e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-    return False
-
 def rmdir(directory):
   directory = Path(directory)
   for item in directory.iterdir():
@@ -1129,61 +1047,75 @@ def rmdir(directory):
 
 def reset(chatid: str):
   try:
-    dbfile='./config/'+chatid+"-db.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
+    dbfile = chatid + "-db"
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    statement = chatbotdb["statements"]     
 
-    sqlite_delete_query = "DELETE FROM Statement"
-    
-    data_tuple = ()
+    statement.delete_many()
 
-    logging.info("reset - Executing: %s", sqlite_delete_query)
+    logging.info("reset - Executing delete by chatid: %s", chatid)
 
-    cursor.execute(sqlite_delete_query, data_tuple)
+    audiodb.delete_by_chatid(chatid)    
 
-    sqliteConnection.commit()
-    cursor.close()
-  except sqlite3.Error as error:
-    logging.error("Failed to delete data from sqlite", exc_info=1)
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
+    folder = "." + get_slashes() + 'audios' + get_slashes()
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        if os.path.isfile(file_path) or os.path.islink(file_path):
+            os.unlink(file_path)
+        elif os.path.isdir(file_path):
+            shutil.rmtree(file_path)
 
-  vacuum_chatbot_db(chatid)
-
-  delete_from_audiodb(chatid)
-  audiodb.vacuum()
-
-  filtersdb.delete_all(chatid)
-  filtersdb.vacuum()
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 
-def delete_from_audiodb(chatid: str):
+def login_google():
   try:
-    dbfile="./config/audiodb.sqlite3"
-    sqliteConnection = sqlite3.connect(dbfile)
-    cursor = sqliteConnection.cursor()
+    email = os.environ.get("BARD_USER")
+    password = os.environ.get("BARD_PASS")
+    
+    chrome_options = ChromeOptions() 
+    chrome_options.add_argument("--disable-setuid-sandbox") 
+    chrome_options.add_argument("--disable-dev-shm-using") 
+    chrome_options.add_argument("--disable-extensions") 
+    chrome_options.add_argument("--disable-gpu")
+    #chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--window-size=%s" % "640,480")
 
-    sqlite_delete_query = "DELETE FROM Audio WHERE chatid = ?"
+    driver = Chrome(use_subprocess=True, options=chrome_options)
+    driver.get("https://accounts.google.com/ServiceLogin")
+    time.sleep(10)
+    WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.NAME, 'identifier'))).send_keys(f'{email}\n')
+    time.sleep(10)
+    WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.NAME, 'Passwd'))).send_keys(f'{password}\n')
+   
+    driver.get("https://bard.google.com/")
+    cookies = driver.get_cookies()
 
-    data_tuple = (chatid, )
+    for cookie in cookies:
+      if cookie["name"] == "__Secure-1PSID":
+        os.environ["__Secure-1PSID"] = cookie["value"]
+        dotenv.set_key(dotenv_path, "__Secure-1PSID", cookie["value"])
+      elif cookie["name"] == "__Secure-1PSIDTS":
+        os.environ["__Secure-1PSIDTS"] = cookie["value"]
+        dotenv.set_key(dotenv_path, "__Secure-1PSIDTS", cookie["value"])
+      elif cookie["name"] == "__Secure-1PSIDCC":
+        os.environ["__Secure-1PSIDCC"] = cookie["value"]
+        dotenv.set_key(dotenv_path, "__Secure-1PSIDCC", cookie["value"])
+    driver.close()
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
-    logging.info("delete_from_audiodb - Executing:  %s", sqlite_delete_query)
-
-    cursor.execute(sqlite_delete_query, data_tuple)
-    sqliteConnection.commit()
-    cursor.close()
-
-  except sqlite3.Error as error:
-    logging.error("Failed to delete data from sqlite", exc_info=1)
-  finally:
-    if sqliteConnection:
-        sqliteConnection.close()
 
 
 def delete_tts(limit=100):
   try:
-    fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+    #fy.login(FAKEYOU_USER,FAKEYOU_PASS)
     user = fy.get_user(FAKEYOU_USER,limit=limit)
     if user is not None and user.ttsResults is not None and user.ttsResults.json is not None:
       for tokenJson in user.ttsResults.json:
@@ -1195,3 +1127,19 @@ def delete_tts(limit=100):
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+def get_mp3(file):
+  if os.path.isfile(file):      
+    sound = AudioSegment.from_mp3(file)
+    memoryBuff = BytesIO()
+    sound.export(memoryBuff, format='mp3', bitrate="256k")
+    memoryBuff.seek(0)
+    return memoryBuff
+  else:
+    return None
+
+def get_slashes():
+  if os.name == "nt": 
+    return "\\"
+  else:
+    return "/"

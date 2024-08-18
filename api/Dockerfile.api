@@ -1,4 +1,4 @@
-FROM python:3.8-slim-bullseye
+FROM python:3.10-slim-bullseye
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -9,7 +9,6 @@ RUN apt-get update && \
         libncurses5-dev \
         libncursesw5-dev \
         libreadline-dev \
-        libsqlite3-dev \
         libssl-dev \
         llvm \
         make \
@@ -28,8 +27,13 @@ RUN apt-get update && \
         libpcre3-dev \
         libpcre3 \
         hunspell-it \
-        sqlite3 \
-        iputils-ping
+        iputils-ping \
+        wget \
+        net-tools \
+        curl
+
+RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+RUN apt-get install -y ./google-chrome-stable_current_amd64.deb
         
 RUN echo 'vm.overcommit_memory=1' >> /etc/sysctl.conf
 
@@ -61,12 +65,13 @@ COPY data data
 COPY libretranslator.py .
 COPY utils.py .
 COPY audiodb.py .
-COPY filtersdb.py .
 COPY custom_trainer.py .
 COPY insults.py .
 COPY image.py .
 COPY main.py .
 COPY exceptions.py .
+COPY custom_mongo_adapter.py .
+COPY subito_wrapper.py .
 COPY config.py .
 COPY entrypoint.sh .
 COPY uwsgi.ini .

@@ -6,10 +6,12 @@ import image
 import utils
 import insults
 import audiodb
-import filtersdb
 import threading
 import sys
 import glob
+import urllib
+import subito_wrapper
+import json
 from io import BytesIO
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -62,14 +64,6 @@ limiter = Limiter(
 
 app.config.from_object(Config())
 
-@app.before_request
-def block_by_filters():
-  request_args = {**request.view_args, **request.args} if request.view_args else {**request.args}
-  if "chatid" in request_args and "filters" not in request.full_path:
-    wordlist = filtersdb.select_all(str(request_args["chatid"]))
-    for word in wordlist:
-      if word.lower() in (str(request_args)).lower():
-        return get_response_filters_error(word)
     
 @app.after_request
 def after_request(response):
@@ -103,6 +97,7 @@ def get_response_str(text: str):
 def get_response_json(data):
   r = Response(response=data, status=200, mimetype="application/json")
   r.headers["Content-Type"] = "application/json; charset=utf-8"
+  r.headers["Accept"] = "application/json"
   return r
 
 def get_response_limit_error(text: str):
@@ -159,8 +154,7 @@ class TextRepeatLearnClass(Resource):
   def get (self, text: str, chatid = "000000", lang = "it"):
     response = get_response_str(text)
     chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-    daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn"+utils.get_random_string(24))
-    daemon.start()
+    threading.Thread(target=lambda: chatbot.get_response(text), name="repeat-learn"+utils.get_random_string(24)).start()
     return response
 
 
@@ -171,8 +165,8 @@ class AudioRepeatLearnUserClass(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get (self, user: str, text: str, chatid = "000000", lang = "it"):
     chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-    daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
-    daemon.start()
+
+    threading.Thread(target=lambda: chatbot.get_response(text), name="repeat-learn-user"+utils.get_random_string(24)).start()
 
     audiodb.insert_or_update(text.strip(), chatid, None, "google", lang, is_correct=1, user=user)
 
@@ -183,7 +177,7 @@ class AudioRepeatLearnUserClass(Resource):
 @nstext.route('/ask/<string:text>/<string:chatid>/')
 @nstext.route('/ask/<string:text>/<string:chatid>/<string:lang>')
 class TextAskClass(Resource):
-  @cache.cached(timeout=10, query_string=True)
+  @cache.cached(timeout=5, query_string=True)
   def get (self, text: str, chatid = "000000", lang = "it"):
     chatbot_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text).text
     return get_response_str(chatbot_response)
@@ -193,6 +187,7 @@ class TextAskClass(Resource):
 @nstext.route('/ask/nolearn/<string:text>/<string:chatid>/')
 @nstext.route('/ask/nolearn/<string:text>/<string:chatid>/<string:lang>')
 class TextAskNoLearnClass(Resource):
+  @cache.cached(timeout=5, query_string=True)
   def get (self, text: str, chatid = "000000", lang = "it"):
     chatbot_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=False).text
     return get_response_str(chatbot_response)
@@ -202,7 +197,7 @@ class TextAskNoLearnClass(Resource):
 @nstext.route('/ask/user/<string:user>/<string:text>/<string:chatid>/')
 @nstext.route('/ask/user/<string:user>/<string:text>/<string:chatid>/<string:lang>')
 class TextAskUserClass(Resource):
-  @cache.cached(timeout=10, query_string=True)
+  @cache.cached(timeout=5, query_string=True)
   def get (self, user: str, text: str, chatid = "000000", lang = "it"):
     chatbot_response = get_chatbot_by_id(chatid=chatid, lang=lang).get_response(text, learn=True).text
     audiodb.insert_or_update(text.strip(), chatid, None, "google", lang, is_correct=1, user=user)
@@ -231,12 +226,6 @@ class TextLearnClass(Resource):
     utils.learn(text, response, get_chatbot_by_id(chatid=chatid, lang=lang))
     return "Ho imparato: " + text + " => " + response
 
-
-@nstext.route('/count/<string:voice>/<string:chatid>/')
-class TextLearnClass(Resource):
-  @cache.cached(timeout=10, query_string=True)
-  def get (self, voice: str, chatid: str):
-    return get_response_str(str(audiodb.select_count_by_chatid_voice(chatid,voice)))
 
 
 @nstext.route('/translate/<string:from_lang>/<string:to_lang>/<string:text>/')
@@ -319,6 +308,46 @@ class ImageGenerateByText(Resource):
 nsaudio = api.namespace('chatbot_audio', 'Accumulators Chatbot TTS audio APIs')
 
 
+@nsaudio.route('/getmp3/<string:filename>')
+class AudioGetMp3Class(Resource):
+  @cache.cached(timeout=7200, query_string=True)
+  def get (self, filename: str):
+    try:
+      file = utils.get_mp3(filename)
+      if file is not None:
+        response = send_file(file, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        return response
+      else:
+        @after_this_request
+        def clear_cache(response):
+          cache.delete_memoized(AudioGetMp3Class.get, self, str)
+          return make_response("TTS Generation Error!", 500)
+    except Exception as e:
+      g.request_error = str(e)
+      @after_this_request
+      def clear_cache(response):
+        cache.delete_memoized(AudioGetMp3Class.get, self, str)
+        return make_response(g.get('request_error'), 500)
+
+@nsaudio.route('/putmp3')
+class AudioPutMp3Class(Resource):
+  def post (self):
+    try:
+      mp3 = request.files['mp3']
+      name = request.form.get("filename")
+      if not mp3 and utils.allowed_file(mp3, extension="mp3"):
+        return get_response_str("Error! Please upload an mp3 file.")      
+      elif mp3 is None:
+        return get_response_str("Error! filename is mandatory.")      
+      else:
+        path = utils.save_mp3(mp3, name)
+        return get_response_str(path)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
+
 @nsaudio.route('/repeat/<string:text>/<string:voice>/')
 @nsaudio.route('/repeat/<string:text>/<string:voice>/<string:chatid>')
 @nsaudio.route('/repeat/<string:text>/<string:voice>/<string:chatid>/<string:language>')
@@ -342,7 +371,6 @@ class AudioRepeatClass(Resource):
       def clear_cache(response):
         cache.delete_memoized(AudioRepeatClass.get, self, str, str, str)
         return make_response(g.get('request_error'), 500)
-
 
 
 @nsaudio.route('/repeat/save/<string:text>/<string:voice>/')
@@ -402,26 +430,6 @@ class AudioCurseClass(Resource):
         cache.delete_memoized(AudioCurseClass.get, self, str, str, str)
         return make_response(g.get('request_error'), 500)
 
-
-@nsaudio.route('/download/<int:id>')
-class AudioDownloadClass(Resource):
-  def get (self, id: int):
-    try:
-      tts_out = utils.download_tts(id)
-      if tts_out is not None:
-        return send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
-      else:
-        @after_this_request
-        def clear_cache(response):
-          cache.delete_memoized(AudioDownloadClass.get, self, int)
-          return make_response("TTS Generation Error!", 500)
-    except Exception as e:
-      g.request_error = str(e)
-      @after_this_request
-      def clear_cache(response):
-        cache.delete_memoized(AudioDownloadClass.get, self, int)
-        return make_response(g.get('request_error'), 500)
-
 @limiter.limit("1/second")
 @nsaudio.route('/random/')
 @nsaudio.route('/random/<string:voice>/')
@@ -433,7 +441,33 @@ class AudioRandomClass(Resource):
     try:
       tts_out, text_response = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang,text)
       if not text_response:
-          response = make_response("Audio not found", 204)
+          text = "Audio not found"
+          response = make_response(text, 204)
+          response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+          return response
+      elif tts_out is not None:
+        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
+        return response
+      if tts_out is None:
+        return make_response("TTS Generation Error!", 500)
+    except Exception as e:
+      return make_response(g.get('request_error'), 500)
+
+@limiter.limit("1/second")
+@nsaudio.route('/randomtms/')
+@nsaudio.route('/randomtms/<string:tms>/')
+@nsaudio.route('/randomtms/<string:tms>/<string:voice>/')
+@nsaudio.route('/randomtms/<string:tms>/<string:voice>/<string:chatid>/')
+@nsaudio.route('/randomtms/<string:tms>/<string:voice>/<string:chatid>/<string:lang>/')
+@nsaudio.route('/randomtms/<string:tms>/<string:voice>/<string:chatid>/<string:lang>/<string:text>')
+class AudioRandomTmsClass(Resource):
+  def get (self, tms = None, voice = "random", chatid = "000000", lang = "it", text = None):
+    try:
+      tts_out, text_response = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang,text)
+      if not text_response:
+          text = "Audio not found"
+          response = make_response(text, 204)
           response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
           return response
       elif tts_out is not None:
@@ -458,15 +492,20 @@ class AudioRepeatLearnClass(Resource):
       if tts_out is not None:
         response = send_file(tts_out, attachment_filename=filename, mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+        if voice is not None:
+          response.headers['X-Generated-Voice'] = voice.encode('utf-8').decode('latin-1')
         chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-        daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
-        daemon.start()
+        threading.Thread(target=lambda: chatbot.get_response(text), name="repeat-learn-user"+utils.get_random_string(24)).start()
         return response
       else:
         @after_this_request
         def clear_cache(response):
           cache.delete_memoized(AudioRepeatLearnClass.get, self, str, str, str)
-          return make_response("TTS Generation Error!", 500)
+          response = make_response("TTS Generation Error!", 500)
+          response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+          if voice is not None:
+            response.headers['X-Generated-Voice'] = voice.encode('utf-8').decode('latin-1')
+          return response
     except AudioLimitException:
       return get_response_limit_error(text)
     except Exception as e:
@@ -493,8 +532,7 @@ class AudioRepeatLearnUserClass(Resource):
         response = send_file(tts_out, attachment_filename=filename, mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
         chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
-        daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="repeat-learn-user"+utils.get_random_string(24))
-        daemon.start()
+        threading.Thread(target=lambda: chatbot.get_response(text), name="repeat-learn-user"+utils.get_random_string(24)).start()
         return response
       else:
         @after_this_request
@@ -519,7 +557,7 @@ class AudioRepeatLearnUserClass(Resource):
 @nsaudio.route('/ask/<string:text>/<int:learn>/<string:voice>/<string:chatid>/')
 @nsaudio.route('/ask/<string:text>/<int:learn>/<string:voice>/<string:chatid>/<string:lang>/')
 class AudioAskClass(Resource):
-  @cache.cached(timeout=30, query_string=True)
+  @cache.cached(timeout=5, query_string=True)
   def get (self, text: str, learn = 1, voice = "random", chatid = "000000", lang= "it"):
     try:
       tts_out = None
@@ -557,7 +595,7 @@ class AudioAskClass(Resource):
 @nsaudio.route('/ask/user/<string:text>/<string:user>/<int:learn>/<string:voice>/<string:chatid>/')
 @nsaudio.route('/ask/user/<string:text>/<string:user>/<int:learn>/<string:voice>/<string:chatid>/<string:lang>/')
 class AudioAskUserClass(Resource):
-  @cache.cached(timeout=30, query_string=True)
+  @cache.cached(timeout=5, query_string=True)
   def get (self, text: str, user: str, learn = 1, voice = "random", chatid = "000000", lang= "it"):
     try:
       tts_out = None
@@ -779,7 +817,6 @@ class InitChatterbotClass(Resource):
     try:
       #threading.Timer(0, get_chatbot_by_id, args=[chatid]).start()
       #return make_response("Initializing chatterbot. Watch the logs for errors.", 200)
-      utils.vacuum_chatbot_db(chatid)
       chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
       if chatbot is not None:
         return make_response("Initialized chatterbot on chatid " + chatid, 200)
@@ -805,7 +842,7 @@ class InitGeneratorClass(Resource):
 
 
 
-@limiter.limit("1/second")
+@limiter.limit("10/second")
 @nsutils.route('/healthcheck')
 class Healthcheck(Resource):
   def get (self):
@@ -821,8 +858,7 @@ class SentencesGenerateClass(Resource):
       text = utils.generate_sentence(chatid)
       if learn == 1:
         chatbot = get_chatbot_by_id(chatid)
-        daemon = Thread(target=chatbot.get_response, args=(text,), daemon=True, name="sentences-generate"+utils.get_random_string(24))
-        daemon.start()
+        threading.Thread(target=lambda: chatbot.get_response(text), name="sentences-generate"+utils.get_random_string(24)).start()
       return make_response(text, 200)
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -837,6 +873,22 @@ class ParagraphGenerateClass(Resource):
   def get(self, chatid = "000000"):
     try:
       return make_response(utils.generate_paragraph(chatid), 200)
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      return make_response(str(e), 500)
+
+
+
+nssubito = api.namespace('subito', 'Accumulators Subito.it APIs')
+@nssubito.route('/search')
+class SubitoSearchUrlClass(Resource):
+  def post (self):
+    try:
+      url = request.form.get("url")
+      query = subito_wrapper.run_query('', url=url)
+      return get_response_json(json.dumps(query.to_dict()))
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -866,22 +918,6 @@ class DownloadSentencesDb(Resource):
       return make_response(str(e), 500)
 
 
-
-@nsdatabase.route('/create/zipfile/')
-@nsdatabase.route('/create/zipfile/<string:chatid>')
-class  DatabaseCreateZipFile(Resource):
-  def get (self, chatid = "000000"):
-    try:
-      if chatid == "000000":
-        threading.Timer(0, utils.download_audio_zip, args=[chatid]).start()
-        return make_response("Creating zipfile under ./config dir. Watch the logs for errors.", 200)
-      else:
-        return make_response("Creating zipfile not permitted for this chatid!", 500)
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-      return make_response(str(e), 500)
 
 
 @nsdatabase.route('/delete/bytext/<string:text>/')
@@ -920,23 +956,15 @@ class DatabaseTrainFile(Resource):
       if lang is None:
         lang = "it"
       trf=request.files['trainfile']
-      if not trf and utils.allowed_file(trf):
+      if not trf and utils.allowed_file(trf, extension="txt"):
         return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
       else:
-        trainfile=TMP_DIR + '/' + utils.get_random_string(24) + ".txt"
+        trainfile=TMP_DIR + utils.get_slashes() + utils.get_random_string(24) + ".txt"
         out_stream = BytesIO()
         trf.save(trainfile)
-        with open(trainfile) as f:
-          wordlist = filtersdb.select_all(str(chatid))
-          for word in wordlist:
-            for line in f:
-              if word.lower() in line.lower():
-                os.remove(trainfile)
-                return get_response_filters_error(word)
         #threading.Timer(0, utils.train_txt, args=[trainfile, get_chatbot_by_id(chatid, lang), lang, chatid]).start()
         chatbot = get_chatbot_by_id(chatid, lang)
-        daemon = Thread(target=utils.train_txt, args=(trainfile,chatbot, lang, chatid,), daemon=True, name="trainer_thread")
-        daemon.start()
+        threading.Thread(target=lambda: utils.train_txt(trainfile,chatbot, lang, chatid), name="trainer_thread").start()
 
         return get_response_str("Done. Watch the logs for errors.")
     except Exception as e:
@@ -944,43 +972,6 @@ class DatabaseTrainFile(Resource):
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
-
-
-@nsdatabase.route('/filters/addword/<string:word>/')
-@nsdatabase.route('/filters/addword/<string:word>/<string:chatid>')
-class FiltersAdd(Resource):
-  def get (self, chatid = "000000", word = ""):
-    try:
-      if word != "":
-        filtersdb.insert(chatid, word)
-        audiodb.update_is_correct_by_word(word, chatid, 0, True)
-        return get_response_str("Adding to blocked words: " + word)
-      else:
-        return make_response(str("ERROR: No word provided"), 500)
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-      return make_response(str(e), 500)
-
-
-@nsdatabase.route('/filters/deleteword/<string:word>/')
-@nsdatabase.route('/filters/deleteword/<string:word>/<string:chatid>')
-class FiltersDelete(Resource):
-  def get (self, chatid = "000000", word = ""):
-    try:
-      if word != "":
-        filtersdb.delete(chatid, word)
-        audiodb.update_is_correct_by_word(word, chatid, 1, True)
-        return get_response_str("Removing from blocked words: " + word)
-      else:
-        return make_response(str("ERROR: No word provided"), 500)
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-      return make_response(str(e), 500)
-
 
 @nsdatabase.route('/reset/')
 @nsdatabase.route('/reset/<string:chatid>')
@@ -996,38 +987,14 @@ class FiltersDelete(Resource):
       return make_response(str(e), 500)
 
 
-@nsdatabase.route('/filters/deleteall/')
-@nsdatabase.route('/filters/deleteall/<string:chatid>')
-class FiltersDelete(Resource):
-  def get (self, chatid = "000000"):
-    try:
-      filtersdb.delete_all(chatid)
-      audiodb.update_is_correct_if_not_none(chatid, 1)
-      return get_response_str("Removing all from blocked words")
-    except Exception as e:
-      exc_type, exc_obj, exc_tb = sys.exc_info()
-      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-      return make_response(str(e), 500)
-
-
 @nsdatabase.route('/backup/chatbot/')
 @nsdatabase.route('/backup/chatbot/<string:chatid>')
 class BackupChatbot(Resource):
   def get (self, chatid = "000000"):
-    utils.backupdb(chatid, "sqlite3")
-    filename = os.path.dirname(os.path.realpath(__file__)) + '/config/' + chatid + '-db.txt'
+    filename = os.path.dirname(os.path.realpath(__file__)) + utils.get_slashes() + 'config' + utils.get_slashes() + chatid + '-db.txt'
     if utils.extract_sentences_from_chatbot(filename, chatid=chatid):
       utils.backupdb(chatid, "txt")
     return "Databases for chatid "+chatid+" backed up!"
-
-@nsdatabase.route('/restore/chatbot/')
-@nsdatabase.route('/restore/chatbot/<string:text>/')
-@nsdatabase.route('/restore/chatbot/<string:text>/<string:chatid>')
-class RestoreChatbot(Resource):
-  def get (self, text = None, chatid = "000000"):
-    outtxt = utils.restore(chatid, text)
-    return send_file(outtxt, attachment_filename='trainfile.txt', mimetype="text/plain")
 
 
 @nsdatabase.route('/forcedelete/bytext/<string:text>/')
@@ -1051,41 +1018,22 @@ def get_chatbot_by_id(chatid = "000000", lang = "it"):
     chatbots_dict[chatid + "_" + lang] = utils.get_chatterbot(chatid, os.environ['TRAIN'] == "True", lang = lang)
   return chatbots_dict[chatid + "_" + lang]
   
- 
-  
 @scheduler.task('interval', id='backupdb', hours=12)
 def backupdb():
-  utils.backupdb("000000", "sqlite3")
-  filename = os.path.dirname(os.path.realpath(__file__)) + '/config/' + chatid + '-db.txt'
-  if utils.extract_sentences_from_chatbot(filename, chatid=chatid):
-    utils.backupdb(chatid, "txt")
-  
-@scheduler.task('interval', id='clean_audio_zip', hours=28)
-def clean_audio_zip():
-  utils.clean_audio_zip()
+  filename = os.path.dirname(os.path.realpath(__file__)) + '/config/000000-db.txt'
+  if utils.extract_sentences_from_chatbot(filename, chatid="000000"):
+    utils.backupdb("000000", "txt")
   
 @scheduler.task('interval', id='delete_tts', hours=12)
 def delete_tts():
   utils.delete_tts(limit=100)
 
-@scheduler.task('interval', id='clean_old_limited_audios', hours=24)
-def clean_old_limited_audios():
-  audiodb.clean_old_limited_audios(int(os.environ.get("MAX_TTS_DURATION")))
-
-@scheduler.task('interval', id='vacuum', hours=13)
-def vacuum():
-  audiodb.vacuum()
-  filtersdb.vacuum()
-
 #if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
 chatbots_dict = {}
-audiodb.create_empty_tables()
-filtersdb.create_empty_tables()
 cache.init_app(app)
 limiter.init_app(app)
 scheduler.init_app(app)
 scheduler.start()
-
 
 if __name__ == '__main__':
   app.run()
