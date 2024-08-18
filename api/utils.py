@@ -332,7 +332,8 @@ def get_chatterbot(chatid: str, train: False, lang = "it"):
   chatbot = ChatBot(
       'PezzenteCapo',
       storage_adapter='custom_mongo_adapter.CustomMongoAdapter',
-      database_uri='mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/',
+      #database_uri='mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/',
+      database_uri='mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/',
       database_name=dbfile,
       statement_comparison_function = SpacySimilarity,
       response_selection_method = get_most_frequent_response,
@@ -423,7 +424,8 @@ def extract_sentences_from_chatbot(filename, chatid="000000"):
   try:    
 
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    #myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     statements = chatbotdb["statements"]
 
@@ -488,7 +490,8 @@ def clean_duplicates(chatid: str):
   try:
     
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    #myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     statements = chatbotdb["statements"]
 
@@ -520,7 +523,8 @@ def delete_by_text(chatid: str, text: str, force = False):
     
     
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    #myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     statements = chatbotdb["statements"]
 
@@ -747,7 +751,8 @@ def list_fakeyou_voices(lang:str):
 def get_random_from_bot(chatid: str, text: str):
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    #myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     statements = chatbotdb["statements"]
 
@@ -827,7 +832,8 @@ def process_population(limit, chatid, lang, listvoices):
       key, voice = random.choice(listvoices)
       sentence = ""
       dbfile = chatid + "-db"
-      myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+      #myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+      myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
       chatbotdb = myclient[dbfile]
       statement = chatbotdb["statements"]     
       cursor = statement.aggregate(
@@ -1048,7 +1054,8 @@ def rmdir(directory):
 def reset(chatid: str):
   try:
     dbfile = chatid + "-db"
-    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    #myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
     chatbotdb = myclient[dbfile]
     statement = chatbotdb["statements"]     
 
