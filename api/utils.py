@@ -201,7 +201,7 @@ def get_tts_aws(text: str, chatid="000000", language="it", save=True, limit=True
     if save:      
       #threading.Thread(target=lambda: thread_save_aws(text, mp3_fp, chatid=chatid, language=language, user=user)).start()
       audiodb.insert_or_update(text.strip(), chatid, None, "aws", language, is_correct=1, user=user)
-    return mp3_fpp
+    return mp3_fp
 
 def thread_save_aws(text: str, mp3_fp, chatid="000000", language="it", user=None):
   hashtext = hashlib.md5((text+"_aws").encode('utf-8')).hexdigest()
@@ -824,7 +824,7 @@ def process_population(limit, chatid, lang, listvoices):
 
   
   result = False
-
+  language = None
   counter_inserted = 0
   counter_skipped_failed = 0
   while counter_inserted < limit or counter_skipped_failed < (limit*10):
