@@ -960,7 +960,6 @@ class DatabaseTrainFile(Resource):
         return get_response_str("Error! Please upload a file name trainfile.txt with a sentence per line.")
       else:
         trainfile=TMP_DIR + utils.get_slashes() + utils.get_random_string(24) + ".txt"
-        out_stream = BytesIO()
         trf.save(trainfile)
         #threading.Timer(0, utils.train_txt, args=[trainfile, get_chatbot_by_id(chatid, lang), lang, chatid]).start()
         chatbot = get_chatbot_by_id(chatid, lang)
