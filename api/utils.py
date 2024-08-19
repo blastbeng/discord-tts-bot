@@ -43,6 +43,7 @@ from essential_generators import DocumentGenerator, MarkovTextGenerator, MarkovW
 from bs4 import BeautifulSoup
 from exceptions import AudioLimitException
 from exceptions import TimeExceededException
+from exceptions import FakeYouException
 import multiprocessing
 from functools import wraps
 from undetected_chromedriver import Chrome, ChromeOptions
