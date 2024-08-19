@@ -597,6 +597,7 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
             exceptmsg = exceptmsg + "\n- " + message
             exceptmsg = exceptmsg + "\n"
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"I can't reproduce this audio, the reasons can be:")
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Depending on the voice you choosed,") + " Permaban " + await utils.translate(currentguildid,"or ") + " Semiban " + await utils.translate(currentguildid,"from one of these services:") + "FakeYou TTS, Amazon Polly, Google TTS."
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"The generated TTS is longer than the maximum limit allowed ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Text contains a word blocked by filters")
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"An audio generation error occurred")
@@ -772,16 +773,17 @@ class PlayAudioWorker:
             exceptmsg = ""
             if text is not None:
                 exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Sentence") + ": " + text
-                if voice is not None:
-                    exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Voice") + ": " + voice
-                exceptmsg = exceptmsg + "\n"
-                exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"I can't reproduce this audio, the reasons can be:")
-                exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"The generated TTS is longer than the maximum limit allowed ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
-                exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Text contains a word blocked by filters")
-                exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"An audio generation error occurred")
-                exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"Remember that with too much spam the bot may be blocked for some minutes.") 
-                exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
-                await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
+            if voice is not None:
+                exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Voice") + ": " + voice
+            exceptmsg = exceptmsg + "\n"
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"I can't reproduce this audio, the reasons can be:")
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Depending on the voice you choosed,") + " Permaban " + await utils.translate(currentguildid,"or ") + " Semiban " + await utils.translate(currentguildid,"from one of these services:") + "FakeYou TTS, Amazon Polly, Google TTS."
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"The generated TTS is longer than the maximum limit allowed ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Text contains a word blocked by filters")
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"An audio generation error occurred")
+            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"Remember that with too much spam the bot may be blocked for some minutes.") 
+            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
+            await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
             
         if audio_count_queue > 0:
             audio_count_queue = audio_count_queue - 1

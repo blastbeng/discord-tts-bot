@@ -4,4 +4,4 @@ cd /opt/docker/compose/discord-tts-bot
 #sudo rm /opt/docker/compose/discord-tts-bot/config/markov*
 #sudo rm /opt/docker/compose/discord-tts-bot/config/sentences*
 docker compose -f docker-compose.yml build
-sudo systemctl restart docker-compose@discord-tts-bot.service
+sudo systemctl restart discord-tts-bot.service

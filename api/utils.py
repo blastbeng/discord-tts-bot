@@ -559,6 +559,17 @@ def save_mp3(mp3, name):
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
   return filesave
 
+@run_with_timer(max_execution_time=60)
+def get_fakeyou_tts(text, voice_to_use):
+  wav = None
+  for x in range(3):
+    try:
+      wav = fy.say(text.strip(), voice_to_use)
+    except:
+      logging.error("get_tts - FAKEYOU ERROR \n         CHATID: %s\n         VOICE: %s\n         SENTENCE: %s\n         SLEEPING 15 SECONDS, COUNTER IS AT: %s", chatid, voice_to_use, text, str(x))
+      time.sleep(15)
+  return wav
+
 def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it", save=True, call_fy=True, limit=True, user=None):
   try:
     if voice is None or voice == "null" or voice == "random":
@@ -571,13 +582,8 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
         return datafy
       elif call_fy:
         wav=None
-        for x in range(5):
-          try:
-            #fy.login(FAKEYOU_USER,FAKEYOU_PASS)
-            wav = fy.say(text.strip(), voice_to_use)
-          except:
-            logging.error("get_tts - FAKEYOU ERROR \n         CHATID: %s\n         VOICE: %s\n         SENTENCE: %s\n         SLEEPING 120 SECONDS, COUNTER IS AT: %s", chatid, voice_to_use, text, str(x))
-            time.sleep(120)
+        fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+        wav = get_fakeyou_tts(text.strip(), voice_to_use)
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
           out = BytesIO()
@@ -639,7 +645,7 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
         #else:
         #  proxies = {}
         #  fy.session.proxies.update(proxies)
-        #fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+        fy.login(FAKEYOU_USER,FAKEYOU_PASS)
         wav = fy.say(text.strip(), voice_to_use)
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
@@ -1122,7 +1128,7 @@ def login_google():
 
 def delete_tts(limit=100):
   try:
-    #fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+    fy.login(FAKEYOU_USER,FAKEYOU_PASS)
     user = fy.get_user(FAKEYOU_USER,limit=limit)
     if user is not None and user.ttsResults is not None and user.ttsResults.json is not None:
       for tokenJson in user.ttsResults.json:
