@@ -595,7 +595,9 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
                     await interaction.followup.send(message, ephemeral = ephermeal)
                 elif response.status == 424:
                     logging.error("[GUILDID : %s] do_play - FakeYou APIs are offline", str(get_current_guild_id(interaction.guild.id)))
-                    message = await utils.translate(get_current_guild_id(interaction.guild.id),"FakeYou APIs aren't available at the moment. Please try again later or use one of these voices:") + " google, Giorgio"
+                    message = message + "\n" + await utils.translate(currentguildid,"I can't reproduce this audio because FakeYou isn't available at the moment. Please try again later.")
+                    message = message + "\n" + await utils.translate(currentguildid,"Alternatively you can use one of these voices:") + " google, Giorgio"
+                    message = message + "\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
                     await interaction.followup.send(message, ephemeral = ephermeal)
                 else:
                     logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(get_current_guild_id(interaction.guild.id)))
@@ -727,7 +729,13 @@ class PlayAudioWorker:
                         await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
                     elif response.status == 424:
                         logging.error("[GUILDID : %s] do_play - FakeYou APIs are offline", str(get_current_guild_id(self.interaction.guild.id)))
-                        exceptmsg = await utils.translate(get_current_guild_id(self.interaction.guild.id),"FakeYou APIs aren't available at the moment. Please try again later or use one of these voices:") + " ["+ str(text) +"]"
+                        if text is not None:
+                            exceptmsg = exceptmsg + "\n" + await utils.translate(currentguildid,"Sentence") + ": " + text
+                        if voice is not None: 
+                            exceptmsg = exceptmsg + "\n" + await utils.translate(currentguildid,"Voice") + ": " + voice
+                        exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"I can't reproduce this audio because FakeYou isn't available at the moment. Please try again later.")
+                        exceptmsg = exceptmsg + "\n" + await utils.translate(currentguildid,"Alternatively you can use one of these voices:") + " google, Giorgio"
+                        exceptmsg = exceptmsg + "\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
                         await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
                     else:
                         logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(get_current_guild_id(self.interaction.guild.id)))
@@ -2338,7 +2346,9 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
                     await interaction.followup.send(message, ephemeral = True)
                 elif response.status_code == 424:
                     logging.error("[GUILDID : %s] do_play - FakeYou APIs are offline", str(get_current_guild_id(interaction.guild.id)))
-                    message = await utils.translate(get_current_guild_id(interaction.guild.id),"FakeYou APIs aren't available at the moment. Please try again later or use one of these voices:") + " google, Giorgio"
+                    message = message + "\n" + await utils.translate(currentguildid,"I can't reproduce this audio because FakeYou isn't available at the moment. Please try again later.")
+                    message = message + "\n" + await utils.translate(currentguildid,"Alternatively you can use one of these voices:") + " google, Giorgio"
+                    message = message + "\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
                     await interaction.followup.send(message, ephemeral = True)
                 else:
                     logging.error("[GUILDID : %s] upload/trainfile/txt - Received bad response from APIs", str(currentguildid))
