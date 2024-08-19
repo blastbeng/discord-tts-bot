@@ -348,6 +348,7 @@ async def listvoices_api(language="it", filter=None):
         else:
             fakeyou_voices = {}
             fakeyou_voices ["google"] = "google"
+            fakeyou_voices ["Giorgio"] = "aws"
             return fakeyou_voices
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -358,6 +359,14 @@ async def listvoices_api(language="it", filter=None):
 async def rps_autocomplete(interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
     currentguildid=get_current_guild_id(interaction.guild.id)
     choices = await listvoices_api(language=utils.get_guild_language(currentguildid))
+    choices = [app_commands.Choice(name=choice, value=choice) for choice in choices if current.lower() in choice.lower()][:25]
+    return choices
+
+async def rps_autocomplete_nofakeyou(interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+    currentguildid=get_current_guild_id(interaction.guild.id)
+    choices = {}
+    choices ["google"] = "google"
+    choices ["Giorgio"] = "aws"
     choices = [app_commands.Choice(name=choice, value=choice) for choice in choices if current.lower() in choice.lower()][:25]
     return choices
 
@@ -1219,7 +1228,7 @@ async def leave(interaction: discord.Interaction):
 @app_commands.describe(text="The sentence to repeat")
 @app_commands.rename(voice='voice')
 @app_commands.describe(voice="The voice to use")
-@app_commands.autocomplete(voice=rps_autocomplete)
+@app_commands.autocomplete(voice=rps_autocomplete_nofakeyou)
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def speak(interaction: discord.Interaction, text: str, voice: str = "random"):
     """Repeat a sentence"""
@@ -1331,7 +1340,7 @@ async def wikipedia(interaction: discord.Interaction, text: str):
 @app_commands.describe(text="the sentence to ask")
 @app_commands.rename(voice='voice')
 @app_commands.describe(voice="The voice to use")
-@app_commands.autocomplete(voice=rps_autocomplete)
+@app_commands.autocomplete(voice=rps_autocomplete_nofakeyou)
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def ask(interaction: discord.Interaction, text: str, voice: str = "google"):
     """Ask something."""
