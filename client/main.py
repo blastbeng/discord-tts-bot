@@ -2332,7 +2332,7 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
                     logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(get_current_guild_id(interaction.guild.id)))
                     message = await utils.translate(get_current_guild_id(interaction.guild.id),"Error. The sentence contains a word that is blocked by filters.") + " ["+ str(message) +"]"
                     await interaction.followup.send(message, ephemeral = True)
-                elif response.status_code == 406:
+                elif response.status_code == 424:
                     logging.error("[GUILDID : %s] do_play - FakeYou APIs are offline", str(get_current_guild_id(interaction.guild.id)))
                     message = await utils.translate(get_current_guild_id(interaction.guild.id),"FakeYou APIs aren't available at the moment. Please try again later or use one of these voices:") + " google, Giorgio"
                     await interaction.followup.send(message, ephemeral = True)
