@@ -105,6 +105,11 @@ def get_response_limit_error(text: str):
   r.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
   return r
 
+def get_response_fakeyou_error(text: str):
+  r = make_response("FakeYou APIs Offline", 424)
+  r.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+  return r
+
 def get_response_filters_error(text: str):
   r = make_response("This sentence contains a word that is blocked by filters", 406)
   r.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
@@ -392,6 +397,8 @@ class AudioSaveRepeatClass(Resource):
           return make_response("TTS Generation Error!", 500)
     except AudioLimitException:
       return get_response_limit_error(text)
+    except FakeYouException:
+      return get_response_fakeyou_error(text)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -423,6 +430,8 @@ class AudioCurseClass(Resource):
           return make_response("TTS Generation Error!", 500)
     except AudioLimitException:
       return get_response_limit_error(cursez)
+    except FakeYouException:
+      return get_response_fakeyou_error(cursez)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -508,6 +517,8 @@ class AudioRepeatLearnClass(Resource):
           return response
     except AudioLimitException:
       return get_response_limit_error(text)
+    except FakeYouException:
+      return get_response_fakeyou_error(text)
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -541,6 +552,8 @@ class AudioRepeatLearnUserClass(Resource):
           return make_response("TTS Generation Error!", 500)
     except AudioLimitException:
       return get_response_limit_error(text)
+    except FakeYouException:
+      return get_response_fakeyou_error(text)
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -582,6 +595,8 @@ class AudioAskClass(Resource):
           return make_response("TTS Generation Error!", 500)
     except AudioLimitException:
       return get_response_limit_error(chatbot_resp)
+    except FakeYouException:
+      return get_response_fakeyou_error(chatbot_resp)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -620,6 +635,8 @@ class AudioAskUserClass(Resource):
           return make_response("TTS Generation Error!", 500)
     except AudioLimitException:
       return get_response_limit_error(chatbot_resp)
+    except FakeYouException:
+      return get_response_fakeyou_error(chatbot_resp)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -649,6 +666,8 @@ class AudioSearchClass(Resource):
           return make_response("TTS Generation Error!", 500)
     except AudioLimitException:
       return get_response_limit_error(wikisaid)
+    except FakeYouException:
+      return get_response_fakeyou_error(wikisaid)
     except Exception as e:
       g.request_error = str(e)
       @after_this_request
@@ -689,6 +708,8 @@ class AudioInsultClass(Resource):
         return resp
     except AudioLimitException:
       return get_response_limit_error(sentence)
+    except FakeYouException:
+      return get_response_fakeyou_error(sentence)
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]

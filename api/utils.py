@@ -559,16 +559,13 @@ def save_mp3(mp3, name):
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
   return filesave
 
-@run_with_timer(max_execution_time=60)
 def get_fakeyou_tts(text, voice_to_use):
-  wav = None
-  for x in range(3):
-    try:
-      wav = fy.say(text.strip(), voice_to_use)
-    except:
-      logging.error("get_tts - FAKEYOU ERROR \n         CHATID: %s\n         VOICE: %s\n         SENTENCE: %s\n         SLEEPING 15 SECONDS, COUNTER IS AT: %s", chatid, voice_to_use, text, str(x))
-      time.sleep(15)
-  return wav
+  try:
+    fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+    wav = fy.say(text.strip(), voice_to_use)
+    return wav
+  except:
+    raise FakeYouException
 
 def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it", save=True, call_fy=True, limit=True, user=None):
   try:
@@ -581,10 +578,11 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       if datafy is not None:
         return datafy
       elif call_fy:
-        wav=None
-        fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+        wav = None
         wav = get_fakeyou_tts(text.strip(), voice_to_use)
-        if wav is not None:
+        if wav is None:
+          raise FakeYouException
+        elif wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
           out = BytesIO()
           sound.export(out, format='mp3', bitrate="256k")

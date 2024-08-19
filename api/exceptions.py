@@ -9,3 +9,6 @@ class BlockedWordException(Exception):
 
 class TimeExceededException(Exception):
     "Max execution time exceeded"
+
+class FakeYouException(Exception):
+    "FakeYou APIs exception"

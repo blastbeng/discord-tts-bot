@@ -605,7 +605,8 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
         if message is not None:
             exceptmsg = exceptmsg + "\n- " + message
             exceptmsg = exceptmsg + "\n"
-            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"I can't reproduce this audio, the reasons can be:")
+            exceptmsg = exceptmsg + "\n " + await utils.translate(currentguildid,"I can't reproduce this audio, the reasons can be:")
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"If you used a modified voice and an error occurred, could be that FakeYou APIs aren't available at the moment.")
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Depending on the voice you choosed,") + " Permaban " + await utils.translate(currentguildid,"or ") + " Semiban " + await utils.translate(currentguildid,"from one of these services:") + "FakeYou TTS, Amazon Polly, Google TTS."
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"The generated TTS is longer than the maximum limit allowed ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Text contains a word blocked by filters")
@@ -720,6 +721,10 @@ class PlayAudioWorker:
                         logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(get_current_guild_id(self.interaction.guild.id)))
                         exceptmsg = await utils.translate(get_current_guild_id(self.interaction.guild.id),"Error. The sentence contains a word that is blocked by filters.") + " ["+ str(text) +"]"
                         await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
+                    elif response.status == 424:
+                        logging.error("[GUILDID : %s] do_play - FakeYou APIs are offline", str(get_current_guild_id(self.interaction.guild.id)))
+                        exceptmsg = await utils.translate(get_current_guild_id(self.interaction.guild.id),"FakeYou APIs aren't available at the moment. Please try again later or use one of these voices:") + " ["+ str(text) +"]"
+                        await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
                     else:
                         logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(get_current_guild_id(self.interaction.guild.id)))
                         raise Exception("play_audio_worker - Error! - ")
@@ -785,13 +790,14 @@ class PlayAudioWorker:
             if voice is not None:
                 exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Voice") + ": " + voice
             exceptmsg = exceptmsg + "\n"
-            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"I can't reproduce this audio, the reasons can be:")
+            exceptmsg = exceptmsg + "\n " + await utils.translate(currentguildid,"I can't reproduce this audio, the reasons can be:")
+            exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"If you used a modified voice and an error occurred, could be that FakeYou APIs aren't available at the moment.")
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Depending on the voice you choosed,") + " Permaban " + await utils.translate(currentguildid,"or ") + " Semiban " + await utils.translate(currentguildid,"from one of these services:") + "FakeYou TTS, Amazon Polly, Google TTS."
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"The generated TTS is longer than the maximum limit allowed ("+ str(int(os.environ.get("MAX_TTS_DURATION"))) +" seconds)")
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Text contains a word blocked by filters")
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"An audio generation error occurred")
             exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"Remember that with too much spam the bot may be blocked for some minutes.") 
-            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
+            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + " https://fakeyou.com/"
             await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
             
         if audio_count_queue > 0:
@@ -2325,6 +2331,10 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
                     message = response.headers["X-Generated-Text"].encode('latin-1').decode('utf-8')
                     logging.error("[GUILDID : %s] do_play - Blocked by filters detected from APIs", str(get_current_guild_id(interaction.guild.id)))
                     message = await utils.translate(get_current_guild_id(interaction.guild.id),"Error. The sentence contains a word that is blocked by filters.") + " ["+ str(message) +"]"
+                    await interaction.followup.send(message, ephemeral = True)
+                elif response.status_code == 406:
+                    logging.error("[GUILDID : %s] do_play - FakeYou APIs are offline", str(get_current_guild_id(interaction.guild.id)))
+                    message = await utils.translate(get_current_guild_id(interaction.guild.id),"FakeYou APIs aren't available at the moment. Please try again later or use one of these voices:") + " google, Giorgio"
                     await interaction.followup.send(message, ephemeral = True)
                 else:
                     logging.error("[GUILDID : %s] upload/trainfile/txt - Received bad response from APIs", str(currentguildid))
