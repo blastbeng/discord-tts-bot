@@ -560,7 +560,6 @@ def save_mp3(mp3, name):
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
   return filesave
 
-@run_with_timer(max_execution_time=120)
 def get_fakeyou_tts(text, voice_to_use):
   try:
     fy.login(FAKEYOU_USER,FAKEYOU_PASS)
@@ -607,8 +606,6 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       return get_tts_google(text.strip(), chatid=chatid, language=language, save=save, limit=limit, user=user)
   except AudioLimitException as el:
     raise(el)
-  except TimeExceededException:
-    raise FakeYouException
   except FakeYouException as elf:
     raise (elf)
   except Exception as e:
