@@ -82,12 +82,12 @@ polly = client('polly', aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
                         aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"), 
                         region_name='eu-central-1')
 
-try:
-  fy.login(FAKEYOU_USER,FAKEYOU_PASS)
-except Exception as e:
-  exc_type, exc_obj, exc_tb = sys.exc_info()
-  fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-  logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno)
+#try:
+#  fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+#except Exception as e:
+#  exc_type, exc_obj, exc_tb = sys.exc_info()
+#  fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+#  logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno)
 
 fake = Faker()
 
@@ -609,6 +609,8 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
     raise(el)
   except TimeExceededException:
     raise FakeYouException
+  except FakeYouException as elf:
+    raise (elf)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
