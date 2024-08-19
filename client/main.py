@@ -595,9 +595,10 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
                     await interaction.followup.send(message, ephemeral = ephermeal)
                 elif response.status == 424:
                     logging.error("[GUILDID : %s] do_play - FakeYou APIs are offline", str(get_current_guild_id(interaction.guild.id)))
+                    message = ""
                     message = message + "\n" + await utils.translate(currentguildid,"I can't reproduce this audio because FakeYou isn't available at the moment. Please try again later.")
                     message = message + "\n" + await utils.translate(currentguildid,"Alternatively you can use one of these voices:") + " google, Giorgio"
-                    message = message + "\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
+                    message = message + "\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue here:") + "https://fakeyou.com/"
                     await interaction.followup.send(message, ephemeral = ephermeal)
                 else:
                     logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(get_current_guild_id(interaction.guild.id)))
@@ -618,7 +619,7 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"The sentence contains a word blocked by filters")
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"An audio generation error occurred")
             exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"Remember that with too much spam the bot may be blocked for some minutes.") 
-            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
+            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue here:") + "https://fakeyou.com/"
             await self.interaction.followup.edit_message(message_id=self.message.id,content=self.exceptmsg)
 
 class PlayAudioLoop:
@@ -729,13 +730,14 @@ class PlayAudioWorker:
                         await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
                     elif response.status == 424:
                         logging.error("[GUILDID : %s] do_play - FakeYou APIs are offline", str(get_current_guild_id(self.interaction.guild.id)))
+                        exceptmsg = ""
                         if text is not None:
-                            exceptmsg = exceptmsg + "\n" + await utils.translate(currentguildid,"Sentence") + ": " + text
+                            exceptmsg = exceptmsg + "\n" + await utils.translate(currentguildid,"text") + ": " + text
                         if voice is not None: 
                             exceptmsg = exceptmsg + "\n" + await utils.translate(currentguildid,"Voice") + ": " + voice
                         exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"I can't reproduce this audio because FakeYou isn't available at the moment. Please try again later.")
                         exceptmsg = exceptmsg + "\n" + await utils.translate(currentguildid,"Alternatively you can use one of these voices:") + " google, Giorgio"
-                        exceptmsg = exceptmsg + "\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
+                        exceptmsg = exceptmsg + "\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue here:") + "https://fakeyou.com/"
                         await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
                     else:
                         logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(get_current_guild_id(self.interaction.guild.id)))
@@ -785,20 +787,20 @@ class PlayAudioWorker:
         #                await self.interaction.followup.send(message, ephemeral = self.ephermeal)
         #            else:
         #                logging.error("[GUILDID : %s] do_play - Received bad response from APIs.", str(currentguildid))
-        #                await self.interaction.followup.send(await utils.translate(currentguildid,"An audio generation error occurred.") + "\n" + await utils.translate(currentguildid,"If a modified voice has been selected, remember that with too much spam the bot may be blocked from FakeYou.com for some minutes.") + "\n" + await utils.translate(currentguildid,"You can check service status and the TTS queue at this address:") + "https://fakeyou.com/", ephemeral = self.ephermeal)                    
+        #                await self.interaction.followup.send(await utils.translate(currentguildid,"An audio generation error occurred.") + "\n" + await utils.translate(currentguildid,"If a modified voice has been selected, remember that with too much spam the bot may be blocked from FakeYou.com for some minutes.") + "\n" + await utils.translate(currentguildid,"You can check service status and the TTS queue here:") + "https://fakeyou.com/", ephemeral = self.ephermeal)                    
         #        await session.close()
         #except aiohttp.ClientConnectionError as e:
         #    exc_type, exc_obj, exc_tb = sys.exc_info()
         #    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         #    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        #    await self.interaction.followup.send(await utils.translate(currentguildid,"An audio generation error occurred.") + "\n" + await utils.translate(currentguildid,"If a modified voice has been selected, remember that with too much spam the bot may be blocked from FakeYou.com for some minutes.") + "\n" + await utils.translate(currentguildid,"You can check service status and the TTS queue at this address:") + "https://fakeyou.com/", ephemeral = self.ephermeal)
+        #    await self.interaction.followup.send(await utils.translate(currentguildid,"An audio generation error occurred.") + "\n" + await utils.translate(currentguildid,"If a modified voice has been selected, remember that with too much spam the bot may be blocked from FakeYou.com for some minutes.") + "\n" + await utils.translate(currentguildid,"You can check service status and the TTS queue here:") + "https://fakeyou.com/", ephemeral = self.ephermeal)
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
             logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
             exceptmsg = ""
             if text is not None:
-                exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Sentence") + ": " + text
+                exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"text") + ": " + text
             if voice is not None:
                 exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"Voice") + ": " + voice
             exceptmsg = exceptmsg + "\n"
@@ -809,7 +811,7 @@ class PlayAudioWorker:
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"The sentence contains a word blocked by filters")
             exceptmsg = exceptmsg + "\n- " + await utils.translate(currentguildid,"An audio generation error occurred")
             exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"Remember that with too much spam the bot may be blocked for some minutes.") 
-            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + " https://fakeyou.com/"
+            exceptmsg = exceptmsg + "\n\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue here:") + " https://fakeyou.com/"
             await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
             
         if audio_count_queue > 0:
@@ -2346,9 +2348,10 @@ async def train(interaction: discord.Interaction, file: discord.Attachment):
                     await interaction.followup.send(message, ephemeral = True)
                 elif response.status_code == 424:
                     logging.error("[GUILDID : %s] do_play - FakeYou APIs are offline", str(get_current_guild_id(interaction.guild.id)))
+                    message = ""
                     message = message + "\n" + await utils.translate(currentguildid,"I can't reproduce this audio because FakeYou isn't available at the moment. Please try again later.")
                     message = message + "\n" + await utils.translate(currentguildid,"Alternatively you can use one of these voices:") + " google, Giorgio"
-                    message = message + "\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue at this address:") + "https://fakeyou.com/"
+                    message = message + "\n" + await utils.translate(currentguildid,"You can check the status of the FakeYou.com service and the TTS queue here:") + "https://fakeyou.com/"
                     await interaction.followup.send(message, ephemeral = True)
                 else:
                     logging.error("[GUILDID : %s] upload/trainfile/txt - Received bad response from APIs", str(currentguildid))
