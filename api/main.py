@@ -25,6 +25,7 @@ from threading import Thread
 from bestemmie import Bestemmie
 from libretranslator import LibreTranslator
 from exceptions import AudioLimitException
+from exceptions import FakeYouException
 from time import strftime
 from utils import SentenceToLearn
 
