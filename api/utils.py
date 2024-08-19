@@ -607,7 +607,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       return get_tts_google(text.strip(), chatid=chatid, language=language, save=save, limit=limit, user=user)
   except AudioLimitException as el:
     raise(el)
-  except TimeExceededException as e:
+  except TimeExceededException:
     raise FakeYouException
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
