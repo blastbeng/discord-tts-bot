@@ -7,8 +7,8 @@ services:
     restart: always
     volumes:
       - redisdata:/data
-    networks:
-      - discord-tts-bot-network
+    ports:
+      - 63799:6379
   discord-tts-bot-api:
     pull_policy: build
     build:
@@ -35,10 +35,9 @@ services:
       interval: 15s
       timeout: 5s
       retries: 12
-    networks:
-      - discord-tts-bot-network
-    ports: 
-      - 5080:5080
+    network_mode: host
+    #ports:
+    #  - 5080:5080
   discord-tts-bot-client:
     pull_policy: build
     build:
@@ -59,8 +58,9 @@ services:
       - "/tmp/discord-tts-bot-discord:/tmp/discord-tts-bot-discord"
     image: "blastbeng/discord-tts-bot-client:1.0.0"
     restart: always
-    networks:
-      - discord-tts-bot-network
+    network_mode: host
+    #networks:
+    #  - discord-tts-bot-network
   discord-tts-bot-telegram:
     pull_policy: build
     build:
@@ -81,13 +81,8 @@ services:
       - "/tmp/discord-tts-bot-discord:/tmp/discord-tts-bot-discord"
     image: "blastbeng/discord-tts-bot-telegram:1.0.0"
     restart: always
-    networks:
-      - discord-tts-bot-network
+    network_mode: host
+    #networks:
+    #  - discord-tts-bot-network
 volumes:
   redisdata:
-networks:
-  discord-tts-bot-network:  
-    enable_ipv6: true
-    ipam:
-      config:
-        - subnet: 2001:db8::/64
