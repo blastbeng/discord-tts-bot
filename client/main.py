@@ -25,7 +25,6 @@ import asyncio
 import requests
 import aiohttp
 import io
-from threading import Thread
 from random import randint
 import requests.exceptions
 import psutil
@@ -44,6 +43,9 @@ GUILD_ID = discord.Object(id=os.environ.get("GUILD_ID"))
 
 def get_api_url():
     return os.environ.get("API_URL")
+
+def get_voiceclone_api_url():
+    return os.environ.get("API_VOICECLONE_URL")
 
 class MyClient(discord.Client):
     def __init__(self, *, intents: discord.Intents):
@@ -310,8 +312,9 @@ populator_loops_dict = {}
 generator_loops_dict = {}
 #subito_loops_dict = {}
 cvc_loops_dict = {}
+available_voices = {}
+voiceclone_voices = {}
 fakeyou_voices = {}
-
 track_users_dict = {}
 
 #async def display_loader(interaction, currentguildid, additional_msg=None):
@@ -327,34 +330,65 @@ track_users_dict = {}
 
 async def listvoices_api(language="it", filter=None):
     try:
+        global voiceclone_voices
         global fakeyou_voices
-        if fakeyou_voices is None or len(fakeyou_voices) == 0 or len(fakeyou_voices) == 1:
+        global available_voices
+        available_voices = {}
+        if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")):
+            if voiceclone_voices is None or len(voiceclone_voices) == 0 or len(voiceclone_voices) == 2:
+                url = get_voiceclone_api_url() + os.environ.get("API_VOICECLONE_PATH") + "/listvoices"
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(url) as response:
+                            if (response.status == 200):
+                                text = await response.text()
+                                voiceclone_voices = json.loads(text)
+                                available_voices.update(voiceclone_voices)
+                        await session.close()         
+                except aiohttp.ClientConnectionError as e:
+                    pass
+            else:
+                available_voices.update(voiceclone_voices)
+        if fakeyou_voices is None or len(fakeyou_voices) == 0 or len(fakeyou_voices) == 2:
             url = get_api_url() + os.environ.get("API_PATH_UTILS") + "/fakeyou/listvoices/" + language
             async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    if (response.status == 200):
-                        text = await response.text()
-                        fakeyou_voices = json.loads(text)
-                await session.close() 
-        if (fakeyou_voices is not None and len(fakeyou_voices) > 0):
+                try:
+                    async with session.get(url) as response:
+                        if (response.status == 200):
+                            text = await response.text()
+                            fakeyou_voices = json.loads(text)
+                            available_voices.update(fakeyou_voices)
+                    await session.close()
+                except aiohttp.ClientConnectionError as e:
+                    pass
+        else:
+            available_voices.update(fakeyou_voices)
+        if (available_voices is not None and len(available_voices) > 0):
             if filter is not None:
                 voice = None
-                for key in fakeyou_voices:
+                for key in available_voices:
                     if filter.lower() in key.lower():
-                        voice = fakeyou_voices[key]
+                        voice = available_voices[key]
                 return voice
             else:
-                return fakeyou_voices
+                return available_voices
         else:
-            fakeyou_voices = {}
-            fakeyou_voices ["google"] = "google"
-            fakeyou_voices ["Giorgio"] = "aws"
-            return fakeyou_voices
+            available_voices = {}
+            available_voices ["google"] = "google"
+            available_voices ["Giorgio"] = "aws"
+            return available_voices
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
         return None
+
+def is_voiceclone_voice(voice_name):
+    global voiceclone_voices
+    for voice in voiceclone_voices:
+        if voice == voice_name:
+            return True
+    return False
 
 async def rps_autocomplete(interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
     currentguildid=get_current_guild_id(interaction.guild.id)
@@ -562,7 +596,7 @@ async def do_play(url: str, interaction: discord.Interaction, currentguildid: st
                     message = response.headers["X-Generated-Text"]
                 if "X-Generated-Voice" in response.headers:
                     voice_code = response.headers["X-Generated-Voice"]
-                    voice = {i for i in dic if dic[i]==fakeyou_voices}
+                    voice = {i for i in dic if dic[i]==available_voices}
                 if (response.status == 200):
                     content = await response.content.read()
                     voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
@@ -693,7 +727,7 @@ class PlayAudioWorker:
                         text = response.headers["X-Generated-Text"]
                     if "X-Generated-Voice" in response.headers:
                         voice_code = response.headers["X-Generated-Voice"]
-                        voice = {i for i in dic if dic[i]==fakeyou_voices}
+                        voice = {i for i in dic if dic[i]==available_voices}
                     if (response.status == 200):
                         content = await response.content.read()
 
@@ -719,6 +753,10 @@ class PlayAudioWorker:
                     elif response.status == 204:
                         logging.info("[GUILDID : %s] do_play - Audio not found", str(get_current_guild_id(self.interaction.guild.id)))
                         exceptmsg = await utils.translate(get_current_guild_id(self.interaction.guild.id),"I haven't found any audio containing the requested text.")
+                        await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
+                    elif response.status == 206:
+                        logging.info("[GUILDID : %s] do_play - Other processes running in voice clone APIs", str(get_current_guild_id(self.interaction.guild.id)))
+                        exceptmsg = await utils.translate(get_current_guild_id(self.interaction.guild.id),"The server GPU is busy processing other requests and AI Voices are not available at the moment, please try again later.")
                         await self.interaction.followup.edit_message(message_id=self.message.id,content=exceptmsg)
                     elif response.status == 400:
                         logging.error("[GUILDID : %s] do_play - TTS Limit exceeded detected from APIs", str(get_current_guild_id(self.interaction.guild.id)))
@@ -1274,7 +1312,14 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "rando
                 voice = randompy.choice(['google', 'aws'])
 
             if voice is not None:
-                url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/learn/user/"+urllib.parse.quote(str(interaction.user.name))+"/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
+                if is_voiceclone_voice(voice):
+                    if str(interaction.guild.id) == str(os.environ.get("GUILD_ID")) and str(interaction.user.id) == str(os.environ.get("ADMIN_ID")) and interaction.user.guild_permissions.administrator:
+                        url = get_voiceclone_api_url+os.environ.get("API_VOICECLONE_PATH")+urllib.parse.quote(str(voice))+"/"+urllib.parse.quote(str(text))+"/"
+                    else:
+                        await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Users allowed to use this voice:") + " " + str(interaction.user.name), ephemeral = True)
+                else:
+                    url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/learn/user/"+urllib.parse.quote(str(interaction.user.name))+"/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
+                        
                 
                 message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm starting to generate the audio for:") + " **" + text + "**" + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
                 worker = PlayAudioWorker(url, interaction, message)
