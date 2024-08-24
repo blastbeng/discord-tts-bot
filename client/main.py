@@ -1382,7 +1382,7 @@ async def audio(interaction: discord.Interaction, audio: discord.Attachment):
                 await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The file extension is not valid."), ephemeral = True)     
             else:
                 audiofile = await audio.to_file()            
-                voice_client.play(FFmpegPCMAudioBytesIO(audiofile.fp.read(), pipe=True), after=lambda e: logging.info("Playing audio - " + text))
+                voice_client.play(FFmpegPCMAudioBytesIO(audiofile.fp.read(), pipe=True), after=lambda e: logging.info(urllib.parse.quote(str(interaction.user.name)) + " requested an audio playback from file"))
                 await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Done! I'm starting the audio playback!"), ephemeral = True)   
         else:
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)            
