@@ -146,6 +146,8 @@ class SlashCommandButton(discord.ui.Button["InteractionRoles"]):
                 await interaction.followup.send("/train <file> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot inserts in its database the sentencess present in the TXT file"), ephemeral = True)
             elif self.name == constants.WIKIPEDIA:
                 await interaction.followup.send("/wikipedia <text> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot searches something on wikipedia"), ephemeral = True)
+            elif self.name == constants.AUDIO:
+                await interaction.followup.send("/audio <audio> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"Audio playback") + " " + await utils.translate(get_current_guild_id(interaction.guild.id),"from an audio file"), ephemeral = True)
             #elif self.name == constants.BARD:
             #    await interaction.followup.send("/bard <text> -> " + await utils.translate(get_current_guild_id(interaction.guild.id),"The bot asks something to") + " Google Bard APIs", ephemeral = True)
             else:
@@ -1360,6 +1362,33 @@ async def wikipedia(interaction: discord.Interaction, text: str):
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
+@client.tree.command()
+@app_commands.rename(audio='audio')
+@app_commands.describe(audio="The audio (mp3 or wav)")
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+async def audio(interaction: discord.Interaction, audio: discord.Attachment):
+    """Audio playback from the input audio"""
+    try:
+        await interaction.response.defer(thinking=True, ephemeral=True)        
+        check_permissions(interaction)
+        
+        voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
+        await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
+
+        if voice_client and not hasattr(voice_client, 'play') and voice_client.is_connected():
+            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later, I'm initializing the voice connection..."), ephemeral = True)
+        elif voice_client:            
+            if not utils.allowed_audio(audio.filename):
+                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The file extension is not valid."), ephemeral = True)     
+            else:
+                audiofile = await audio.to_file()            
+                voice_client.play(FFmpegPCMAudioBytesIO(audiofile.fp.read(), pipe=True), after=lambda e: logging.info("Playing audio - " + text))
+                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Done! I'm starting the audio playback!"), ephemeral = True)   
+        else:
+            await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)            
+        
+    except Exception as e:
+        await send_error(e, interaction)
 
 #@client.tree.command()
 #@app_commands.rename(text='text')
@@ -2440,6 +2469,7 @@ async def reset(interaction: discord.Interaction):
 
 @admin.error
 @accept.error
+@audio.error
 @avatar.error
 #@bard.error
 @commands.error

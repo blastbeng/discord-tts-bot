@@ -137,3 +137,6 @@ def random_choice(text: str):
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in "txt"
+
+def allowed_audio(filename):
+    return '.' in filename and (filename.rsplit('.', 1)[1].lower() in "wav" or filename.rsplit('.', 1)[1].lower() in "mp3")
