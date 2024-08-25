@@ -2066,8 +2066,8 @@ async def timer(interaction: discord.Interaction, seconds: int):
         await interaction.response.defer(thinking=True, ephemeral=True)
         check_permissions(interaction)
         currentguildid = get_current_guild_id(interaction.guild.id)
-        if seconds < 30 or seconds > 1200:
-            await interaction.followup.send(await utils.translate(currentguildid,"Seconds must be greater than 30 and lower than 1200"), ephemeral = True)
+        if seconds < 60 or seconds > 1200:
+            await interaction.followup.send(await utils.translate(currentguildid,"Seconds must be greater than 60 and lower than 1200"), ephemeral = True)
         else:
             loops_dict[interaction.guild.id].play_audio_loop.change_interval(seconds=seconds)
             logging.info("timer - play_audio_loop.change_interval(seconds="+str(seconds)+")")
