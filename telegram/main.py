@@ -25,6 +25,8 @@ API_URL = os.environ.get("API_URL")
 API_PATH_TEXT = os.environ.get("API_PATH_TEXT")
 API_PATH_AUDIO = os.environ.get("API_PATH_AUDIO")
 API_PATH_UTILS = os.environ.get("API_PATH_UTILS")
+API_VOICECLONE_URL = os.environ.get("API_VOICECLONE_URL")
+API_VOICECLONE_PATH = os.environ.get("API_VOICECLONE_PATH")
 BOT_NAME = os.environ.get("BOT_NAME")
 
 logging.info("Starting Telegram Client...")
@@ -66,7 +68,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
@@ -93,7 +95,7 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
           
@@ -154,11 +156,11 @@ async def speak(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
           
-application.add_handler(CommandHandler('speakcloned', speakcloned))
+application.add_handler(CommandHandler('speak', speak))
 
 
 async def speakcloned(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -167,9 +169,7 @@ async def speakcloned(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
             strid = "000000"
         if strid:
-            def log_speakcloned_help(): 
-
-            userinput = update.message.text[7:].strip()
+            userinput = update.message.text[13:].strip()
             splitted = userinput.split("-")
             message = splitted[0].strip()
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
@@ -191,30 +191,39 @@ async def speakcloned(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             voice = voices[voice_rest]
                             voice_name = voice_rest
                             break
+                        
                 if voice is not None and voice_name is not None:             
-                    url = API_VOICECLONE_URL + API_VOICECLONE_PATH + "/voice/talk/" + urllib.parse.quote(voice) + "/" + urllib.parse.quote(message) + "/"
+                    url = API_VOICECLONE_URL + API_VOICECLONE_PATH + "talk/" + urllib.parse.quote(voice_name) + "/" + urllib.parse.quote(message) + "/"
 
-                    count = 120
-
+                    count = 0
+                    generated = False
                     response = requests.get(url)
-                    if (response.status_code == 200):
+                    if (response.status_code == 206):
+                        await update.message.reply_text("altri processi di generazione audio sono attivi, riprovare piú tardi", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                    elif (response.status_code == 200):
                         while count < 120:
-                            time.sleep(2)
                             poll_url = response.json()["poll_url"]
                             poll_response = requests.get(poll_url)
-                            if (poll_response.status_code == 200):
-                                audio_url = poll_response.json()["status_url"]
+                            poll_json = poll_response.json()
+                            if (poll_response.status_code == 200 and poll_json["status"] == 'Completed'):
+                                audio_url = poll_json["audio_url"]
                                 audio_response = requests.get(audio_url)
-                                audio = BytesIO(response.content)
+                                audio = BytesIO(audio_response.content)
                                 title = "Messaggio vocale"
                                 await update.message.reply_audio(audio, disable_notification=True, title=title, performer=voice_name,  filename=get_random_string(12)+ "audio.mp3", reply_to_message_id=update.message.message_id, protect_content=False)
-                                break
+                                count = 120
+                                generated = True
                             else:
-                                await update.message.reply_text("la generazione ha impiegato troppo tempo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                                break
-                            count = count + 1
-                else raise SpeakClonedException()
-            else raise SpeakClonedException()
+                                time.sleep(2)
+                                count = count + 1
+                        if count >= 120 and generated is False:                 
+                            await update.message.reply_text("la generazione ha impiegato troppo tempo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                    else:
+                        await update.message.reply_text("è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                else:
+                    raise SpeakClonedException("user input error")
+            else:
+                raise SpeakClonedException("user input error")
 
                
     except SpeakClonedException:
@@ -227,11 +236,11 @@ async def speakcloned(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print(exc_type, fname, exc_tb.tb_lineno)
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
         await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
           
-application.add_handler(CommandHandler('speak', speak))
+application.add_handler(CommandHandler('speakcloned', speakcloned))
 
 async def listvoices(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -257,11 +266,11 @@ async def listvoices(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print(exc_type, fname, exc_tb.tb_lineno)
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
         await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
            
-application.add_handler(CommandHandler('listclonedvoices', listclonedvoices))
+application.add_handler(CommandHandler('listvoices', listvoices))
 
 async def listclonedvoices(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -286,10 +295,10 @@ async def listclonedvoices(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print(exc_type, fname, exc_tb.tb_lineno)
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
         await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
            
-application.add_handler(CommandHandler('listvoices', listvoices))
+application.add_handler(CommandHandler('listclonedvoices', listclonedvoices))
 
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -305,7 +314,7 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print(exc_type, fname, exc_tb.tb_lineno)
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
         await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
 
