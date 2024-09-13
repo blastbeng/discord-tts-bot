@@ -22,6 +22,7 @@ libretranslatepy
 Flask-APScheduler==1.12.4
 Tweepy==4.12.1
 faker==17.6.0
+sortedcontainers==2.2.2
 praw==7.7.0
 pyenchant==3.2.2
 fakeyou
@@ -45,4 +46,7 @@ piper
 awscli
 boto3
 numpy==1.26.4
-
+oyaml==0.8
+h11==0.11
+pephubclient==0.1.2
+mdurl==0.1.1
