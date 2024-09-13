@@ -1,19 +1,22 @@
 ---
 version: "3.3"
 services:
-  discord-tts-bot-redis:
-    image: redis
-    container_name: discord-tts-bot-redis
-    restart: always
-    volumes:
-      - redisdata:/data
-    ports:
-      - 63799:6379
+  #discord-tts-bot-redis:
+  #  image: redis
+  #  container_name: discord-tts-bot-redis
+  #  restart: always
+  #  volumes:
+  #    - redisdata:/data
+  #  ports:
+  #    - 63799:6379
+    #networks:
+    #  - discord-tts-bot-network
   discord-tts-bot-api:
     pull_policy: build
     build:
       context: ./api
       dockerfile: Dockerfile.api
+      network: host
     container_name: discord-tts-bot-api
     environment:
       - PUID=1000
@@ -24,17 +27,12 @@ services:
     volumes:
       - ".env:/app/.env"
       - "./config:/app/config"
-      - "./audios:/app/audios"
+      - "discord-tts-bot-audios:/app/audios"
       - "./backups:/app/backups"
       - "./config:/app/config-external"
       - "/tmp/discord-tts-bot-api:/tmp/discord-tts-bot-api"
       - "/tmp/discord-tts-bot-discord:/tmp/discord-tts-bot-discord"
     entrypoint: ./entrypoint.sh
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:5080/utils/healthcheck"]
-      interval: 15s
-      timeout: 5s
-      retries: 12
     network_mode: host
     #ports:
     #  - 5080:5080
@@ -48,9 +46,6 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Rome
-    depends_on:
-      discord-tts-bot-api:
-        condition: service_healthy
     volumes:
       - ".env:/app/.env"
       - "./config:/app/config"
@@ -86,3 +81,14 @@ services:
     #  - discord-tts-bot-network
 volumes:
   redisdata:
+  discord-tts-bot-audios:
+    driver_opts:
+      type: cifs
+      o: username=blast,password=2fa74lovz,uid=1000,gid=1000,vers=3.0
+      device: //192.168.1.160/discord-tts-bot-audios
+#networks:
+#  discord-tts-bot-network:
+#    enable_ipv6: true
+#    ipam:
+#      config:
+#        - subnet: 2001:db8::/64

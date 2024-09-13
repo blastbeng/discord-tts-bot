@@ -26,6 +26,7 @@ praw==7.7.0
 pyenchant==3.2.2
 fakeyou
 sqlitedict==2.1.0
+uWSGI==2.0.21
 Flask-Limiter==3.3.0
 uwsgi-tools==1.1.1
 pydub==0.25.1
@@ -35,7 +36,6 @@ bestemmie
 bs4
 pymongo==4.6.0
 requests
-git+https://github.com/dsdanielpark/Bard-API.git
 langdetect
 selenium
 webdriver_manager
