@@ -51,7 +51,7 @@ COPY requirements.txt .
 
 RUN pip3 install --no-cache --upgrade pip setuptools
 RUN pip3 install wheel
-RUN pip3 install -r requirements.txt
+RUN pip3 install --default-timeout=900 -r requirements.txt
 
 RUN spacy download en_core_web_sm
 RUN spacy download fr_core_news_sm
