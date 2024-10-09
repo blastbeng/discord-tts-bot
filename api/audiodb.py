@@ -217,6 +217,27 @@ def update_is_correct(name: str, chatid: str, voice: str, language: str, is_corr
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 
+def delete_by_word(text: str, chatid: str):
+  try:
+    dbfile = chatid + "-db"
+    #myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    audiotable = chatbotdb["audio"]   
+
+    rgx = re.compile('.*' + text + '.*', re.IGNORECASE)  # compile the regex
+    audiotable.delete_many({'name':rgx})
+
+    rgx = re.compile(text + '.*', re.IGNORECASE)  # compile the regex
+    audiotable.delete_many({'name':rgx})
+
+    rgx = re.compile('.*' + text, re.IGNORECASE)  # compile the regex
+    audiotable.delete_many({'name':rgx})
+
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
 def update_is_correct_by_word(text: str, chatid: str, is_correct: int, use_like: bool):
   try:
