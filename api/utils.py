@@ -532,8 +532,29 @@ def delete_by_text(chatid: str, text: str, force = False):
     rgx = re.compile('.*' + text + '.*', re.IGNORECASE)  # compile the regex
     statements.delete_many({'text':rgx})
 
+    rgx = re.compile(text + '.*', re.IGNORECASE)  # compile the regex
+    statements.delete_many({'text':rgx})
+
+    rgx = re.compile('.*' + text, re.IGNORECASE)  # compile the regex
+    statements.delete_many({'text':rgx})
+
     rgx_2 = re.compile('.*' + text + '.*', re.IGNORECASE)  # compile the regex
     statements.delete_many({'in_response_to':rgx_2})
+
+    rgx_2 = re.compile('.*' + text, re.IGNORECASE)  # compile the regex
+    statements.delete_many({'in_response_to':rgx_2})
+
+    rgx_2 = re.compile(text + '.*', re.IGNORECASE)  # compile the regex
+    statements.delete_many({'in_response_to':rgx_2})
+
+    rgx_2 = re.compile('.*' + text + '.*', re.IGNORECASE)  # compile the regex
+    statements.delete_many({'search_in_response_to':rgx_2})
+
+    rgx_2 = re.compile(text + '.*', re.IGNORECASE)  # compile the regex
+    statements.delete_many({'search_in_response_to':rgx_2})
+
+    rgx_2 = re.compile('.*' + text, re.IGNORECASE)  # compile the regex
+    statements.delete_many({'search_in_response_to':rgx_2})
 
     logging.info("delete_by_text - Deleting: %s", text)
 
@@ -543,8 +564,7 @@ def delete_by_text(chatid: str, text: str, force = False):
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     return("Errore!")
   if force:
-    #delete_from_audiodb_by_text(chatid, text)
-    audiodb.update_is_correct_by_word(text, chatid, 0, True)
+    audiodb.delete_by_word(text, chatid)
     return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot e dal db audio!')
   else:
     return('Frasi con parola chiave "' + text + '" cancellate dal db chatbot!')
