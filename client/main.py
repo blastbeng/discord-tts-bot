@@ -1325,7 +1325,7 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "rando
                 if os.path.isfile(blocktxt):
                     with open(blocktxt) as blfile:
                         for line in blfile:
-                            if blocked in str(text).lower():
+                            if line.lower() in str(text).lower():
                                 blocked = True
                                 break
                 if blocked:
