@@ -745,7 +745,7 @@ class PlayAudioWorker:
                             
                         if not voice_client.is_connected():
                             await voice_client.channel.connect()
-                            time.sleep(5)
+                            time.sleep(5)   
 
                         logmessage = 'play_audio_worker - ' + text
                         voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info(logmessage))
@@ -1321,22 +1321,25 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "rando
                 #        await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Users allowed to use this voice:") + " " + str(interaction.user.name), ephemeral = True)
                 #else:
                 blocked = False
-                blocktxt = join(dirname(__file__), '.config/blocked.txt')
+                blocktxt = os.path.join(dirname(__file__) + '/config/blocked.txt')
                 if os.path.isfile(blocktxt):
                     with open(blocktxt) as blfile:
                         for line in blfile:
-                            if line.lower() in str(text).lower():
+                            if line.strip().lower() in str(text).strip().lower():
                                 blocked = True
                                 break
+                url = None
                 if blocked:
-                    url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(interaction.user.name))+"/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
+                    url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use)
                 else:
                     url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/learn/user/"+urllib.parse.quote(str(interaction.user.name))+"/"+urllib.parse.quote(str(text))+"/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(lang_to_use) + "/"
                         
-                
-                message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm starting to generate the audio for:") + " **" + text + "**" + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
-                worker = PlayAudioWorker(url, interaction, message)
-                worker.play_audio_worker.start()
+                if url is not None:
+                    message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm starting to generate the audio for:") + " **" + text + "**" + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
+                    worker = PlayAudioWorker(url, interaction, message)
+                    worker.play_audio_worker.start()
+                else:
+                    await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)      
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)      
                  
