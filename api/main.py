@@ -927,10 +927,9 @@ nsdatabase = api.namespace('database', 'Accumulators Database APIs')
 class DownloadSentencesDb(Resource):
   def get(self, chatid = "000000"):
     try:      
-      pattern = "./backups/" + chatid + "-db_backup_*.txt"
-      latest_bk = (max(glob.glob(pattern), key=os.path.getmtime)) 
-      if latest_bk is not None:
-        return send_file(latest_bk, attachment_filename='trainfile.txt', mimetype="text/plain")
+      backup_file = utils.backupdb(chatid, "txt")
+      if backup_file is not None:
+        return send_file(backup_file, attachment_filename='trainfile.txt', mimetype="text/plain")
       else:
         return make_response("Failed to download sentences.", 500)
     except Exception as e:
@@ -1042,8 +1041,7 @@ def get_chatbot_by_id(chatid = "000000", lang = "it"):
 @scheduler.task('interval', id='backupdb', hours=12)
 def backupdb():
   filename = os.path.dirname(os.path.realpath(__file__)) + '/config/000000-db.txt'
-  if utils.extract_sentences_from_chatbot(filename, chatid="000000"):
-    utils.backupdb("000000", "txt")
+  utils.backupdb("000000", "txt")
   
 @scheduler.task('interval', id='delete_tts', hours=12)
 def delete_tts():

@@ -913,30 +913,34 @@ def process_population(limit, chatid, lang, listvoices):
 
 def backupdb(chatid: str, extension: str):  
   try:
-    dbfile=os.path.dirname(os.path.realpath(__file__)) + get_slashes() + "config" + get_slashes() + chatid + "-db." + extension
-    dst=os.path.dirname(os.path.realpath(__file__)) + get_slashes() + "backups" + get_slashes() + chatid + "-db_backup_" + str(time.time()) + "." + extension
-    shutil.copyfile(dbfile, dst)
+    filename = os.path.dirname(os.path.realpath(__file__)) + get_slashes() + 'config' + get_slashes() + chatid + '-db.txt'
+    if extract_sentences_from_chatbot(filename, chatid=chatid):
+      dbfile=os.path.dirname(os.path.realpath(__file__)) + get_slashes() + "config" + get_slashes() + chatid + "-db." + extension
+      dst=os.path.dirname(os.path.realpath(__file__)) + get_slashes() + "backups" + get_slashes() + chatid + "-db_backup_" + str(time.time()) + "." + extension
+      shutil.copyfile(dbfile, dst)
 
-    current_time = time.time()
+      current_time = time.time()
 
-    bakdir = "backups"
-    N = 30
-    os.chdir(os.path.join(os.getcwd(), bakdir)) 
-    list_of_files = os.listdir() 
-    current_time = time.time() 
-    day = 86400
-    for i in list_of_files: 
-      file_location = os.path.join(os.getcwd(), i) 
-      file_time = os.stat(file_location).st_mtime 
-      if(file_time < current_time - day*N): 
-        os.remove(file_location) 
-    
-    os.chdir("../")      
+      bakdir = "backups"
+      N = 30
+      os.chdir(os.path.join(os.getcwd(), bakdir)) 
+      list_of_files = os.listdir() 
+      current_time = time.time() 
+      day = 86400
+      for i in list_of_files: 
+        file_location = os.path.join(os.getcwd(), i) 
+        file_time = os.stat(file_location).st_mtime 
+        if(file_time < current_time - day*N): 
+          os.remove(file_location) 
+      
+      os.chdir("../")
+      return dst
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
     raise Exception(e)
+  return  None
 
 def init_generator_models(chatid, language):
 

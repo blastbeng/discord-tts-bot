@@ -7,6 +7,8 @@ services:
       - discord-tts-bot-redis-data:/data
     ports:
       - 63799:6379
+    networks:
+      - discord-tts-bot-network
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
       interval: 15s
@@ -35,7 +37,6 @@ services:
       - "/tmp/discord-tts-bot-api:/tmp/discord-tts-bot-api"
       - "/tmp/discord-tts-bot-discord:/tmp/discord-tts-bot-discord"
     entrypoint: ./entrypoint.sh
-    network_mode: host
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:5080/utils/healthcheck"]
       interval: 15s
@@ -47,6 +48,8 @@ services:
         condition: service_healthy
       discord-tts-bot-redis:
         condition: service_healthy
+    networks:
+      - discord-tts-bot-network
     ports:
       - 5080:5080
   discord-tts-bot-client:
@@ -70,6 +73,8 @@ services:
       - "/tmp/discord-tts-bot-discord:/tmp/discord-tts-bot-discord"
     image: "blastbeng/discord-tts-bot-client:1.0.0"
     restart: unless-stopped
+    networks:
+      - discord-tts-bot-network
   discord-tts-bot-telegram:
     pull_policy: build
     build:
@@ -91,6 +96,8 @@ services:
       - "/tmp/discord-tts-bot-discord:/tmp/discord-tts-bot-discord"
     image: "blastbeng/discord-tts-bot-telegram:1.0.0"
     restart: unless-stopped
+    networks:
+      - discord-tts-bot-network
   discord-tts-bot-mongodb:
     #image: mongo:8.0.3
     image: l33tlamer/mongodb-without-avx:latest
@@ -105,6 +112,8 @@ services:
       - /usr/bin/curl:/usr/bin/curl
     ports:
       - 27017:27017
+    networks:
+      - discord-tts-bot-network
     entrypoint: "mongod --bind_ip_all --quiet --logpath /dev/null"
     healthcheck:
       test: mongo --norc --quiet --host=localhost --eval "db.runCommand('ping')" || exit
@@ -117,3 +126,10 @@ services:
 volumes:
   discord-tts-bot-mongodb-data:
   discord-tts-bot-redis-data:
+
+networks:
+  discord-tts-bot-network:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 2001:db8::/64
