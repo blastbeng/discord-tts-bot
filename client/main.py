@@ -702,7 +702,16 @@ class PlayAudioLoop:
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
             logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
-
+async def direct_play(voice_client, url):
+    connector = aiohttp.TCPConnector(force_close=True)
+    async with aiohttp.ClientSession(connector=connector) as session:
+        async with session.get(url) as response:
+            if (response.status == 200):
+                content = await response.content.read()
+                message = 'direct_play - playing audio'
+                voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info(message))
+                #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
+        await session.close()  
 
 class PlayAudioWorker:
     
@@ -1157,6 +1166,32 @@ async def on_voice_state_update(member, before, after):
             elif before.channel is None and after.channel is not None:
                 voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
                 await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+@client.event
+async def on_member_join(member):
+    try:
+        perms = member.channel.permissions_for(member.channel.guild.me)
+        if (perms.administrator or perms.speak):
+            voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
+            if voice_client is not None and not voice_client.is_playing():
+                await direct_play(voice_client, "https://www.myinstants.com/media/sounds/buongiorno-salvini.mp3")
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+@client.event
+async def on_member_leave(member):
+    try:
+        perms = member.channel.permissions_for(member.channel.guild.me)
+        if (perms.administrator or perms.speak):
+            voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
+            if voice_client is not None and not voice_client.is_playing():
+                await direct_play(voice_client, "https://www.myinstants.com/media/sounds/buonasera-salvini.mp3")
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
