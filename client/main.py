@@ -1165,7 +1165,7 @@ async def on_voice_state_update(member, before, after):
                     await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
                     if not voice_client.is_connected():
                         await voice_client.channel.connect()
-                        time.sleep(2)
+                    time.sleep(1)
                     if voice_client is not None:
                         if voice_client.is_playing():
                             voice_client.stop()
@@ -1177,7 +1177,7 @@ async def on_voice_state_update(member, before, after):
                     await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
                     if not voice_client.is_connected():
                         await voice_client.channel.connect()
-                        time.sleep(2)   
+                    time.sleep(1)   
                     if voice_client is not None:
                         if voice_client.is_playing():
                             voice_client.stop()
@@ -1189,7 +1189,7 @@ async def on_voice_state_update(member, before, after):
                     await connect_bot_by_voice_client(voice_client, before.channel, None, member=member)
                     if not voice_client.is_connected():
                         await voice_client.channel.connect()
-                        time.sleep(2)
+                    time.sleep(1)   
                     if voice_client is not None:
                         if voice_client.is_playing():
                             voice_client.stop()
