@@ -1184,10 +1184,10 @@ async def on_voice_state_update(member, before, after):
                     #if voice_client:
                     #    await voice_client.disconnect()
                     await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
-                    if not voice_client.is_connected():
-                        await voice_client.channel.connect()
-                    time.sleep(1)
                     if voice_client is not None:
+                        if not voice_client.is_connected():
+                            await voice_client.channel.connect()
+                        time.sleep(1)
                         if voice_client.is_playing():
                             voice_client.stop()
                         login_audios = get_login_audios()
@@ -1198,10 +1198,10 @@ async def on_voice_state_update(member, before, after):
                 perms = after.channel.permissions_for(after.channel.guild.me)
                 if (perms.administrator or perms.speak):
                     await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
-                    if not voice_client.is_connected():
-                        await voice_client.channel.connect()
-                    time.sleep(1)   
                     if voice_client is not None:
+                        if not voice_client.is_connected():
+                            await voice_client.channel.connect()
+                        time.sleep(1)   
                         if voice_client.is_playing():
                             voice_client.stop()
                         login_audios = get_login_audios()
@@ -1212,10 +1212,10 @@ async def on_voice_state_update(member, before, after):
                 perms = before.channel.permissions_for(before.channel.guild.me)
                 if (perms.administrator or perms.speak):
                     await connect_bot_by_voice_client(voice_client, before.channel, None, member=member)
-                    if not voice_client.is_connected():
-                        await voice_client.channel.connect()
-                    time.sleep(1)   
                     if voice_client is not None:
+                        if not voice_client.is_connected():
+                            await voice_client.channel.connect()
+                        time.sleep(1)   
                         if voice_client.is_playing():
                             voice_client.stop()
                         logout_audios = get_logout_audios()
