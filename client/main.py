@@ -1183,6 +1183,7 @@ async def on_voice_state_update(member, before, after):
                             voice_client.stop()
                         await direct_play(voice_client, "https://www.myinstants.com/media/sounds/buongiorno-salvini.mp3")
             elif after.channel is None and before.channel is not None:
+                voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
                 perms = before.channel.permissions_for(before.channel.guild.me)
                 if (perms.administrator or perms.speak):
                     await connect_bot_by_voice_client(voice_client, before.channel, None, member=member)
