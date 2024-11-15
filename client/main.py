@@ -45,8 +45,7 @@ def get_login_audios():
         if os.path.isfile(path_login_audios):
             with open(path_login_audios, 'r') as file_login_audios:
                 login_audios = json.load(file_login_audios)
-    else:
-        return login_audios
+    return login_audios
 
 logout_audios = None
 def get_logout_audios():
@@ -56,8 +55,7 @@ def get_logout_audios():
         if os.path.isfile(path_logout_audios):
             with open(path_logout_audios, 'r') as file_logout_audios:
                 logout_audios = json.load(file_logout_audios)
-    else:
-        return logout_audios
+    return logout_audios
 
 #process_pool = listening.AudioProcessPool(1)
 
