@@ -28,6 +28,7 @@ import io
 from random import randint
 import requests.exceptions
 import psutil
+import json
 #from discord.ext import listening
 
 
@@ -35,6 +36,28 @@ from utils import FFmpegPCMAudioBytesIO
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
+
+login_audios = None
+def get_login_audios():
+    global login_audios
+    if login_audios is None:
+        path_login_audios = os.path.join(dirname(__file__) + '/config/login_audios.json')
+        if os.path.isfile(path_login_audios):
+            with open(path_login_audios, 'r') as file_login_audios:
+                login_audios = json.load(file_login_audios)
+    else:
+        return login_audios
+
+logout_audios = None
+def get_logout_audios():
+    global logout_audios
+    if logout_audios is None:
+        path_logout_audios = os.path.join(dirname(__file__) + '/config/logout_audios.json')
+        if os.path.isfile(path_logout_audios):
+            with open(path_logout_audios, 'r') as file_logout_audios:
+                logout_audios = json.load(file_logout_audios)
+    else:
+        return logout_audios
 
 #process_pool = listening.AudioProcessPool(1)
 
@@ -708,7 +731,7 @@ async def direct_play(voice_client, url):
         async with session.get(url) as response:
             if (response.status == 200):
                 content = await response.content.read()
-                message = 'direct_play - playing audio'
+                message = 'direct_play - playing audio from url: ' + url
                 voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info(message))
                 #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
         await session.close()  
@@ -1169,7 +1192,9 @@ async def on_voice_state_update(member, before, after):
                     if voice_client is not None:
                         if voice_client.is_playing():
                             voice_client.stop()
-                        await direct_play(voice_client, "https://www.myinstants.com/media/sounds/buongiorno-salvini.mp3")
+                        login_audios = get_login_audios()
+                        url_audio = login_audios[str(member.id)] if login_audios is not None and str(member.id) in login_audios else "https://www.myinstants.com/media/sounds/buongiorno-salvini.mp3"
+                        await direct_play(voice_client, url_audio)
             elif before.channel is None and after.channel is not None:
                 voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
                 perms = after.channel.permissions_for(after.channel.guild.me)
@@ -1181,7 +1206,9 @@ async def on_voice_state_update(member, before, after):
                     if voice_client is not None:
                         if voice_client.is_playing():
                             voice_client.stop()
-                        await direct_play(voice_client, "https://www.myinstants.com/media/sounds/buongiorno-salvini.mp3")
+                        login_audios = get_login_audios()
+                        url_audio = login_audios[str(member.id)] if login_audios is not None and str(member.id) in login_audios else "https://www.myinstants.com/media/sounds/buongiorno-salvini.mp3"
+                        await direct_play(voice_client, url_audio)
             elif after.channel is None and before.channel is not None:
                 voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
                 perms = before.channel.permissions_for(before.channel.guild.me)
@@ -1193,7 +1220,9 @@ async def on_voice_state_update(member, before, after):
                     if voice_client is not None:
                         if voice_client.is_playing():
                             voice_client.stop()
-                        await direct_play(voice_client, "https://www.myinstants.com/media/sounds/buonasera-salvini.mp3")
+                        logout_audios = get_logout_audios()
+                        url_audio = logout_audios[str(member.id)] if logout_audios is not None and str(member.id) in logout_audios else "https://www.myinstants.com/media/sounds/buonasera-salvini.mp3"
+                        await direct_play(voice_client, url_audio)
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
