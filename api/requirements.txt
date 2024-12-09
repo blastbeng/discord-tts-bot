@@ -25,7 +25,6 @@ faker==17.6.0
 sortedcontainers==2.2.2
 praw==7.7.0
 pyenchant==3.2.2
-fakeyou
 sqlitedict==2.1.0
 uWSGI==2.0.21
 Flask-Limiter==3.3.0
@@ -50,3 +49,5 @@ oyaml==0.8
 h11==0.11
 pephubclient==0.1.2
 mdurl==0.1.1
+aiohttp
+#fakeyou

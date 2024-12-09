@@ -705,7 +705,7 @@ def list_fakeyou_voices(lang:str):
   foundvoices = None
   try:
 
-    file_path = "./config/voices_"+lang+".json"
+    file_path = os.path.abspath(os.curdir) + "/config/voices_"+lang+".json"
     
     #if bool(random.getrandbits(1)):
     #  proxies = {'http': 'http://192.168.1.160:9058'}
@@ -725,7 +725,7 @@ def list_fakeyou_voices(lang:str):
       foundvoices = {}
 
 
-      inclusion_file_path = "./config/voices_inclusions_"+lang+".json"
+      inclusion_file_path = os.path.abspath(os.curdir) + "/config/voices_inclusions_"+lang+".json"
 
       if os.path.exists(inclusion_file_path):
         with open(inclusion_file_path) as inclusion_file:
