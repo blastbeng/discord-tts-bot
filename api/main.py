@@ -450,11 +450,28 @@ class AudioRandomClass(Resource):
   def get (self, voice = "random", chatid = "000000", lang = "it", text = None):
     try:
       tts_out, text_response = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang,text)
-      if not text_response:
-          text = "Audio not found"
-          response = make_response(text, 204)
-          response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
-          return response
+      if not text_response and voice == "random" or voice == "google" or voice == "aws":
+          if voice == "random":
+            voice = "google"
+          sentence = utils.get_random_from_bot(chatid, text)
+          if sentence is None or sentence.strip() == "":
+              text = "Audio not found"
+              response = make_response(text, 204)
+              response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+              return response
+          else:
+              tts_out = utils.get_tts(sentence, chatid=chatid, voice=voice, language=lang, user=None)
+              if tts_out is not None:     
+                  response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+                  response.headers['X-Generated-Text'] = sentence.encode('utf-8').decode('latin-1')
+                  chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
+                  threading.Thread(target=lambda: chatbot.get_response(sentence), name="random"+utils.get_random_string(24)).start()
+                  return response
+              else:
+                  text = "Audio not found"
+                  response = make_response(text, 204)
+                  response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+                  return response
       elif tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
@@ -475,11 +492,28 @@ class AudioRandomTmsClass(Resource):
   def get (self, tms = None, voice = "random", chatid = "000000", lang = "it", text = None):
     try:
       tts_out, text_response = audiodb.select_by_chatid_voice_language_random(chatid,voice,lang,text)
-      if not text_response:
-          text = "Audio not found"
-          response = make_response(text, 204)
-          response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
-          return response
+      if not text_response and voice == "random" or voice == "google" or voice == "aws":
+          if voice == "random":
+            voice = "google"
+          sentence = utils.get_random_from_bot(chatid, text)
+          if sentence is None or sentence.strip() == "":
+              text = "Audio not found"
+              response = make_response(text, 204)
+              response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+              return response
+          else:
+              tts_out = utils.get_tts(sentence, chatid=chatid, voice=voice, language=lang, user=None)
+              if tts_out is not None:     
+                  response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+                  response.headers['X-Generated-Text'] = sentence.encode('utf-8').decode('latin-1')
+                  chatbot = get_chatbot_by_id(chatid=chatid, lang=lang)
+                  threading.Thread(target=lambda: chatbot.get_response(sentence), name="randomtms"+utils.get_random_string(24)).start()
+                  return response
+              else:
+                  text = "Audio not found"
+                  response = make_response(text, 204)
+                  response.headers['X-Generated-Text'] = text.encode('utf-8').decode('latin-1')
+                  return response
       elif tts_out is not None:
         response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
         response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')

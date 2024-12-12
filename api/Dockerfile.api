@@ -70,6 +70,7 @@ COPY audiodb.py .
 COPY custom_trainer.py .
 COPY insults.py .
 COPY image.py .
+COPY test.py .
 COPY main.py .
 COPY exceptions.py .
 COPY custom_mongo_adapter.py .
