@@ -251,14 +251,14 @@ class PlayButton(discord.ui.Button["InteractionRoles"]):
                     await voice_client.channel.connect()
                     time.sleep(5)
 
-                if voice_client.is_playing():
+                if voice_client is not None and voice_client.is_playing():
                     await voice_client.stop()
 
             #voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info(message))
             #await self.interaction.followup.edit_message(message_id=self.message.id,content=text, view = view)
-
-            voice_client.play(FFmpegPCMAudioBytesIO(self.content, pipe=True), after=lambda e: logging.info("play_button - " + self.message))
-            await interaction.followup.send(self.message, ephemeral = True)
+            if voice_client is not None:
+                voice_client.play(FFmpegPCMAudioBytesIO(self.content, pipe=True), after=lambda e: logging.info("play_button - " + self.message))
+                await interaction.followup.send(self.message, ephemeral = True)
                 
         except Exception as e:
             await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
@@ -331,6 +331,7 @@ logging.getLogger('discord.voice_client').setLevel(int(os.environ.get("LOG_LEVEL
 discord.utils.setup_logging(level=int(os.environ.get("LOG_LEVEL")), root=False)
 
 loops_dict = {}
+kick_loops_dict = {}
 populator_loops_dict = {}
 generator_loops_dict = {}
 #subito_loops_dict = {}
@@ -723,6 +724,29 @@ class PlayAudioLoop:
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
             logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
+
+class KickMutedDeafenLoop:
+    
+    def __init__(self, guildid):
+        for guild in client.guilds:
+            if guild.id == guildid:
+                self.guild = guild
+
+    @tasks.loop(seconds=300)
+    async def kick_muted_deafen_loop(self):
+        try:         
+            for channel in self.guild.voice_channels:
+                perms = channel.permissions_for(channel.guild.me)
+                #if (perms.administrator or perms.speak):
+                for member in channel.members:
+                    if not member.bot and (member.voice.self_deaf is True):
+                        await member.move_to(None)
+                            
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
 async def direct_play(voice_client, url):
     connector = aiohttp.TCPConnector(force_close=True)
     async with aiohttp.ClientSession(connector=connector) as session:
@@ -1105,6 +1129,10 @@ async def on_guild_available(guild):
         if guild.id not in loops_dict:
             loops_dict[guild.id] = PlayAudioLoop(guild.id)
             loops_dict[guild.id].play_audio_loop.start() 
+
+        if guild.id not in kick_loops_dict:
+            kick_loops_dict[guild.id] = KickMutedDeafenLoop(guild.id)
+            kick_loops_dict[guild.id].kick_muted_deafen_loop.start() 
 
         if guild.id not in populator_loops_dict:
             populator_loops_dict[guild.id] = PopulatorLoop(guild.id)      
