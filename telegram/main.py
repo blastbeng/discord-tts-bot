@@ -38,10 +38,6 @@ logging.basicConfig(
 
 application = ApplicationBuilder().token(TOKEN).build()
 
-
-class SpeakClonedException(Exception):
-    pass
-
 def get_random_string(length):
     letters = string.ascii_lowercase
     return ''.join(random.choice(letters) for i in range(length))
@@ -51,7 +47,6 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chatid = str(update.effective_chat.id)
         if(CHAT_ID == chatid):
             strid = "000000"
-        if strid:
             message = update.message.text.strip()
             if(message != ""    ):
                 url = API_URL + API_PATH_TEXT + "ask/" + urllib.parse.quote(message) + "/000000/it"
@@ -71,15 +66,36 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+async def random(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        chatid = str(update.effective_chat.id)
+        if(CHAT_ID == chatid or GROUP_CHAT_ID == chatid):
+            strid = "000000"
+            message = update.message.text[8:].strip()
+            url = API_URL + API_PATH_TEXT + "/random/000000/"
+            if(message != ""):
+                url = url + urllib.parse.quote(message)
+
+            response = requests.get(url)
+            if (response.status_code == 200):
+                await update.message.reply_text(response.text, disable_notification=True, protect_content=False)
+            else:
+                await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, protect_content=False)
+
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+      await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+
+application.add_handler(CommandHandler('random', random))
 
 async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         chatid = str(update.effective_chat.id)
         if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
             strid = "000000"
-        if strid:
-            message = update.message.text[5:].strip();
+            message = update.message.text[5:].strip()
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
                 url = API_URL + API_PATH_TEXT + "ask/" + urllib.parse.quote(message) + "/000000/it"
 
@@ -102,13 +118,11 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
 application.add_handler(CommandHandler('ask', ask))
 
 
-
 async def speak(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         chatid = str(update.effective_chat.id)
         if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
             strid = "000000"
-        if strid:
             userinput = update.message.text[7:].strip()
             splitted = userinput.split("-")
             message = splitted[0].strip()
@@ -163,177 +177,6 @@ async def speak(update: Update, context: ContextTypes.DEFAULT_TYPE):
 application.add_handler(CommandHandler('speak', speak))
 
 
-async def speakxtts(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        chatid = str(update.effective_chat.id)
-        if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
-            strid = "000000"
-        if strid:
-            userinput = update.message.text[11:].strip()
-            splitted = userinput.split("-")
-            message = splitted[0].strip()
-            if(message != "" and len(message) <= 500  and not message.endswith('bot')):
-
-                url = API_VOICECLONE_URL + API_VOICECLONE_PATH + "/listvoices"
-
-                voices = None
-                voice = None
-                voice_name = None
-
-                response = requests.get(url)
-                if (response.status_code == 200):
-                    voices = response.json()
-                
-                if len(splitted) >= 2 and voices is not None:
-                    sel_voice = splitted[1].lower().strip()
-                    for voice_rest in voices:   
-                        if sel_voice.lower() in voice_rest.lower():
-                            voice = voices[voice_rest]
-                            voice_name = voice_rest
-                            break
-                        
-                if voice is not None and voice_name is not None:             
-                    url = API_VOICECLONE_URL + API_VOICECLONE_PATH + "talk/" + urllib.parse.quote(voice_name) + "/" + urllib.parse.quote(message) + "/1/0/"
-
-                    count = 0
-                    generated = False
-                    response = requests.get(url)
-                    if (response.status_code == 206):
-                        await update.message.reply_text("altri processi di generazione audio sono attivi, riprovare piú tardi", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                    elif (response.status_code == 200):
-                        while count < 120:
-                            poll_url = response.json()["poll_url"]
-                            poll_response = requests.get(poll_url)
-                            poll_json = poll_response.json()
-                            if (poll_response.status_code == 200):
-                                audio_url = poll_json["audio_url"]
-                                audio_response = requests.get(audio_url)
-                                audio = BytesIO(audio_response.content)
-                                title = "Messaggio vocale"
-                                count = 120
-                                generated = True
-                                await update.message.reply_audio(audio, disable_notification=True, title=title, performer=voice_name,  filename=get_random_string(12)+ "audio.mp3", reply_to_message_id=update.message.message_id, protect_content=False)
-                            elif (poll_response.status_code != 206):
-                                await update.message.reply_text("si è verificato un errore stronzo durante il polling", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                                break
-                            else:
-                                time.sleep(2)
-                                count=count+1
-                        if count >= 120 and generated is False:
-                            await update.message.reply_text("la generazione ha impiegato troppo tempo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                    else:
-                        await update.message.reply_text("si è verificato un errore stronzo nella chiamata al servizio talk", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                else:
-                    raise SpeakClonedException("user input error")
-            else:
-                raise SpeakClonedException("user input error")
-
-               
-    except SpeakClonedException as es:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        text = "se vuoi che ripeto qualcosa devi scrivere una frase dopo /speakcloned (massimo 500 caratteri).\n\n\n"
-        text = text + "PS: Il modello vocale é obbligatorio, aggiungi:\n"
-        text = text + "'- modello vocale' al fondo della frase.\n\n"
-        text = text + "Esempio: '/speakcloned ciao - utente'.\n\n"
-        text = text + "Usa /listclonedvoices per una lista dei modelli disponibili."
-        await update.message.reply_text(text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-
-          
-application.add_handler(CommandHandler('speakxtts', speakxtts))
-
-
-
-async def speakbark(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        chatid = str(update.effective_chat.id)
-        if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
-            strid = "000000"
-        if strid:
-            userinput = update.message.text[11:].strip()
-            splitted = userinput.split("-")
-            message = splitted[0].strip()
-            if(message != "" and len(message) <= 500  and not message.endswith('bot')):
-
-                url = API_VOICECLONE_URL + API_VOICECLONE_PATH + "/listvoices"
-
-                voices = None
-                voice = None
-                voice_name = None
-
-                response = requests.get(url)
-                if (response.status_code == 200):
-                    voices = response.json()
-                
-                if len(splitted) >= 2 and voices is not None:
-                    sel_voice = splitted[1].lower().strip()
-                    for voice_rest in voices:   
-                        if sel_voice.lower() in voice_rest.lower():
-                            voice = voices[voice_rest]
-                            voice_name = voice_rest
-                            break
-                        
-                if voice is not None and voice_name is not None:             
-                    url = API_VOICECLONE_URL + API_VOICECLONE_PATH + "talk/" + urllib.parse.quote(voice_name) + "/" + urllib.parse.quote(message) + "/1/1/"
-
-                    count = 0
-                    generated = False
-                    response = requests.get(url)
-                    if (response.status_code == 206):
-                        await update.message.reply_text("altri processi di generazione audio sono attivi, riprovare piú tardi", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                    elif (response.status_code == 200):
-                        while count < 120:
-                            poll_url = response.json()["poll_url"]
-                            poll_response = requests.get(poll_url)
-                            poll_json = poll_response.json()
-                            if (poll_response.status_code == 200):
-                                audio_url = poll_json["audio_url"]
-                                audio_response = requests.get(audio_url)
-                                audio = BytesIO(audio_response.content)
-                                title = "Messaggio vocale"
-                                count = 120
-                                generated = True
-                                await update.message.reply_audio(audio, disable_notification=True, title=title, performer=voice_name,  filename=get_random_string(12)+ "audio.mp3", reply_to_message_id=update.message.message_id, protect_content=False)
-                            elif (poll_response.status_code != 206):
-                                await update.message.reply_text("si è verificato un errore stronzo durante il polling", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                                break
-                            else:
-                                time.sleep(2)
-                                count=count+1
-                        if count >= 120 and generated is False:
-                            await update.message.reply_text("la generazione ha impiegato troppo tempo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                    else:
-                        await update.message.reply_text("si è verificato un errore stronzo nella chiamata al servizio talk", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                else:
-                    raise SpeakClonedException("user input error")
-            else:
-                raise SpeakClonedException("user input error")
-
-               
-    except SpeakClonedException as es:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        text = "se vuoi che ripeto qualcosa devi scrivere una frase dopo /speakcloned (massimo 500 caratteri).\n\n\n"
-        text = text + "PS: Il modello vocale é obbligatorio, aggiungi:\n"
-        text = text + "'- modello vocale' al fondo della frase.\n\n"
-        text = text + "Esempio: '/speakcloned ciao - utente'.\n\n"
-        text = text + "Usa /listclonedvoices per una lista dei modelli disponibili."
-        await update.message.reply_text(text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-
-          
-application.add_handler(CommandHandler('speakbark', speakbark))
 
 async def listvoices(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -343,7 +186,6 @@ async def listvoices(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chatid = str(update.effective_chat.id)
         if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
             strid = "000000"    
-        if strid:
             url = API_URL + API_PATH_UTILS + "/fakeyou/listvoices/it"
 
             response = requests.get(url)
@@ -365,41 +207,12 @@ async def listvoices(update: Update, context: ContextTypes.DEFAULT_TYPE):
            
 application.add_handler(CommandHandler('listvoices', listvoices))
 
-async def listclonedvoices(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    text = "lista dei modelli vocali clonati disponibili:\n"
-    
-    try:
-        chatid = str(update.effective_chat.id)
-        if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
-            strid = "000000"    
-        if strid:
-            url = API_VOICECLONE_URL + API_VOICECLONE_PATH + "listvoices"
-            response = requests.get(url)
-            if (response.status_code == 200):
-                data = response.json()
-                for voice in data:   
-                    text = text + "- "+voice+"\n"
-                await update.message.reply_text(text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-            else:
-                await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-                
-                         
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-        await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
-           
-application.add_handler(CommandHandler('listclonedvoices', listclonedvoices))
-
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
 
         chatid = str(update.effective_chat.id)
         if((CHAT_ID == chatid or GROUP_CHAT_ID == chatid)):
             strid = "000000"    
-        if strid:
             await update.message.reply_text("Riavvio in corso...", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
         python = sys.executable
@@ -415,18 +228,101 @@ application.add_handler(CommandHandler('restart', restart))
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    text = "ask - chiedi qualcosa (text)\n"
+    text = "ask - chiedi qualcosa al bot\n"
+    text = text + "disable - disabilita modalitá automatica\n"
+    text = text + "enable - abilita modalitá automatica\n"
     text = text + "help - visualizza i comandi\n"
     text = text + "listvoices - elenca i modelli vocali\n"
-    text = text + "listclonedvoices - elenca i modelli vocali\n"
     text = text + "restart - riavvia il bot\n"
     text = text + "speak - ripete il messaggio via audio\n"
-    text = text + "speakxtts - ripete il messaggio via audio usando xtts e rvc\n"
-    text = text + "speakbark - ripete il messaggio via audio usando bark e rvc\n"
+    text = text + "stop - interrompe la modalitá automatica\n"
 
     await update.message.reply_text(text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
            
 application.add_handler(CommandHandler('help', help))
 
+async def callback_auto_message(context):
+    try:
+        url = API_URL + API_PATH_TEXT + "/random/000000/"
+        response = requests.get(url)
+        if (response.status_code == 200):
+            await context.bot.send_message(chat_id=context.job.chat_id, text=response.text, disable_notification=True, protect_content=False)
 
-application.run_polling()
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        chatid = str(update.effective_chat.id)
+        if(CHAT_ID == chatid):
+            strid = "000000"
+            message = update.message.text.strip()
+            if(message != ""    ):
+                url = API_URL + API_PATH_TEXT + "ask/" + urllib.parse.quote(message) + "/000000/it"
+
+                response = requests.get(url)
+                if (response.status_code == 200):
+                    await update.message.reply_text(response.text, disable_notification=True, protect_content=False)
+                else:
+                    await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, protect_content=False)
+                
+            else:
+                await update.message.reply_text("se vuoi dirmi o chiedermi qualcosa devi scrivere una frase dopo /ask (massimo 500 caratteri)", disable_notification=True, protect_content=False)
+
+
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+
+
+def remove_job_if_exists(name: str, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Remove job with given name. Returns whether job was removed."""
+    current_jobs = context.job_queue.get_jobs_by_name(name)
+    if not current_jobs:
+        return False
+    for job in current_jobs:
+        job.schedule_removal()
+    return True
+
+async def enable(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        chatid = str(update.effective_chat.id)   
+        if(GROUP_CHAT_ID == chatid):
+            job = context.job_queue.get_jobs_by_name(chatid)
+            if not job:
+                context.job_queue.run_repeating(callback_auto_message, 600, chat_id=chatid, name=str(chatid))
+
+        await update.message.reply_text("abilito la modalitá automatica", disable_notification=True, protect_content=False)
+
+    except Exception as e:
+      await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, protect_content=False)
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+application.add_handler(CommandHandler("enable", enable))
+
+
+async def disable(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        chatid = str(update.effective_chat.id)   
+        if(GROUP_CHAT_ID == chatid):
+            job_removed = remove_job_if_exists(str(chatid), context)
+
+            await update.message.reply_text("disabilito la modalitá automatica", disable_notification=True, protect_content=False)
+    except Exception as e:
+      await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, protect_content=False)
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+
+application.add_handler(CommandHandler("disable", disable))
+
+
+
+application.run_polling(allowed_updates=Update.ALL_TYPES)
