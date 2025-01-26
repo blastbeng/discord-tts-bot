@@ -235,7 +235,6 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = text + "listvoices - elenca i modelli vocali\n"
     text = text + "restart - riavvia il bot\n"
     text = text + "speak - ripete il messaggio via audio\n"
-    text = text + "stop - interrompe la modalitá automatica\n"
 
     await update.message.reply_text(text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
            
@@ -297,7 +296,7 @@ async def enable(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not job:
                 context.job_queue.run_repeating(callback_auto_message, 600, chat_id=chatid, name=str(chatid))
 
-        await update.message.reply_text("abilito la modalitá automatica", disable_notification=True, protect_content=False)
+            await update.message.reply_text("abilito la modalitá automatica", disable_notification=True, protect_content=False)
 
     except Exception as e:
       await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, protect_content=False)
