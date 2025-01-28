@@ -39,8 +39,8 @@ logging.basicConfig(
 application = ApplicationBuilder().token(TOKEN).build()
 
 def get_random_string(length):
-    letters = string.ascii_lowercase
-    return ''.join(random.choice(letters) for i in range(length))
+    random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+    return random_string
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -66,7 +66,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
-async def random(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def random_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         chatid = str(update.effective_chat.id)
         if(CHAT_ID == chatid or GROUP_CHAT_ID == chatid):
@@ -88,7 +88,7 @@ async def random(update: Update, context: ContextTypes.DEFAULT_TYPE):
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
 
-application.add_handler(CommandHandler('random', random))
+application.add_handler(CommandHandler('random', random_cmd))
 
 async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
