@@ -68,6 +68,19 @@ def get_api_url():
 def get_voiceclone_api_url():
     return os.environ.get("API_VOICECLONE_URL")
 
+def get_anythingllm_online_status():
+    try:
+        r = requests.get(os.environ.get("ANYTHING_LLM_ENDPOINT"))
+        r.raise_for_status()
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+        logging.info("AnythingLLM Host Offline." + self.message)
+        return False
+    except requests.exceptions.HTTPError:
+        logging.info("AnythingLLM Host Error 4xx or 5xx." + self.message)
+        return False
+    else:
+        return True
+
 class MyClient(discord.Client):
     def __init__(self, *, intents: discord.Intents):
         super().__init__(intents=intents)
@@ -708,17 +721,47 @@ class PlayAudioLoop:
             if channelfound is not None and channeluserfound is not None:
                 await connect_bot_by_voice_client(voice_client, channelfound, None)
                 if voice_client and hasattr(voice_client, 'play') and voice_client.is_connected() and not voice_client.is_playing():
-                    url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"random/random/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/"
-                    connector = aiohttp.TCPConnector(force_close=True)
-                    async with aiohttp.ClientSession(connector=connector) as session:
-                        async with session.get(url) as response:
-                            if (response.status == 200):
-                                content = await response.content.read()
-                                text = response.headers["X-Generated-Text"]
-                                message = 'play_audio_loop - random - ' + text
-                                voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info(message))
-                                #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
-                        await session.close()  
+                    if currentguildid == '000000' and get_anythingllm_online_status():
+                        random_url = get_api_url()+os.environ.get("API_PATH_TEXT")+"random/" + currentguildid + "/"
+                        random_response = requests.get(random_url)
+                        if (random_response.status_code == 200):
+                            data = {
+                                    "message": random_response.text,
+                                    "mode": "chat"
+                                }
+                            headers = {
+                                'Authorization': 'Bearer ' + os.environ.get("ANYTHING_LLM_API_KEY")
+                            }
+                            connector = aiohttp.TCPConnector(force_close=True)
+                            anything_llm_url = os.environ.get("ANYTHING_LLM_ENDPOINT") + "/api/v1/workspace/" + os.environ.get("ANYTHING_LLM_WORKSPACE") + "/chat"
+                            async with aiohttp.ClientSession(connector=connector) as anything_llm_session:
+                                async with anything_llm_session.post(anything_llm_url, headers=headers, json=data) as anything_llm_response:
+                                    if (anything_llm_response.status == 200):
+                                        anything_llm_json = await anything_llm_response.json()
+                                        anything_llm_text = anything_llm_json["textResponse"]
+                                        url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(anything_llm_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))   
+                                        async with aiohttp.ClientSession(connector=connector) as session:
+                                            async with session.get(url) as response:
+                                                if (response.status == 200):
+                                                    content = await response.content.read()
+                                                    text = response.headers["X-Generated-Text"]
+                                                    message = 'play_audio_loop - random - ' + text
+                                                    voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info(message))
+                                                    #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
+                                            await session.close()  
+                                await anything_llm_session.close()  
+                    else:
+                        url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"random/random/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/"
+                        connector = aiohttp.TCPConnector(force_close=True)
+                        async with aiohttp.ClientSession(connector=connector) as session:
+                            async with session.get(url) as response:
+                                if (response.status == 200):
+                                    content = await response.content.read()
+                                    text = response.headers["X-Generated-Text"]
+                                    message = 'play_audio_loop - random - ' + text
+                                    voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info(message))
+                                    #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
+                            await session.close()  
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]

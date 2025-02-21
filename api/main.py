@@ -957,7 +957,7 @@ nsdatabase = api.namespace('database', 'Accumulators Database APIs')
 
 
 @nsdatabase.route('/download/sentences/')
-@nsdatabase.route('/download/sentences/<string:chatid>')
+@nsdatabase.route('/download/sentences/<string:chatid>/')
 class DownloadSentencesDb(Resource):
   def get(self, chatid = "000000"):
     try:      
@@ -972,7 +972,8 @@ class DownloadSentencesDb(Resource):
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return make_response(str(e), 500)
 
-@nsdatabase.route('/download/sentences/<string:chatid>/webpage.html')
+@nsdatabase.route('/download/html/sentences/')
+@nsdatabase.route('/download/html/sentences/<string:chatid>/')
 class DownloadSentencesDbHtml(Resource):
   @cache.cached(timeout=7200, query_string=True)
   def get(self, chatid = "000000"):
