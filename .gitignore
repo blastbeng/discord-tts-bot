@@ -149,3 +149,7 @@ rclone/rclone.conf
 wwebjs_auth
 manual_backup_*
 audios/
+ollama
+ollama/
+storage
+storage/

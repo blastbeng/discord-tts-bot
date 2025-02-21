@@ -739,7 +739,7 @@ class KickMutedDeafenLoop:
                 perms = channel.permissions_for(channel.guild.me)
                 #if (perms.administrator or perms.speak):
                 for member in channel.members:
-                    if not member.bot and (member.voice.self_deaf is True):
+                    if not member.bot and (member.voice.self_deaf is True) and str(member.id) == str(382617570446147585):
                         await member.move_to(None)
                             
         except Exception as e:
@@ -2163,7 +2163,7 @@ async def disable(interaction: discord.Interaction):
 
 @client.tree.command()
 @app_commands.rename(seconds='seconds')
-@app_commands.describe(seconds="Timeout seconds (Min 30 - Max 1200)")
+@app_commands.describe(seconds="Timeout seconds (Min 60 - Max 1200)")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def timer(interaction: discord.Interaction, seconds: int):
     """Change the timer for the auto talking feature."""
