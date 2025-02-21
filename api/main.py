@@ -15,7 +15,7 @@ import json
 from io import BytesIO
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask import Flask, request, send_file, Response, jsonify, make_response, after_this_request, g
+from flask import Flask, request, send_file, Response, jsonify, make_response, after_this_request, g, render_template
 from flask_restx import Api, Resource, reqparse
 from flask_apscheduler import APScheduler
 from flask_caching import Cache
@@ -956,8 +956,7 @@ class SubitoSearchUrlClass(Resource):
 nsdatabase = api.namespace('database', 'Accumulators Database APIs')
 
 
-@nsdatabase.route('/download/sentences/')
-@nsdatabase.route('/download/sentences/<string:chatid>')
+@nsdatabase.route('/download/sentences/<string:chatid>/webpage.html')
 class DownloadSentencesDb(Resource):
   def get(self, chatid = "000000"):
     try:      
@@ -972,8 +971,13 @@ class DownloadSentencesDb(Resource):
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return make_response(str(e), 500)
 
-
-
+@nsdatabase.route('/download/html/sentences/')
+@nsdatabase.route('/download/html/sentences/<string:chatid>')
+class DownloadSentencesDbHtml(Resource):
+  @cache.cached(timeout=7200, query_string=True)
+  def get(self, chatid = "000000"):
+    return render_template('download.html',
+                           sentences=utils.get_sentences_from_chatbot(chatid))
 
 @nsdatabase.route('/delete/bytext/<string:text>/')
 @nsdatabase.route('/delete/bytext/<string:text>/<string:chatid>')

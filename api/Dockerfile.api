@@ -77,6 +77,7 @@ COPY custom_mongo_adapter.py .
 COPY subito_wrapper.py .
 COPY config.py .
 ADD fakeyou /app/fakeyou
+ADD templates /app/templates
 COPY entrypoint.sh .
 COPY uwsgi.ini .
 RUN chmod +x entrypoint.sh

@@ -450,6 +450,27 @@ def extract_sentences_from_chatbot(filename, chatid="000000"):
     return False
   return True
 
+
+def get_sentences_from_chatbot(chatid="000000"):
+  try:    
+    sentences = []
+    dbfile = chatid + "-db"
+    #myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_USER")+':'+os.environ.get("MONGO_PASS")+'@'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    myclient = pymongo.MongoClient('mongodb://'+os.environ.get("MONGO_HOST")+':'+os.environ.get("MONGO_PORT")+'/')
+    chatbotdb = myclient[dbfile]
+    statements = chatbotdb["statements"]
+
+    for row in statements.distinct('text'): 
+      logging.debug('get_sentences_from_chatbot - [chatid:' + chatid + '] - "' + row + '"')
+      sentences.append(row)
+
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
+    return []
+  return set(sentences)
+
 def get_random_string(length):
     # choose from all lowercase letter
     letters = string.ascii_lowercase
