@@ -3,3 +3,4 @@ python-dotenv
 requests
 pytz
 psutil
+aiohttp

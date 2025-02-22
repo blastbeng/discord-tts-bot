@@ -70,16 +70,20 @@ def get_voiceclone_api_url():
 
 def get_anythingllm_online_status():
     try:
-        r = requests.get(os.environ.get("ANYTHING_LLM_ENDPOINT"))
-        r.raise_for_status()
+        r = requests.get(os.environ.get("ANYTHING_LLM_ENDPOINT"), timeout=1)
+        if (r.status_code == 200):
+            return True
+        else:
+            return False
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-        logging.info("AnythingLLM Host Offline." + self.message)
+        logging.info("AnythingLLM Host Offline.")
         return False
     except requests.exceptions.HTTPError:
-        logging.info("AnythingLLM Host Error 4xx or 5xx." + self.message)
+        logging.info("AnythingLLM Host Error 4xx or 5xx.")
         return False
     else:
         return True
+    
 
 class MyClient(discord.Client):
     def __init__(self, *, intents: discord.Intents):
@@ -227,7 +231,7 @@ class SaveButton(discord.ui.Button["InteractionRoles"]):
         try:
             await interaction.response.defer(thinking=True, ephemeral=True)
             currentguildid = get_current_guild_id(interaction.guild.id)
-            url = get_api_url() + os.environ.get("API_PATH_TEXT") + "repeat/learn/" + urllib.parse.quote(self.message) + "/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/"
+            url = get_api_url() + os.environ.get("API_PATH_TEXT") + "repeat/learn/" + urllib.parse.quote(self.message) + "/" + currentguildid + "/" + utils.get_guild_language(currentguildid)
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if (response.status == 200):
@@ -721,12 +725,12 @@ class PlayAudioLoop:
             if channelfound is not None and channeluserfound is not None:
                 await connect_bot_by_voice_client(voice_client, channelfound, None)
                 if voice_client and hasattr(voice_client, 'play') and voice_client.is_connected() and not voice_client.is_playing():
-                    if currentguildid == '000000' and get_anythingllm_online_status():
+                    if currentguildid == '000000' and get_anythingllm_online_status() and bool(randompy.getrandbits(1)):
                         random_url = get_api_url()+os.environ.get("API_PATH_TEXT")+"random/" + currentguildid + "/"
                         random_response = requests.get(random_url)
                         if (random_response.status_code == 200):
                             data = {
-                                    "message": random_response.text,
+                                    "message": urllib.parse.quote(random_response.text.rstrip()),
                                     "mode": "chat"
                                 }
                             headers = {
@@ -738,7 +742,7 @@ class PlayAudioLoop:
                                 async with anything_llm_session.post(anything_llm_url, headers=headers, json=data) as anything_llm_response:
                                     if (anything_llm_response.status == 200):
                                         anything_llm_json = await anything_llm_response.json()
-                                        anything_llm_text = anything_llm_json["textResponse"]
+                                        anything_llm_text = anything_llm_json["textResponse"].partition('\n')[0].lstrip('\"').rstrip('\"').rstrip()
                                         url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(anything_llm_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))   
                                         async with aiohttp.ClientSession(connector=connector) as session:
                                             async with session.get(url) as response:
@@ -1584,7 +1588,7 @@ async def audio(interaction: discord.Interaction, audio: discord.Attachment):
 @app_commands.rename(voice='voice')
 @app_commands.describe(voice="The voice to use")
 @app_commands.autocomplete(voice=rps_autocomplete)
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 30.0, key=lambda i: (i.user.id))
 async def ask(interaction: discord.Interaction, text: str, voice: str = "google"):
     """Ask something."""
     is_deferred=True
@@ -1605,11 +1609,42 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
                 voice = await listvoices_api(language=lang_to_use, filter=voice)
 
             if voice is not None:
-                url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"ask/user/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(str(interaction.user.name))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
-                
-                message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm looking for an answer to:") + " **" + text + "**" + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
-                worker = PlayAudioWorker(url, interaction, message)
-                worker.play_audio_worker.start()
+                if currentguildid == '000000' and get_anythingllm_online_status():
+                    data = {
+                            "message": urllib.parse.quote(text.rstrip()),
+                            "mode": "chat"
+                        }
+                    headers = {
+                        'Authorization': 'Bearer ' + os.environ.get("ANYTHING_LLM_API_KEY")
+                    }
+                    connector = aiohttp.TCPConnector(force_close=True)
+                    anything_llm_url = os.environ.get("ANYTHING_LLM_ENDPOINT") + "/api/v1/workspace/" + os.environ.get("ANYTHING_LLM_WORKSPACE") + "/chat"
+                    message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm looking for an answer to:") + " **" + text + "**" + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)            
+                    async with aiohttp.ClientSession(connector=connector) as anything_llm_session:
+                        async with anything_llm_session.post(anything_llm_url, headers=headers, json=data) as anything_llm_response:
+                            if (anything_llm_response.status == 200):
+                                anything_llm_json = await anything_llm_response.json()
+                                anything_llm_text = anything_llm_json["textResponse"].partition('\n')[0].lstrip('\"').rstrip('\"').rstrip()
+                                url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(anything_llm_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))   
+                                
+                                worker = PlayAudioWorker(url, interaction, message)
+                                worker.play_audio_worker.start()
+                        await anything_llm_session.close()
+                    
+                    url = get_api_url() + os.environ.get("API_PATH_TEXT") + "repeat/learn/" + urllib.parse.quote(text.rstrip()) + "/" + currentguildid + "/" + utils.get_guild_language(currentguildid)
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(url) as response:
+                            if (response.status == 200):
+                                logging.info("ask - " + urllib.parse.quote(text.rstrip()) + " - saved!")
+                            else:
+                                logging.error("ask - " + urllib.parse.quote(text.rstrip()) + " - error saving!")
+                        await session.close()  
+                else:
+                    url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"ask/user/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(str(interaction.user.name))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
+                    
+                    message:discord.Message = await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"I'm looking for an answer to:") + " **" + text + "**" + await get_queue_message(get_current_guild_id(interaction.guild.id)), ephemeral = True)
+                    worker = PlayAudioWorker(url, interaction, message)
+                    worker.play_audio_worker.start()
             else:
                 await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True) 
                    
