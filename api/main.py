@@ -83,6 +83,15 @@ def after_request(response):
 cache = Cache(app)
 api = Api(app)
 
+
+
+@app.route('/sentences/')
+@app.route('/sentences/<string:chatid>/')
+@cache.cached(timeout=7200, query_string=True)
+def view(chatid = "000000"):
+  return render_template('download.html',
+    sentences=utils.get_sentences_from_chatbot(chatid))
+
 nstext = api.namespace('chatbot_text', 'Accumulators Chatbot Text APIs')
 
 parserinsult = reqparse.RequestParser()
@@ -971,14 +980,6 @@ class DownloadSentencesDb(Resource):
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       return make_response(str(e), 500)
-
-@nsdatabase.route('/download/html/sentences/')
-@nsdatabase.route('/download/html/sentences/<string:chatid>/')
-class DownloadSentencesDbHtml(Resource):
-  @cache.cached(timeout=7200, query_string=True)
-  def get(self, chatid = "000000"):
-    return render_template('download.html',
-                           sentences=utils.get_sentences_from_chatbot(chatid))
 
 @nsdatabase.route('/delete/bytext/<string:text>/')
 @nsdatabase.route('/delete/bytext/<string:text>/<string:chatid>')
