@@ -41,7 +41,7 @@ application = ApplicationBuilder().token(TOKEN).build()
 
 def get_anythingllm_online_status():
     try:
-        r = requests.get(os.environ.get("ANYTHING_LLM_ENDPOINT"), timeout=1)
+        r = requests.get(os.environ.get("OLLAMA_BASE_PATH"), timeout=1)
         if (r.status_code == 200):
             return True
         else:
