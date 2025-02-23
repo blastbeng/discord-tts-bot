@@ -730,7 +730,7 @@ class PlayAudioLoop:
                         random_response = requests.get(random_url)
                         if (random_response.status_code == 200):
                             data = {
-                                    "message": urllib.parse.quote(random_response.text.rstrip()),
+                                    "message": random_response.text.rstrip(),
                                     "mode": "chat"
                                 }
                             headers = {
@@ -1611,7 +1611,7 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
             if voice is not None:
                 if currentguildid == '000000' and get_anythingllm_online_status():
                     data = {
-                            "message": urllib.parse.quote(text.rstrip()),
+                            "message": text.rstrip(),
                             "mode": "chat"
                         }
                     headers = {

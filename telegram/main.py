@@ -65,14 +65,44 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if(CHAT_ID == chatid):
             strid = "000000"
             message = update.message.text.strip()
-            if(message != ""    ):
-                url = API_URL + API_PATH_TEXT + "ask/" + urllib.parse.quote(message) + "/000000/it"
-
-                response = requests.get(url)
-                if (response.status_code == 200):
-                    await update.message.reply_text(response.text, disable_notification=True, protect_content=False)
+            if(message != ""):
+                if get_anythingllm_online_status():
+                    data = {
+                            "message": message.rstrip(),
+                            "mode": "chat"
+                        }
+                    headers = {
+                        'Authorization': 'Bearer ' + os.environ.get("ANYTHING_LLM_API_KEY")
+                    }
+                    connector = aiohttp.TCPConnector(force_close=True)
+                    anything_llm_url = os.environ.get("ANYTHING_LLM_ENDPOINT") + "/api/v1/workspace/" + os.environ.get("ANYTHING_LLM_WORKSPACE") + "/chat"
+                    async with aiohttp.ClientSession(connector=connector) as anything_llm_session:
+                        async with anything_llm_session.post(anything_llm_url, headers=headers, json=data) as anything_llm_response:
+                            if (anything_llm_response.status == 200):
+                                anything_llm_json = await anything_llm_response.json()
+                                anything_llm_text = anything_llm_json["textResponse"].rstrip()
+                                await update.message.reply_text(anything_llm_text, disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                            else:
+                                await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+                        await anything_llm_session.close()  
+                    
+                    
+                    url = API_URL + API_PATH_TEXT + "repeat/learn/" + urllib.parse.quote(message.rstrip()) + "/" + strid + "/it"
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(url) as response:
+                            if (response.status == 200):
+                                logging.info("ask - " + urllib.parse.quote(message.rstrip()) + " - saved!")
+                            else:
+                                logging.error("ask - " + urllib.parse.quote(message.rstrip()) + " - error saving!")
+                        await session.close() 
                 else:
-                    await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, protect_content=False)
+                    url = API_URL + API_PATH_TEXT + "ask/" + urllib.parse.quote(message) + "/000000/it"
+
+                    response = requests.get(url)
+                    if (response.status_code == 200):
+                        await update.message.reply_text(response.text, disable_notification=True, protect_content=False)
+                    else:
+                        await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, protect_content=False)
                 
             else:
                 await update.message.reply_text("se vuoi dirmi o chiedermi qualcosa devi scrivere una frase dopo /ask (massimo 500 caratteri)", disable_notification=True, protect_content=False)
@@ -82,6 +112,8 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
       await update.message.reply_text("Errore!", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
+
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
 async def random_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -116,7 +148,7 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
                 if get_anythingllm_online_status():
                     data = {
-                            "message": urllib.parse.quote(message.rstrip()),
+                            "message": message.rstrip(),
                             "mode": "chat"
                         }
                     headers = {
@@ -301,31 +333,12 @@ async def callback_auto_message(context):
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    try:
-        chatid = str(update.effective_chat.id)
-        if(CHAT_ID == chatid):
-            strid = "000000"
-            message = update.message.text.strip()
-            if(message != ""    ):
-                url = API_URL + API_PATH_TEXT + "ask/" + urllib.parse.quote(message) + "/000000/it"
-
-                response = requests.get(url)
-                if (response.status_code == 200):
-                    await update.message.reply_text(response.text, disable_notification=True, protect_content=False)
-                else:
-                    await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, protect_content=False)
-                
-            else:
-                await update.message.reply_text("se vuoi dirmi o chiedermi qualcosa devi scrivere una frase dopo /ask (massimo 500 caratteri)", disable_notification=True, protect_content=False)
-
 
     except Exception as e:
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
       logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
 
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
 
 def remove_job_if_exists(name: str, context: ContextTypes.DEFAULT_TYPE) -> bool:
