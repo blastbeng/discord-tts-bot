@@ -68,18 +68,18 @@ def get_api_url():
 def get_voiceclone_api_url():
     return os.environ.get("API_VOICECLONE_URL")
 
-def get_anythingllm_online_status():
+def get_online_status(url_path):
     try:
-        r = requests.get(os.environ.get("OLLAMA_BASE_PATH"), timeout=1)
+        r = requests.get(url_path, timeout=1)
         if (r.status_code == 200):
             return True
         else:
             return False
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-        logging.info("AnythingLLM Host Offline.")
+        logging.info(url_path + ": Host Offline.")
         return False
     except requests.exceptions.HTTPError:
-        logging.info("AnythingLLM Host Error 4xx or 5xx.")
+        logging.info(url_path + ": Host Error 4xx or 5xx.")
         return False
     else:
         return True
@@ -725,7 +725,7 @@ class PlayAudioLoop:
             if channelfound is not None and channeluserfound is not None:
                 await connect_bot_by_voice_client(voice_client, channelfound, None)
                 if voice_client and hasattr(voice_client, 'play') and voice_client.is_connected() and not voice_client.is_playing():
-                    if currentguildid == '000000' and get_anythingllm_online_status() and bool(randompy.getrandbits(1)):
+                    if currentguildid == '000000' and get_online_status(os.environ.get("OLLAMA_BASE_PATH")) and get_online_status(os.environ.get("ANYTHING_LLM_ENDPOINT")) and bool(randompy.getrandbits(1)):
                         random_url = get_api_url()+os.environ.get("API_PATH_TEXT")+"random/" + currentguildid + "/"
                         random_response = requests.get(random_url)
                         if (random_response.status_code == 200):
@@ -1609,7 +1609,7 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
                 voice = await listvoices_api(language=lang_to_use, filter=voice)
 
             if voice is not None:
-                if currentguildid == '000000' and get_anythingllm_online_status():
+                if currentguildid == '000000' and get_online_status(os.environ.get("OLLAMA_BASE_PATH")) and get_online_status(os.environ.get("ANYTHING_LLM_ENDPOINT")):
                     data = {
                             "message": text.rstrip(),
                             "mode": "chat"

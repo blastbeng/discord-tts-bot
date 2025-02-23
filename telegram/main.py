@@ -39,18 +39,18 @@ logging.basicConfig(
 
 application = ApplicationBuilder().token(TOKEN).build()
 
-def get_anythingllm_online_status():
+def get_online_status(url_path):
     try:
-        r = requests.get(os.environ.get("OLLAMA_BASE_PATH"), timeout=1)
+        r = requests.get(url_path, timeout=1)
         if (r.status_code == 200):
             return True
         else:
             return False
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-        logging.info("AnythingLLM Host Offline.")
+        logging.info(url_path + ": Host Offline.")
         return False
     except requests.exceptions.HTTPError:
-        logging.info("AnythingLLM Host Error 4xx or 5xx.")
+        logging.info(url_path + ": Host Error 4xx or 5xx.")
         return False
     else:
         return True
@@ -66,7 +66,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             strid = "000000"
             message = update.message.text.strip()
             if(message != ""):
-                if get_anythingllm_online_status():
+                if get_online_status(os.environ.get("OLLAMA_BASE_PATH")) and get_online_status(os.environ.get("ANYTHING_LLM_ENDPOINT")):
                     data = {
                             "message": message.rstrip(),
                             "mode": "chat"
@@ -146,7 +146,7 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
             strid = "000000"
             message = update.message.text[5:].strip()
             if(message != "" and len(message) <= 500  and not message.endswith('bot')):
-                if get_anythingllm_online_status():
+                if get_online_status(os.environ.get("OLLAMA_BASE_PATH")) and get_online_status(os.environ.get("ANYTHING_LLM_ENDPOINT")):
                     data = {
                             "message": message.rstrip(),
                             "mode": "chat"
