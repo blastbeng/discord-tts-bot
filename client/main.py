@@ -852,7 +852,7 @@ class PlayAudioWorker:
                         voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info(logmessage))
                         #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
                         if previous_message is not None:
-                            text = "_" previous_message + "_\n\n" + text
+                            text = "_" + previous_message + "_\n\n" + text
                         await self.interaction.followup.edit_message(message_id=self.message.id,content=text, view = view)
                     
                     elif response.status == 204:
@@ -1803,7 +1803,7 @@ async def random(interaction: discord.Interaction, voice: str = "random", text: 
 
 
 @client.tree.command()
-@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
+@app_commands.checks.cooldown(1, 30.0, key=lambda i: (i.user.id))
 async def ai(interaction: discord.Interaction):
     """Ask AI a random sentence"""
     is_deferred=True
@@ -1812,7 +1812,6 @@ async def ai(interaction: discord.Interaction):
         check_permissions(interaction)
         currentguildid = get_current_guild_id(interaction.guild.id)
         if currentguildid == '000000' and get_online_status(os.environ.get("OLLAMA_BASE_PATH")) and get_online_status(os.environ.get("ANYTHING_LLM_ENDPOINT")):
-            await interaction.response.defer(thinking=True, ephemeral=True)
             check_permissions(interaction)
             
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
