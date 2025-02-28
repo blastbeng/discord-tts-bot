@@ -603,8 +603,10 @@ def save_mp3(mp3, name):
 
 def get_fakeyou_tts(text, voice_to_use):
   try:
-    #fy.login(os.environ.get("blastbeng"),os.environ.get("Ox6chuo5iu1lungo"))
     global fy
+    global fylogin
+    if fylogin is None: 
+      fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
     wav = fy.say(text.strip(), voice_to_use)
     return wav
   except:
@@ -690,6 +692,9 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
         #  fy.session.proxies.update(proxies)
         #fy.login(os.environ.get("blastbeng"),os.environ.get("Ox6chuo5iu1lungo"))
         global fy
+        global fylogin
+        if fylogin is None: 
+          fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
         wav = fy.say(text.strip(), voice_to_use)
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
@@ -741,6 +746,9 @@ def list_fakeyou_voices(lang:str):
     try:
       #fy.login(os.environ.get("blastbeng"),os.environ.get("Ox6chuo5iu1lungo"))
       global fy
+      global fylogin
+      if fylogin is None: 
+        fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
       voices=fy.list_voices(size=0)
     except Exception as e:
       pass
@@ -836,12 +844,19 @@ def get_random_from_bot(chatid: str, text: str):
     raise Exception(e)
     
 
-def populate_audiodb_unlimited(limit: int, chatid: str, lang: str):  
+def populate_audiodb_unlimited(limit: int, chatid: str, lang: str): 
+  global fylogin
+  if fylogin is None: 
+    fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
   populate_audiodb_internal(limit, chatid, lang)
   delete_tts(limit=limit)
 
 def populate_audiodb_limited(limit: int, chatid: str, lang: str):  
   try:
+    global fy
+    global fylogin
+    if fylogin is None: 
+      fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
     populate_audiodb(limit, chatid, lang)
   except TimeExceededException as et:
     logging.debug("populate_audiodb - ENDED POPULATION\n         REACHED UP MAX EXECUTION TIME\n         CHATID: %s\n         LIMIT: %s", chatid, str(limit))
@@ -1177,7 +1192,6 @@ def login_google():
 
 def delete_tts(limit=100):
   try:
-    #fy.login(os.environ.get("blastbeng"),os.environ.get("Ox6chuo5iu1lungo"))
     global fylogin
     if fylogin is not None:
       user = fy.get_user(login.username,limit=limit)
