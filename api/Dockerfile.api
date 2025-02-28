@@ -55,11 +55,7 @@ RUN pip3 install wheel
 RUN pip3 install --default-timeout=900 -r requirements.txt
 
 RUN spacy download en_core_web_sm
-RUN spacy download fr_core_news_sm
-RUN spacy download de_core_news_sm
-RUN spacy download it_core_news_sm
-RUN spacy download pt_core_news_sm
-RUN spacy download es_core_news_sm
+RUN spacy download it_core_news_smx
 
 WORKDIR /app
 
@@ -76,7 +72,7 @@ COPY exceptions.py .
 COPY custom_mongo_adapter.py .
 COPY subito_wrapper.py .
 COPY config.py .
-ADD fakeyou /app/fakeyou
+#ADD fakeyou /app/fakeyou
 ADD templates /app/templates
 COPY entrypoint.sh .
 COPY uwsgi.ini .

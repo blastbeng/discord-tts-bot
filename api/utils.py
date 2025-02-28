@@ -64,8 +64,6 @@ TMP_DIR = os.environ.get("TMP_DIR")
 TRANSLATOR_PROVIDER = os.environ.get("TRANSLATOR_PROVIDER")
 TRANSLATOR_BASEURL = os.environ.get("TRANSLATOR_BASEURL")
 MYMEMORY_TRANSLATOR_EMAIL = os.environ.get("MYMEMORY_TRANSLATOR_EMAIL")
-FAKEYOU_USER = os.environ.get("FAKEYOU_USER")
-FAKEYOU_PASS = os.environ.get("FAKEYOU_PASS")
 
 logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
@@ -76,18 +74,20 @@ log.setLevel(int(os.environ.get("LOG_LEVEL")))
 
 
 
-fy=fakeyou.FakeYou()
-
 polly = client('polly', aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), 
                         aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"), 
                         region_name='eu-central-1')
 
-#try:
-#  fy.login(FAKEYOU_USER,FAKEYOU_PASS)
-#except Exception as e:
-#  exc_type, exc_obj, exc_tb = sys.exc_info()
-#  fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-#  logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno)
+fy=fakeyou.FakeYou()
+fylogin = None
+try:
+  fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
+  logging.info("Lgged in as user %s %s %s", fylogin.username)
+except Exception as e:
+  exc_type, exc_obj, exc_tb = sys.exc_info()
+  fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+  logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno)
+  logging.error("Initializing FakeYou FAILED! Login Error.")
 
 fake = Faker()
 
@@ -603,7 +603,8 @@ def save_mp3(mp3, name):
 
 def get_fakeyou_tts(text, voice_to_use):
   try:
-    fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+    #fy.login(os.environ.get("blastbeng"),os.environ.get("Ox6chuo5iu1lungo"))
+    global fy
     wav = fy.say(text.strip(), voice_to_use)
     return wav
   except:
@@ -687,7 +688,8 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
         #else:
         #  proxies = {}
         #  fy.session.proxies.update(proxies)
-        fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+        #fy.login(os.environ.get("blastbeng"),os.environ.get("Ox6chuo5iu1lungo"))
+        global fy
         wav = fy.say(text.strip(), voice_to_use)
         if wav is not None:
           sound = AudioSegment.from_wav(BytesIO(bytes(wav.content)))
@@ -737,7 +739,8 @@ def list_fakeyou_voices(lang:str):
     
     voices = None
     try:
-      fy.login(FAKEYOU_USER,FAKEYOU_PASS)
+      #fy.login(os.environ.get("blastbeng"),os.environ.get("Ox6chuo5iu1lungo"))
+      global fy
       voices=fy.list_voices(size=0)
     except Exception as e:
       pass
@@ -1174,14 +1177,16 @@ def login_google():
 
 def delete_tts(limit=100):
   try:
-    fy.login(FAKEYOU_USER,FAKEYOU_PASS)
-    user = fy.get_user(FAKEYOU_USER,limit=limit)
-    if user is not None and user.ttsResults is not None and user.ttsResults.json is not None:
-      for tokenJson in user.ttsResults.json:
-        token = tokenJson['tts_result_token']
-        result = fy.delete_tts_result(token)
-        if result:
-          logging.info("delete_tts - DELETED: %s", token)
+    #fy.login(os.environ.get("blastbeng"),os.environ.get("Ox6chuo5iu1lungo"))
+    global fylogin
+    if fylogin is not None:
+      user = fy.get_user(login.username,limit=limit)
+      if user is not None and user.ttsResults is not None and user.ttsResults.json is not None:
+        for tokenJson in user.ttsResults.json:
+          token = tokenJson['tts_result_token']
+          result = fy.delete_tts_result(token)
+          if result:
+            logging.info("delete_tts - DELETED: %s", token)
   except Exception as e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]

@@ -457,11 +457,7 @@ def get_languages_menu():
 
     options = []    
     options.append(app_commands.Choice(name="English",      value="en"))
-    options.append(app_commands.Choice(name="French",       value="fr"))
-    options.append(app_commands.Choice(name="German",       value="de"))
     options.append(app_commands.Choice(name="Italian",      value="it"))
-    options.append(app_commands.Choice(name="Portuguese",   value="pt"))
-    options.append(app_commands.Choice(name="Spanish",      value="es"))
 
     return options
 
@@ -750,8 +746,9 @@ class PlayAudioLoop:
                                                     content = await response.content.read()
                                                     text = response.headers["X-Generated-Text"]
                                                     message = 'play_audio_loop - random - ' + text
-                                                    voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info(message))
-                                                    #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
+                                                    if voice_client and hasattr(voice_client, 'play') and voice_client.is_connected() and not voice_client.is_playing():
+                                                        voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info(message))
+                                                        #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
                                             await session.close()  
                                 await anything_llm_session.close()  
                     else:
@@ -815,6 +812,7 @@ class PlayAudioWorker:
         self.ephermeal = ephermeal
         self.show_save = show_save
         self.message = message
+        self.previous_message = previous_message
 
     @tasks.loop(seconds=0.1, count=1)
     async def play_audio_worker(self):
@@ -851,8 +849,8 @@ class PlayAudioWorker:
                         logmessage = 'play_audio_worker - ' + text
                         voice_client.play(FFmpegPCMAudioBytesIO(content, pipe=True), after=lambda e: logging.info(logmessage))
                         #voice_client.source = discord.PCMVolumeTransformer(voice_client.source, volume=float(os.environ.get("BOT_VOLUME")))
-                        if previous_message is not None:
-                            text = "_" + previous_message + "_\n\n" + text
+                        if self.previous_message is not None:
+                            text = "_" + self.previous_message + "_\n\n" + text
                         await self.interaction.followup.edit_message(message_id=self.message.id,content=text, view = view)
                     
                     elif response.status == 204:
@@ -1257,22 +1255,16 @@ async def on_voice_state_update(member, before, after):
                 perms = after.channel.permissions_for(after.channel.guild.me)
                 if (perms.administrator or perms.speak):
                     await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
-                    if voice_client is not None:
-                        if voice_client.is_connected():
-                            if voice_client.is_playing():
-                                voice_client.stop()
-                            login_audios = get_login_audios()
-                            url_audio = login_audios[str(member.id)] if login_audios is not None and str(member.id) in login_audios else "https://www.myinstants.com/media/sounds/buongiorno-salvini.mp3"
-                            await direct_play(voice_client, url_audio)
+                    if voice_client is not None and voice_client.is_connected() and not voice_client.is_playing():
+                        login_audios = get_login_audios()
+                        url_audio = login_audios[str(member.id)] if login_audios is not None and str(member.id) in login_audios else "https://www.myinstants.com/media/sounds/buongiorno-salvini.mp3"
+                        await direct_play(voice_client, url_audio)
             elif before.channel is None and after.channel is not None:
                 voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
                 perms = after.channel.permissions_for(after.channel.guild.me)
                 if (perms.administrator or perms.speak):
                     await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
-                    if voice_client is not None:
-                        if voice_client.is_connected():
-                            if voice_client.is_playing():
-                                voice_client.stop()
+                    if voice_client is not None and voice_client.is_connected() and not voice_client.is_playing():
                             login_audios = get_login_audios()
                             url_audio = login_audios[str(member.id)] if login_audios is not None and str(member.id) in login_audios else "https://www.myinstants.com/media/sounds/buongiorno-salvini.mp3"
                             await direct_play(voice_client, url_audio)
@@ -1281,13 +1273,10 @@ async def on_voice_state_update(member, before, after):
                 perms = before.channel.permissions_for(before.channel.guild.me)
                 if (perms.administrator or perms.speak):
                     await connect_bot_by_voice_client(voice_client, before.channel, None, member=member)
-                    if voice_client is not None:
-                        if voice_client.is_connected():
-                            if voice_client.is_playing():
-                                voice_client.stop()
-                            logout_audios = get_logout_audios()
-                            url_audio = logout_audios[str(member.id)] if logout_audios is not None and str(member.id) in logout_audios else "https://www.myinstants.com/media/sounds/buonasera-salvini.mp3"
-                            await direct_play(voice_client, url_audio)
+                    if voice_client is not None and voice_client.is_connected() and not voice_client.is_playing():
+                        logout_audios = get_logout_audios()
+                        url_audio = logout_audios[str(member.id)] if logout_audios is not None and str(member.id) in logout_audios else "https://www.myinstants.com/media/sounds/buonasera-salvini.mp3"
+                        await direct_play(voice_client, url_audio)
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -1622,15 +1611,6 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
                                 worker = PlayAudioWorker(url, interaction, message, previous_message = text.rstrip())
                                 worker.play_audio_worker.start()
                         await anything_llm_session.close()
-                    
-                    url = get_api_url() + os.environ.get("API_PATH_TEXT") + "repeat/learn/" + urllib.parse.quote(text.rstrip()) + "/" + currentguildid + "/" + utils.get_guild_language(currentguildid)
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(url) as response:
-                            if (response.status == 200):
-                                logging.info("ask - " + urllib.parse.quote(text.rstrip()) + " - saved!")
-                            else:
-                                logging.error("ask - " + urllib.parse.quote(text.rstrip()) + " - error saving!")
-                        await session.close()  
                 else:
                     url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"ask/user/"+urllib.parse.quote(str(text))+"/"+urllib.parse.quote(str(interaction.user.name))+"/1/" + urllib.parse.quote(voice) + "/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid)) + "/"
                     
@@ -1812,7 +1792,6 @@ async def ai(interaction: discord.Interaction):
         check_permissions(interaction)
         currentguildid = get_current_guild_id(interaction.guild.id)
         if currentguildid == '000000' and get_online_status(os.environ.get("OLLAMA_BASE_PATH")) and get_online_status(os.environ.get("ANYTHING_LLM_ENDPOINT")):
-            check_permissions(interaction)
             
             voice_client = get_voice_client_by_guildid(client.voice_clients, interaction.guild.id)
             await connect_bot_by_voice_client(voice_client, interaction.user.voice.channel, interaction.guild)
@@ -1821,42 +1800,37 @@ async def ai(interaction: discord.Interaction):
                 await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later, I'm initializing the voice connection..."), ephemeral = True)
             elif voice_client:
                 
-                currentguildid = get_current_guild_id(interaction.guild.id)                
-
-                if voice != "random":
-                    voice = await listvoices_api(language=utils.get_guild_language(currentguildid), filter=voice)
-
-                if voice is not None:
+                currentguildid = get_current_guild_id(interaction.guild.id)
                 
-                    random_url = get_api_url()+os.environ.get("API_PATH_TEXT")+"random/" + currentguildid + "/"
-                    random_response = requests.get(random_url)
-                    if (random_response.status_code == 200):
-                        data = {
-                                "message": random_response.text.rstrip(),
-                                "mode": "chat"
-                            }
-                        headers = {
-                            'Authorization': 'Bearer ' + os.environ.get("ANYTHING_LLM_API_KEY")
+                random_url = get_api_url()+os.environ.get("API_PATH_TEXT")+"random/" + currentguildid + "/"
+                random_response = requests.get(random_url)
+                message:discord.Message = await interaction.followup.send(random_response.text.rstrip(), ephemeral = True)
+                if (random_response.status_code == 200):
+                    data = {
+                            "message": random_response.text.rstrip(),
+                            "mode": "chat"
                         }
-                        connector = aiohttp.TCPConnector(force_close=True)
-                        anything_llm_url = os.environ.get("ANYTHING_LLM_ENDPOINT") + "/api/v1/workspace/" + os.environ.get("ANYTHING_LLM_WORKSPACE") + "/chat"
-                        async with aiohttp.ClientSession(connector=connector) as anything_llm_session:
-                            async with anything_llm_session.post(anything_llm_url, headers=headers, json=data) as anything_llm_response:
-                                if (anything_llm_response.status == 200):
-                                    anything_llm_json = await anything_llm_response.json()
-                                    anything_llm_text = anything_llm_json["textResponse"].partition('\n')[0].lstrip('\"').rstrip('\"').rstrip()
-                                    url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(anything_llm_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))   
-                                    
-                                message:discord.Message = await interaction.followup.send(anything_llm_text, ephemeral = True)
+                    headers = {
+                        'Authorization': 'Bearer ' + os.environ.get("ANYTHING_LLM_API_KEY")
+                    }
+                    connector = aiohttp.TCPConnector(force_close=True)
+                    anything_llm_url = os.environ.get("ANYTHING_LLM_ENDPOINT") + "/api/v1/workspace/" + os.environ.get("ANYTHING_LLM_WORKSPACE") + "/chat"
+                    async with aiohttp.ClientSession(connector=connector) as anything_llm_session:
+                        async with anything_llm_session.post(anything_llm_url, headers=headers, json=data) as anything_llm_response:
+                            if (anything_llm_response.status == 200):
+                                anything_llm_json = await anything_llm_response.json()
+                                anything_llm_text = anything_llm_json["textResponse"].partition('\n')[0].lstrip('\"').rstrip('\"').rstrip()
+                                url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(anything_llm_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))   
                                 
-                                worker = PlayAudioWorker(url, interaction, message, previous_message = random_response.text.rstrip())
-                                worker.play_audio_worker.start()
-                                await anything_llm_session.close()
+                            
+                            worker = PlayAudioWorker(url, interaction, message, previous_message = random_response.text.rstrip())
+                            worker.play_audio_worker.start()
+                            await anything_llm_session.close()
                 else:
                     await interaction.followup.send("Discord API Error, " + await utils.translate(get_current_guild_id(interaction.guild.id),"please try again later"), ephemeral = True)
             else:
                 await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
-        elif currentguildid == '000000' and (not get_online_status(os.environ.get("OLLAMA_BASE_PATH")) or get_online_status(os.environ.get("ANYTHING_LLM_ENDPOINT"))):
+        elif currentguildid == '000000' and (not get_online_status(os.environ.get("OLLAMA_BASE_PATH")) or not get_online_status(os.environ.get("ANYTHING_LLM_ENDPOINT"))):
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The IA is currently offline, it may be that Blast's PC is off."), ephemeral = True)
         else:
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"This is a private command and can only be used by members with specific permissions on the main Bot Server"), ephemeral = True)

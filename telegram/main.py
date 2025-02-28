@@ -85,16 +85,6 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             else:
                                 await update.message.reply_text("si è verificato un errore stronzo", disable_notification=True, reply_to_message_id=update.message.message_id, protect_content=False)
                         await anything_llm_session.close()  
-                    
-                    
-                    url = API_URL + API_PATH_TEXT + "repeat/learn/" + urllib.parse.quote(message.rstrip()) + "/" + strid + "/it"
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(url) as response:
-                            if (response.status == 200):
-                                logging.info("ask - " + urllib.parse.quote(message.rstrip()) + " - saved!")
-                            else:
-                                logging.error("ask - " + urllib.parse.quote(message.rstrip()) + " - error saving!")
-                        await session.close() 
                 else:
                     url = API_URL + API_PATH_TEXT + "ask/" + urllib.parse.quote(message) + "/000000/it"
 
