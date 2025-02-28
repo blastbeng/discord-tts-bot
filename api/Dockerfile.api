@@ -55,7 +55,7 @@ RUN pip3 install wheel
 RUN pip3 install --default-timeout=900 -r requirements.txt
 
 RUN spacy download en_core_web_sm
-RUN spacy download it_core_news_smx
+RUN spacy download it_core_news_sm
 
 WORKDIR /app
 
