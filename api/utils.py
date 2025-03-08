@@ -6,11 +6,12 @@ import json
 import requests
 import sys
 import threading
+import traceback
 import os
 import urllib
 import pymongo
 import yt_dlp
-from functools import lru_cache
+#from functools import lru_cache
 import string
 import fakeyou
 import time
@@ -82,7 +83,7 @@ fy=fakeyou.FakeYou()
 fylogin = None
 try:
   fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
-  logging.info("Lgged in as user %s %s %s", fylogin.username)
+  logging.info("Lgged in as user %s ", fylogin.username)
 except Exception as e:
   exc_type, exc_obj, exc_tb = sys.exc_info()
   fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -141,30 +142,30 @@ def function_runner(*args, **kwargs):
     send_end.send(result)
 
 
-@parametrized
-def run_with_timer(func, max_execution_time):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        recv_end, send_end = multiprocessing.Pipe(False)
-        kwargs["__send_end"] = send_end
-        kwargs["__function"] = func
-        
-        ## PART 2
-        p = multiprocessing.Process(target=function_runner, args=args, kwargs=kwargs)
-        p.start()
-        p.join(max_execution_time)
-        if p.is_alive():
-            p.terminate()
-            p.join()
-            raise TimeExceededException("Exceeded Execution Time")
-        result = recv_end.recv()
-
-        if isinstance(result, Exception):
-            raise result
-
-        return result
-
-    return wrapper
+#@parametrized
+#def run_with_timer(func, max_execution_time):
+#    @wraps(func)
+#    def wrapper(*args, **kwargs):
+#        recv_end, send_end = multiprocessing.Pipe(False)
+#        kwargs["__send_end"] = send_end
+#        kwargs["__function"] = func
+#        
+#        ## PART 2
+#        p = multiprocessing.Process(target=function_runner, args=args, kwargs=kwargs)
+#        p.start()
+#        p.join(max_execution_time)
+#        if p.is_alive():
+#            p.terminate()
+#            p.join()
+#            raise TimeExceededException("Exceeded Execution Time")
+#        result = recv_end.recv()
+#
+#        if isinstance(result, Exception):
+#            raise result
+#
+#        return result
+#
+#    return wrapper
 
 
 def wiki_summary(testo: str, lang: str):
@@ -672,7 +673,7 @@ def thread_save_fakeyou(text: str, sound, voice_to_use, chatid="000000", languag
   sound.export(filesave, format='mp3', bitrate="256k")
   audiodb.insert_or_update(text.strip(), chatid, filesave, voice_to_use, language, duration=duration, user=user)
 
-@run_with_timer(max_execution_time=300)
+#@run_with_timer(max_execution_time=300)
 def populate_tts(text: str, chatid="000000", voice=None, israndom=False, language="it"):
   try:  
     if voice is None or voice == "null" or voice == "random":
@@ -728,7 +729,7 @@ def get_random_voice(lang="it"):
   title, token = random.choice(list(localvoices.items()))
   return token
 
-@lru_cache(maxsize=128)
+#@lru_cache(maxsize=128)
 def list_fakeyou_voices(lang:str):
   foundvoices = None
   try:
@@ -804,7 +805,7 @@ def list_fakeyou_voices(lang:str):
     exc_type, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno, exc_info=1)
-    list_fakeyou_voices.cache_clear()
+    #list_fakeyou_voices.cache_clear()
     raise Exception(e)
 
 def get_random_from_bot(chatid: str, text: str):
@@ -863,7 +864,7 @@ def populate_audiodb_limited(limit: int, chatid: str, lang: str):
   finally:
     delete_tts(limit=limit)
 
-@run_with_timer(max_execution_time=600)
+#@run_with_timer(max_execution_time=600)
 def populate_audiodb(limit: int, chatid: str, lang: str):  
   populate_audiodb_internal(limit, chatid, lang)
 
@@ -943,8 +944,7 @@ def process_population(limit, chatid, lang, listvoices):
         audiodb.increment_counter(sentence, chatid, voice, language, int(os.environ.get("COUNTER_LIMIT")))
       else:
         audiodb.insert(sentence, chatid, None, voice, language, is_correct=1)
-      inserted="Failed (" + str(e) + ")"
-      logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: %s", chatid, voice, key, sentence, inserted)
+      logging.error("populate_audiodb - ERROR ELAB\n         CHATID: %s\n         VOICE: %s (%s)\n         SENTENCE: %s\n         RESULT: Failed\n         EXCEPTION: %s", chatid, voice, key, sentence, traceback.format_exc())
       counter_skipped_failed = counter_skipped_failed + 1
       time.sleep(randint(5,120))
 
@@ -1194,7 +1194,7 @@ def delete_tts(limit=100):
   try:
     global fylogin
     if fylogin is not None:
-      user = fy.get_user(login.username,limit=limit)
+      user = fy.get_user(fylogin.username,limit=limit)
       if user is not None and user.ttsResults is not None and user.ttsResults.json is not None:
         for tokenJson in user.ttsResults.json:
           token = tokenJson['tts_result_token']
