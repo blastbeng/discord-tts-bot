@@ -79,16 +79,17 @@ polly = client('polly', aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
                         aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"), 
                         region_name='eu-central-1')
 
-fy=fakeyou.FakeYou()
 fylogin = None
-try:
-  fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
-  logging.info("Lgged in as user %s ", fylogin.username)
-except Exception as e:
-  exc_type, exc_obj, exc_tb = sys.exc_info()
-  fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-  logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno)
-  logging.error("Initializing FakeYou FAILED! Login Error.")
+fy=fakeyou.FakeYou()
+if os.environ.get("FAKEYOU_ENABLED") == "1":
+  try:
+    fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
+    logging.info("Lgged in as user %s ", fylogin.username)
+  except Exception as e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    logging.error("%s %s %s", exc_type, fname, exc_tb.tb_lineno)
+    logging.error("Initializing FakeYou FAILED! Login Error.")
 
 fake = Faker()
 
@@ -606,7 +607,7 @@ def get_fakeyou_tts(text, voice_to_use):
   try:
     global fy
     global fylogin
-    if fylogin is None: 
+    if fylogin is None and os.environ.get("FAKEYOU_ENABLED") == "1": 
       fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
     wav = fy.say(text.strip(), voice_to_use)
     return wav
@@ -623,7 +624,7 @@ def get_tts(text: str, chatid="000000", voice=None, israndom=False, language="it
       datafy = audiodb.select_by_name_chatid_voice_language(text.strip(), chatid, voice_to_use, language)
       if datafy is not None:
         return datafy
-      elif call_fy:
+      elif call_fy and os.environ.get("FAKEYOU_ENABLED") == "1":
         wav = None
         wav = get_fakeyou_tts(text.strip(), voice_to_use)
         if wav is None:
@@ -694,7 +695,7 @@ def populate_tts(text: str, chatid="000000", voice=None, israndom=False, languag
         #fy.login(os.environ.get("blastbeng"),os.environ.get("Ox6chuo5iu1lungo"))
         global fy
         global fylogin
-        if fylogin is None: 
+        if fylogin is None and os.environ.get("FAKEYOU_ENABLED") == "1": 
           fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
         wav = fy.say(text.strip(), voice_to_use)
         if wav is not None:
@@ -748,7 +749,7 @@ def list_fakeyou_voices(lang:str):
       #fy.login(os.environ.get("blastbeng"),os.environ.get("Ox6chuo5iu1lungo"))
       global fy
       global fylogin
-      if fylogin is None: 
+      if fylogin is None and os.environ.get("FAKEYOU_ENABLED") == "1": 
         fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
       voices=fy.list_voices(size=0)
     except Exception as e:
@@ -781,7 +782,7 @@ def list_fakeyou_voices(lang:str):
 
       
       foundvoices["google"] = "google"
-      foundvoices["Giorgio"] = "aws"
+      #foundvoices["Giorgio"] = "aws"
       
       with open(file_path, "w") as write_file:
         json_string = json.dumps(foundvoices, ensure_ascii=False, indent=4).encode('utf-8').decode('utf-8')
@@ -798,7 +799,7 @@ def list_fakeyou_voices(lang:str):
       
       foundvoices = {}
       foundvoices["google"] = "google"
-      foundvoices["Giorgio"] = "aws"
+      #foundvoices["Giorgio"] = "aws"
 
     return foundvoices
   except Exception as e:
@@ -847,7 +848,7 @@ def get_random_from_bot(chatid: str, text: str):
 
 def populate_audiodb_unlimited(limit: int, chatid: str, lang: str): 
   global fylogin
-  if fylogin is None: 
+  if fylogin is None and os.environ.get("FAKEYOU_ENABLED") == "1": 
     fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
   populate_audiodb_internal(limit, chatid, lang)
   delete_tts(limit=limit)
@@ -856,7 +857,7 @@ def populate_audiodb_limited(limit: int, chatid: str, lang: str):
   try:
     global fy
     global fylogin
-    if fylogin is None: 
+    if fylogin is None and os.environ.get("FAKEYOU_ENABLED") == "1": 
       fylogin = fy.login(os.environ.get("FAKEYOU_USER"),os.environ.get("FAKEYOU_PASS"))
     populate_audiodb(limit, chatid, lang)
   except TimeExceededException as et:

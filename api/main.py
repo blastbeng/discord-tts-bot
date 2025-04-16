@@ -486,7 +486,12 @@ class AudioRandomClass(Resource):
         response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
         return response
       if tts_out is None:
-        return make_response("TTS Generation Error!", 500)
+        tts_out = utils.get_tts(text_response, chatid=chatid, voice="google", language=lang, user=None)
+        if tts_out is None:
+          return make_response("TTS Generation Error!", 500)
+        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
+        return response
     except Exception as e:
       return make_response(g.get('request_error'), 500)
 
@@ -528,7 +533,12 @@ class AudioRandomTmsClass(Resource):
         response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
         return response
       if tts_out is None:
-        return make_response("TTS Generation Error!", 500)
+        tts_out = utils.get_tts(text_response, chatid=chatid, voice="google", language=lang, user=None)
+        if tts_out is None:
+          return make_response("TTS Generation Error!", 500)
+        response = send_file(tts_out, attachment_filename='audio.mp3', mimetype='audio/mpeg')
+        response.headers['X-Generated-Text'] = text_response.encode('utf-8').decode('latin-1')
+        return response
     except Exception as e:
       return make_response(g.get('request_error'), 500)
       

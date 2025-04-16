@@ -46,11 +46,11 @@ def reset_play_audio_loop():
             loops_dict[guild.id] = PlayAudioLoop(guild.id)
             loops_dict[guild.id].play_audio_loop.stop()
             loops_dict[guild.id].play_audio_loop.cancel()
-            time.sleep(5)
-            loops_dict[guild.id].play_audio_loop.start()
-        elif not loops_dict[guild.id].play_audio_loop.is_running():
-            loops_dict[guild.id].play_audio_loop.start()
-        time.sleep(5)
+        #    time.sleep(5)
+            #loops_dict[guild.id].play_audio_loop.start()
+        #elif not loops_dict[guild.id].play_audio_loop.is_running():
+        #    loops_dict[guild.id].play_audio_loop.start()
+        #time.sleep(5)
         loops_dict[guild.id].play_audio_loop.change_interval(seconds=300)
         logging.info("Resetting play_audio_loop for guild id: " + str(guild.id))
 
@@ -774,7 +774,7 @@ class PlayAudioLoop:
                                 async with anything_llm_session.post(anything_llm_url, headers=headers, json=data) as anything_llm_response:
                                     if (anything_llm_response.status == 200):
                                         anything_llm_json = await anything_llm_response.json()
-                                        anything_llm_text = anything_llm_json["textResponse"].partition('\n')[0].lstrip('\"').rstrip('\"').rstrip()
+                                        anything_llm_text = anything_llm_json["textResponse"].partition('\n')[0].replace('"','').replace('\n', ' ').replace('\r', '').lstrip('\"').rstrip('\"').rstrip()
                                         url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(anything_llm_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))   
                                         async with aiohttp.ClientSession(connector=connector) as session:
                                             async with session.get(url) as response:
@@ -999,14 +999,14 @@ class PopulatorLoop:
     def __init__(self, guildid):  
         self.guildid = guildid
 
-    @tasks.loop(minutes=int(240))
+    @tasks.loop(minutes=int(30))
     async def populator_loop(self):
         try:
             currentguildid = get_current_guild_id(str(self.guildid))
             
             connector = aiohttp.TCPConnector(force_close=True)
             async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(get_api_url()+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/4/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/0" + "/") as response:
+                async with session.get(get_api_url()+os.environ.get("API_PATH_DATABASE")+"/audiodb/populate/1/" + currentguildid + "/" + utils.get_guild_language(currentguildid) + "/0" + "/") as response:
                     if (response.status == 200):
                         logging.info("populator_loop - " + str(response.text))
                     else:
@@ -1211,7 +1211,7 @@ async def on_guild_available(guild):
         
         if guild.id not in loops_dict:
             loops_dict[guild.id] = PlayAudioLoop(guild.id)
-            loops_dict[guild.id].play_audio_loop.start() 
+            #loops_dict[guild.id].play_audio_loop.start() 
 
         if guild.id not in kick_loops_dict:
             kick_loops_dict[guild.id] = KickMutedDeafenLoop(guild.id)
@@ -1283,28 +1283,18 @@ async def on_voice_state_update(member, before, after):
             perms = after.channel.permissions_for(after.channel.guild.me)
         elif before is not None and before.channel is not None:
             perms = before.channel.permissions_for(before.channel.guild.me)
-        if perms is not None and (perms.administrator or perms.speak):
-            if before is not None and before.channel is not None and after is not None and before.channel.id != after.channel.id:
+        voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
+        if voice_client is not None and voice_client.is_connected() and not voice_client.is_playing() and perms is not None and (perms.administrator or perms.speak):
+            if before is None or before.channel is None or (before is not None and before.channel != voice_client.channel):
                 #await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
-                voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
-                if voice_client is not None and voice_client.is_connected() and not voice_client.is_playing():
-                    login_audios = get_login_audios()
-                    url_audio = login_audios[str(member.id)] if login_audios is not None and str(member.id) in login_audios else "https://www.myinstants.com/media/sounds/buongiorno-salvini.mp3"
-                    await direct_play(voice_client, url_audio)
-            elif (before is None or before.channel is None) and after is not None and after.channel is not None:
-                #await connect_bot_by_voice_client(voice_client, after.channel, None, member=member)
-                voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
-                if voice_client is not None and voice_client.is_connected() and not voice_client.is_playing():
-                        login_audios = get_login_audios()
-                        url_audio = login_audios[str(member.id)] if login_audios is not None and str(member.id) in login_audios else "https://www.myinstants.com/media/sounds/buongiorno-salvini.mp3"
-                        await direct_play(voice_client, url_audio)
-            elif after is not None and after.channel is None and before is not None and before.channel is not None:
+                login_audios = get_login_audios()
+                url_audio = login_audios[str(member.id)] if login_audios is not None and str(member.id) in login_audios else "https://www.myinstants.com/media/sounds/buongiorno-salvini.mp3"
+                await direct_play(voice_client, url_audio)
+            elif after is None or after.channel is None or (after is not None and after.channel != voice_client.channel):
                 #await connect_bot_by_voice_client(voice_client, before.channel, None, member=member)
-                voice_client = get_voice_client_by_guildid(client.voice_clients, member.guild.id)
-                if voice_client is not None and voice_client.is_connected() and not voice_client.is_playing():
-                    logout_audios = get_logout_audios()
-                    url_audio = logout_audios[str(member.id)] if logout_audios is not None and str(member.id) in logout_audios else "https://www.myinstants.com/media/sounds/buonasera-salvini.mp3"
-                    await direct_play(voice_client, url_audio)
+                logout_audios = get_logout_audios()
+                url_audio = logout_audios[str(member.id)] if logout_audios is not None and str(member.id) in logout_audios else "https://www.myinstants.com/media/sounds/buonasera-salvini.mp3"
+                await direct_play(voice_client, url_audio)
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -1634,7 +1624,7 @@ async def ask(interaction: discord.Interaction, text: str, voice: str = "google"
                             if (anything_llm_response.status == 200):
                                 anything_llm_json = await anything_llm_response.json()
                                 #anything_llm_text = anything_llm_json["textResponse"].partition('\n')[0].lstrip('\"').rstrip('\"').rstrip()
-                                anything_llm_text = anything_llm_json["textResponse"]
+                                anything_llm_text = anything_llm_json["textResponse"].replace('"','').replace('\n', ' ').replace('\r', '').rstrip()
                                 url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(anything_llm_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))   
                                 
                                 worker = PlayAudioWorker(url, interaction, message, previous_message = text.rstrip())
@@ -1849,7 +1839,7 @@ async def ai(interaction: discord.Interaction):
                             if (anything_llm_response.status == 200):
                                 anything_llm_json = await anything_llm_response.json()
                                 #anything_llm_text = anything_llm_json["textResponse"].partition('\n')[0].lstrip('\"').rstrip('\"').rstrip()
-                                anything_llm_text = anything_llm_json["textResponse"]
+                                anything_llm_text = anything_llm_json["textResponse"].replace('"','').replace('\n', ' ').replace('\r', '').rstrip()
                                 url = get_api_url()+os.environ.get("API_PATH_AUDIO")+"repeat/"+urllib.parse.quote(str(anything_llm_text))+"/google/"+urllib.parse.quote(currentguildid)+ "/" + urllib.parse.quote(utils.get_guild_language(currentguildid))   
                                 
                             
@@ -2226,7 +2216,7 @@ async def translate(interaction: discord.Interaction, text: str, language_to: ap
 
 @client.tree.command()
 @app_commands.rename(url='url')
-@app_commands.describe(url="Youtube link (Must match https://www.youtube.com/watch?v=1abcd2efghi)")
+@app_commands.describe(url="Youtube link")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def youtube(interaction: discord.Interaction, url: str):
     """Play a youtube link"""
@@ -2243,13 +2233,14 @@ async def youtube(interaction: discord.Interaction, url: str):
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later, I'm initializing the voice connection..."), ephemeral = True)
         elif voice_client:
 
-            if "watch?v=" in url:
+            r = requests.get(url)
+            if "Video unavailable" in r.text:
+                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"Video unavailable"), ephemeral = True)
+            else:
                 currentguildid = get_current_guild_id(interaction.guild.id)
 
                 urlapi = get_api_url()+os.environ.get("API_PATH_MUSIC")+"youtube/get/"+(url.split("watch?v=",1)[1])+"/"+urllib.parse.quote(currentguildid)
                 await do_play(urlapi, interaction, currentguildid, ephermeal = False)
-            else:
-                await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"URL must match something like https://www.youtube.com/watch?v=1abcd2efghi"), ephemeral = True)
         else:
             await interaction.followup.send(await utils.translate(get_current_guild_id(interaction.guild.id),"The bot is not ready yet or another user is already using another command.") +"\n" + await utils.translate(get_current_guild_id(interaction.guild.id),"Please try again later or use stop command"), ephemeral = True)
            
@@ -2298,7 +2289,7 @@ async def disable(interaction: discord.Interaction):
 
 @client.tree.command()
 @app_commands.rename(seconds='seconds')
-@app_commands.describe(seconds="Timeout seconds (Min 60 - Max 1200)")
+@app_commands.describe(seconds="Timeout seconds (Min 120 - Max 1200)")
 @app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.user.id))
 async def timer(interaction: discord.Interaction, seconds: int):
     """Change the timer for the auto talking feature."""
@@ -2307,8 +2298,8 @@ async def timer(interaction: discord.Interaction, seconds: int):
         await interaction.response.defer(thinking=True, ephemeral=True)
         check_permissions(interaction)
         currentguildid = get_current_guild_id(interaction.guild.id)
-        if seconds < 60 or seconds > 1200:
-            await interaction.followup.send(await utils.translate(currentguildid,"Seconds must be greater than 60 and lower than 1200"), ephemeral = True)
+        if seconds < 120 or seconds > 1200:
+            await interaction.followup.send(await utils.translate(currentguildid,"Seconds must be greater than 120 and lower than 1200"), ephemeral = True)
         else:
             loops_dict[interaction.guild.id].play_audio_loop.change_interval(seconds=seconds)
             logging.info("timer - play_audio_loop.change_interval(seconds="+str(seconds)+")")
@@ -2708,6 +2699,7 @@ async def reset(interaction: discord.Interaction):
     except Exception as e:
         await send_error(e, interaction, from_generic=False, is_deferred=is_deferred)
 
+@ai.error
 @admin.error
 @accept.error
 @audio.error
