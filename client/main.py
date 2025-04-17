@@ -476,7 +476,7 @@ async def rps_autocomplete_nofakeyou(interaction: discord.Interaction, current: 
     currentguildid=get_current_guild_id(interaction.guild.id)
     choices = {}
     choices ["google"] = "google"
-    choices ["Giorgio"] = "aws"
+    #choices ["Giorgio"] = "aws"
     choices = [app_commands.Choice(name=choice, value=choice) for choice in choices if current.lower() in choice.lower()][:25]
     return choices
 
@@ -1449,7 +1449,8 @@ async def speak(interaction: discord.Interaction, text: str, voice: str = "rando
             if voice != "random":
                 voice = await listvoices_api(language=lang_to_use, filter=voice)
             else:
-                voice = randompy.choice(['google', 'aws'])
+                #voice = randompy.choice(['google', 'aws'])
+                voice = randompy.choice(['google'])
 
             if voice is not None:
                 #if is_voiceclone_voice(voice):
